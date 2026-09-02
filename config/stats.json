@@ -1,0 +1,29 @@
+{
+  "_comment_physics": "Cấu hình tần số tính toán của Server và kích thước/tốc độ di chuyển vật thể",
+  "_comment_tick_rate": "server_tick_rate: Số lần Server tính toán va chạm và cập nhật tọa độ trong 1 giây (30 Hz)",
+  "_comment_tank_speed": "tank_speed: Tốc độ di chuyển cơ bản của xe tăng (pixel mỗi nhịp tick)",
+  "_comment_bullet_speed": "bullet_speed: Tốc độ bay của viên đạn (pixel mỗi nhịp tick)",
+  "_comment_nitro": "nitro_speed_multiplier: Hệ số nhân tốc độ khi ăn bình khí Nitro (tăng gấp đôi)",
+  "_comment_sizes": "tank_size: Kích thước xe (36x36), bullet_size: Đường kính đạn (8px), tile_size: Kích thước ô bản đồ (40x40)",
+  
+  "physics": {
+    "server_tick_rate": 30,
+    "tank_speed": 4.0,
+    "bullet_speed": 9.0,
+    "nitro_speed_multiplier": 2.0,
+    "tank_size": 36,
+    "bullet_size": 8,
+    "tile_size": 40
+  },
+
+  "_comment_damage": "Cấu hình sát thương của từng loại đạn và độ bền của tường",
+  "_comment_normal_bullet": "normal_bullet: Sát thương đạn thường (trừ 1 máu)",
+  "_comment_rocket_bullet": "rocket_bullet: Sát thương đạn tên lửa (trừ 3 máu -> tiêu diệt xe ngay lập tức)",
+  "_comment_brick_wall": "brick_wall_max_hits: Số lần đạn thường bắn trúng để phá hủy hoàn toàn 1 ô tường gạch",
+
+  "damage": {
+    "normal_bullet": 1,
+    "rocket_bullet": 3,
+    "brick_wall_max_hits": 3
+  }
+}

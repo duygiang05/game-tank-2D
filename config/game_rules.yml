@@ -1,0 +1,27 @@
+# ==============================================================================
+# CẤU HÌNH LUẬT CHƠI VÀ VÒNG ĐỜI TRẬN ĐẤU (GAME RULES & LIFECYCLE)
+# ==============================================================================
+game:
+  # Cấu hình chỉ số gốc của xe tăng
+  tank:
+    max_hp: 3                  # Lượng máu tối đa của mỗi xe tăng (3 máu)
+    fire_cooldown_ms: 1000     # Thời gian giãn cách giữa 2 lần bắn (1000ms = 1 giây/viên, chống spam đạn)
+    ghost_duration_s: 5        # Thời gian làm mờ/bất tử ngay sau khi hồi sinh (5 giây an toàn)
+
+  # Danh sách các mốc thời gian trận đấu mà Chủ phòng có thể lựa chọn (tính bằng giây)
+  match_durations:
+    - 45                       # Trận đấu nhanh: 45 giây
+    - 60                       # Trận đấu tiêu chuẩn: 60 giây
+    - 90                       # Trận đấu kéo dài: 90 giây
+
+  # Thời gian chờ hồi sinh tương ứng với từng mốc thời gian trận đấu (tính bằng giây)
+  respawn_times:
+    match_45s: 3               # Trận 45s -> Chết phải chờ 3s mới hồi sinh
+    match_60s: 5               # Trận 60s -> Chết phải chờ 5s mới hồi sinh
+    match_90s: 7               # Trận 90s -> Chết phải chờ 7s mới hồi sinh
+
+  # Cấu hình hệ thống vật phẩm bổ trợ (Power-up Buffs)
+  power_up:
+    spawn_interval_s: 7        # Chu kỳ tự động sinh ngẫu nhiên 1 vật phẩm trên map (7 giây/lần)
+    shield_duration_s: 5       # Thời gian duy trì lớp Khiên chắn đạn thường (5 giây)
+    nitro_duration_s: 5        # Thời gian duy trì hiệu ứng Bình tăng tốc chạy/xoay (5 giây)
