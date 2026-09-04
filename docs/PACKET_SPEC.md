@@ -67,9 +67,9 @@ Mọi dữ liệu gửi qua `NetworkUtil` tuân theo cấu trúc 2 phần:
 
 | Packet Type | Chiều | Ghi chú | Payload (`data`) mẫu |
 |---|---|---|---|
-| `PLAYER_INPUT` | Client → Server | Gửi ngay khi phím W/A/S/D hoặc chuột thay đổi. `move` ∈ {`UP`,`DOWN`,`LEFT`,`RIGHT`,`NONE`} | `{"move":"UP","turretAngle":45.5}` |
-| `PLAYER_SHOOT_REQ` | Client → Server | Gửi lệnh bắn đạn | `{"turretAngle":45.5}` |
-| `GAME_SNAPSHOT` | Server → Client | Broadcast định kỳ, tickrate 30–60 FPS | `{"tick":1450,"tanks":[{"id":101,"x":150.5,"y":200.0,"bodyAngle":0.0,"turretAngle":45.5,"hp":3,"isAlive":true}],"bullets":[{"id":1,"ownerId":101,"x":175.0,"y":215.0,"vx":7.07,"vy":7.07}]}` |
+| `PLAYER_INPUT` | Client → Server | Gửi trạng thái phím điều khiển (tiến/lùi và bẻ lái trái/phải). `move` ∈ {`FORWARD`,`BACKWARD`,`NONE`}, `rotate` ∈ {`LEFT`,`RIGHT`,`NONE`}| `{"move":"FORWARD","rotate":"LEFT"}` |
+| `PLAYER_SHOOT_REQ` | Client → Server | Lệnh bắn đạn (đạn tự bay theo góc angle hiện tại của xe) | `{}` |
+| `GAME_SNAPSHOT` | Server → Client | Broadcast định kỳ, tickrate 30–60 FPS | `{"tick":1450,"tanks":[{"id":101,"x":150.5,"y":200.0,"angle":45.5,"hp":3,"isAlive":true}],"bullets":[{"id":1,"ownerId":101,"x":175.0,"y":215.0,"vx":7.07,"vy":7.07}]}` |
 | `GAME_EVENT_EFFECT` | Server → Client | Hiệu ứng va chạm/nổ | `{"eventType":"EXPLOSION","x":175.0,"y":215.0,"targetTankId":102}` |
 | `GAME_OVER_NOTIFY` | Server → Client | Kết thúc ván đấu | `{"winnerId":101,"winnerName":"player1","scoreGained":100}` |
 
