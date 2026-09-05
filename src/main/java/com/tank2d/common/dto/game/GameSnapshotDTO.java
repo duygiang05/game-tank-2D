@@ -18,4 +18,8 @@ public class GameSnapshotDTO {
         this.tanks = tanks;
         this.bullets = bullets;
     }
+    
+    public long getTick() { return tick; }
+    public List<TankSnapshotDTO> getTanks() { return tanks; }
+    public List<BulletSnapshotDTO> getBullets() { return bullets; }
 }

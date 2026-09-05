@@ -24,4 +24,11 @@ public class BulletSnapshotDTO {
         this.vx = vx;
         this.vy = vy;
     }
+    
+    public int getId() { return id; }
+    public int getOwnerId() { return ownerId; }
+    public double getX() { return x; }
+    public double getY() { return y; }
+    public double getVx() { return vx; }
+    public double getVy() { return vy; }
 }

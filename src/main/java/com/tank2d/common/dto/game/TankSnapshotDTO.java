@@ -24,4 +24,11 @@ public class TankSnapshotDTO {
         this.hp = hp;
         this.isAlive = isAlive;
     }
+    
+    public int getId() { return id; }
+    public double getX() { return x; }
+    public double getY() { return y; }
+    public double getAngle() { return angle; }
+    public int getHp() { return hp; }
+    public boolean isAlive() { return isAlive; }
 }
