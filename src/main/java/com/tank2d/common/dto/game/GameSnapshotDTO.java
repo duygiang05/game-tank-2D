@@ -8,12 +8,12 @@ import java.util.List;
  *
  * @author Admin
  */
-public class GameSnapshot {
+public class GameSnapshotDTO {
     private long tick;
     private List<TankSnapshotDTO> tanks;
     private List<BulletSnapshotDTO> bullets;
 
-    public GameSnapshot(long tick, List<TankSnapshotDTO> tanks, List<BulletSnapshotDTO> bullets) {
+    public GameSnapshotDTO(long tick, List<TankSnapshotDTO> tanks, List<BulletSnapshotDTO> bullets) {
         this.tick = tick;
         this.tanks = tanks;
         this.bullets = bullets;

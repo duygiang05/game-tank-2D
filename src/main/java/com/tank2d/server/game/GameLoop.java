@@ -5,7 +5,7 @@ import com.tank2d.server.model.BulletEntity;
 import com.tank2d.server.physics.TankMovementProcessor;
 import com.tank2d.common.dto.game.TankSnapshotDTO;
 import com.tank2d.common.dto.game.BulletSnapshotDTO;
-import com.tank2d.common.dto.game.GameSnapshot;
+import com.tank2d.common.dto.game.GameSnapshotDTO;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -79,7 +79,7 @@ public class GameLoop implements Runnable {
     public Map<Integer, TankEntity> getTanks() { return tanks; }
     public long getTickCount() { return tickCount; }
 
-    public GameSnapshot buildSnapshot() {
+    public GameSnapshotDTO buildSnapshot() {
         List<TankSnapshotDTO> tankDTOs = new ArrayList<>();
         for (TankEntity tank : tanks.values()) {
             tankDTOs.add(new TankSnapshotDTO(
@@ -96,7 +96,7 @@ public class GameLoop implements Runnable {
             ));
         }
 
-        return new GameSnapshot(tickCount, tankDTOs, bulletDTOs);
+        return new GameSnapshotDTO(tickCount, tankDTOs, bulletDTOs);
     }
 
     public static void main(String[] args) throws InterruptedException {
@@ -113,7 +113,7 @@ public class GameLoop implements Runnable {
             Thread.sleep(33);
         }
 
-        GameSnapshot snapshot = loop.buildSnapshot();
+        GameSnapshotDTO snapshot = loop.buildSnapshot();
         String json = new com.google.gson.Gson().toJson(snapshot);
         System.out.println("\n=== GAME_SNAPSHOT mẫu gửi cho Tùng ===");
         System.out.println(json);
