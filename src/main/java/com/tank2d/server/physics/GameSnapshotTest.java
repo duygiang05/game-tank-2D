@@ -4,8 +4,10 @@
  */
 package com.tank2d.server.physics;
 
+import com.tank2d.server.game.GameLoop;
+import com.tank2d.server.model.TankEntity;
 import com.google.gson.Gson;
-import com.tank2d.common.model.GameSnapshot;
+import com.tank2d.common.dto.game.GameSnapshot;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
 /**
