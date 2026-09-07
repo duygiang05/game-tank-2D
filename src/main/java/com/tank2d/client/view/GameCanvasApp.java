@@ -2,7 +2,7 @@ package com.tank2d.client.view;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import com.tank2d.common.model.TankDTO;
+import com.tank2d.common.dto.game.TankSnapshotDTO;
 
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
@@ -18,24 +18,25 @@ import java.util.List;
 
 public class GameCanvasApp extends Application {
 
-    // Khởi tạo kích thước Canvas cố định 800x600
     private static final int CANVAS_WIDTH = 800;
     private static final int CANVAS_HEIGHT = 600;
+    
+    // Kích thước xe tăng mặc định theo quy định dự án
+    public static final double TANK_SIZE = 36.0;
 
     private Canvas canvas;
     private GraphicsContext gc;
     private final Gson gson = new Gson();
 
-    // Biến đo đạc chỉ số FPS
     private long lastFpsCheck = System.nanoTime();
     private int frameCounter = 0;
     private int currentFps = 0;
 
-    // Chuỗi Mock JSON mô phỏng dữ liệu GAME_SNAPSHOT từ Hoàng
+    // Chuỗi Mock JSON cập nhật theo đúng kiểu dữ liệu TankSnapshotDTO (id là int, có hp và isAlive)
     private final String mockJsonData = "["
-            + "{\"id\":\"tank_1\",\"x\":200.0,\"y\":150.0,\"angle\":45.0},"
-            + "{\"id\":\"tank_2\",\"x\":500.0,\"y\":350.0,\"angle\":180.0},"
-            + "{\"id\":\"tank_3\",\"x\":650.0,\"y\":100.0,\"angle\":270.0}"
+            + "{\"id\":1,\"x\":200.0,\"y\":150.0,\"angle\":45.0,\"hp\":100,\"isAlive\":true},"
+            + "{\"id\":2,\"x\":500.0,\"y\":350.0,\"angle\":180.0,\"hp\":50,\"isAlive\":true},"
+            + "{\"id\":3,\"x\":650.0,\"y\":100.0,\"angle\":270.0,\"hp\":0,\"isAlive\":false}"
             + "]";
 
     @Override
@@ -58,66 +59,66 @@ public class GameCanvasApp extends Application {
         new AnimationTimer() {
             @Override
             public void handle(long now) {
-                // Tính toán FPS
                 updateFpsCounter(now);
 
-                // 1. Clear nền màu đen chuẩn 800x600
+                // 1. Clear màn hình
                 gc.setFill(Color.BLACK);
                 gc.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-                // 2. Bóc tách chuỗi Mock JSON
-                Type listType = new TypeToken<List<TankDTO>>() {}.getType();
-                List<TankDTO> tanks = gson.fromJson(mockJsonData, listType);
+                // 2. Parse dữ liệu snapshot bằng TankSnapshotDTO
+                Type listType = new TypeToken<List<TankSnapshotDTO>>() {}.getType();
+                List<TankSnapshotDTO> tanks = gson.fromJson(mockJsonData, listType);
 
-                // 3. Render danh sách xe tăng
+                // 3. Render các xe tăng còn sống
                 if (tanks != null) {
-                    for (TankDTO tank : tanks) {
-                        drawTank(tank);
+                    for (TankSnapshotDTO tank : tanks) {
+                        if (tank.isAlive()) {
+                            drawTank(tank);
+                        }
                     }
                 }
 
-                // 4. Hiển thị FPS ở góc màn hình
+                // 4. Hiển thị thông số FPS
                 renderFpsInfo();
             }
         }.start();
     }
 
     /**
-     * Quy trình vẽ xe tăng dùng GraphicsContext theo đúng yêu cầu:
-     * gc.save() -> gc.translate(x, y) -> gc.rotate(angle) -> draw -> gc.restore()
+     * Vẽ xe tăng sử dụng TankSnapshotDTO theo đúng quy tắc save/restore và căn giữa tâm
      */
-    private void drawTank(TankDTO tank) {
-    gc.save();
+    private void drawTank(TankSnapshotDTO tank) {
+        gc.save();
 
-    gc.translate(tank.getX(), tank.getY());
-    gc.rotate(tank.getAngle());
+        // Dịch chuyển gốc tọa độ về tâm xe và xoay góc
+        gc.translate(tank.getX(), tank.getY());
+        gc.rotate(tank.getAngle());
 
-    double tankSize = tank.getSize();
-    double halfSize = tankSize / 2.0;
+        double halfSize = TANK_SIZE / 2.0;
 
-    // 1. Thân xe (Kích thước tankSize x tankSize)
-    gc.setFill(Color.FORESTGREEN);
-    gc.fillRect(-halfSize, -halfSize, tankSize, tankSize);
+        // 1. Vẽ Thân xe
+        gc.setFill(Color.FORESTGREEN);
+        gc.fillRect(-halfSize, -halfSize, TANK_SIZE, TANK_SIZE);
 
-    // 2. Xích xe (Tự động co giãn theo tankSize)
-    double treadWidth = tankSize * 0.14; // Bề rộng xích
-    gc.setFill(Color.DARKSLATEGRAY);
-    gc.fillRect(-halfSize - treadWidth, -halfSize, treadWidth, tankSize); // Xích trái
-    gc.fillRect(halfSize, -halfSize, treadWidth, tankSize);               // Xích phải
+        // 2. Vẽ Xích xe 2 bên
+        double treadWidth = TANK_SIZE * 0.14;
+        gc.setFill(Color.DARKSLATEGRAY);
+        gc.fillRect(-halfSize - treadWidth, -halfSize, treadWidth, TANK_SIZE);
+        gc.fillRect(halfSize, -halfSize, treadWidth, TANK_SIZE);
 
-    // 3. Nòng súng
-    double cannonWidth = tankSize * 0.16;
-    double cannonLength = tankSize * 0.55;
-    gc.setFill(Color.ORANGE);
-    gc.fillRect(-cannonWidth / 2, -halfSize - cannonLength + (tankSize * 0.2), cannonWidth, cannonLength);
+        // 3. Vẽ Nòng súng
+        double cannonWidth = TANK_SIZE * 0.16;
+        double cannonLength = TANK_SIZE * 0.55;
+        gc.setFill(Color.ORANGE);
+        gc.fillRect(-cannonWidth / 2, -halfSize - cannonLength + (TANK_SIZE * 0.2), cannonWidth, cannonLength);
 
-    // 4. Tháp pháo
-    double turretSize = tankSize * 0.5;
-    gc.setFill(Color.LIMEGREEN);
-    gc.fillOval(-turretSize / 2, -turretSize / 2, turretSize, turretSize);
+        // 4. Vẽ Tháp pháo tròn
+        double turretSize = TANK_SIZE * 0.5;
+        gc.setFill(Color.LIMEGREEN);
+        gc.fillOval(-turretSize / 2, -turretSize / 2, turretSize, turretSize);
 
-    gc.restore();
-}
+        gc.restore();
+    }
 
     private void updateFpsCounter(long now) {
         frameCounter++;
