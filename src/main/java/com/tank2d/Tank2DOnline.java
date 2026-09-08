@@ -1,16 +1,27 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- */
-
 package com.tank2d;
 
-/**
- *
- * @author PC
- */
-public class Tank2DOnline {
+import javafx.application.Application;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Scene;
+import javafx.scene.Parent;
+import javafx.stage.Stage;
+
+public class Tank2DOnline extends Application {
+
+    @Override
+    public void start(Stage stage) throws Exception {
+        Parent root = FXMLLoader.load(
+            getClass().getResource("/com/tank2d/client/view/login.fxml")
+        );
+
+        Scene scene = new Scene(root);
+
+        stage.setTitle("Tank 2D Online");
+        stage.setScene(scene);
+        stage.show();
+    }
 
     public static void main(String[] args) {
-        System.out.println("Hello World!");
+        launch(args);
     }
 }
