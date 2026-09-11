@@ -1,0 +1,135 @@
+package com.tank2d.client.view;
+
+import com.google.gson.Gson;
+import com.tank2d.common.dto.game.GameSnapshotDTO;
+import com.tank2d.common.dto.game.TankSnapshotDTO;
+import com.tank2d.common.dto.game.BulletSnapshotDTO; 
+
+import javafx.animation.AnimationTimer;
+import javafx.application.Application;
+import javafx.scene.Scene;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
+import javafx.stage.Stage;
+
+public class GameCanvasApp extends Application {
+
+    private static final int CANVAS_WIDTH = 800;
+    private static final int CANVAS_HEIGHT = 600;
+    public static final double TANK_SIZE = 36.0;
+
+    private Canvas canvas;
+    private GraphicsContext gc;
+    private final Gson gson = new Gson();
+
+    private long lastFpsCheck = System.nanoTime();
+    private int frameCounter = 0;
+    private int currentFps = 0;
+
+    // Chuỗi Mock JSON cập nhật theo đúng gói tin GAME_SNAPSHOT mới (Gồm cả tanks và bullets)
+    private final String mockJsonData = "{"
+            + "\"tanks\":["
+            + "  {\"id\":1,\"x\":200.0,\"y\":150.0,\"angle\":0.0,\"hp\":100,\"isAlive\":true}," // angle 0 -> quay sang phải
+            + "  {\"id\":2,\"x\":500.0,\"y\":350.0,\"angle\":90.0,\"hp\":50,\"isAlive\":true}"  // angle 90 -> quay xuống dưới
+            + "],"
+            + "\"bullets\":[]" // Danh sách đạn (nếu có)
+            + "}";
+
+    @Override
+    public void start(Stage primaryStage) {
+        canvas = new Canvas(CANVAS_WIDTH, CANVAS_HEIGHT);
+        gc = canvas.getGraphicsContext2D();
+
+        StackPane root = new StackPane(canvas);
+        Scene scene = new Scene(root, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+        primaryStage.setTitle("Tank 2D - Canvas Render Engine (Tùng)");
+        primaryStage.setScene(scene);
+        primaryStage.setResizable(false);
+        primaryStage.show();
+
+        startRenderLoop();
+    }
+
+    private void startRenderLoop() {
+        new AnimationTimer() {
+            @Override
+            public void handle(long now) {
+                updateFpsCounter(now);
+
+                // 1. Clear màn hình
+                gc.setFill(Color.BLACK);
+                gc.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+                // 2. Parse gói tin GameSnapshotDTO tổng hợp
+                GameSnapshotDTO snapshot = gson.fromJson(mockJsonData, GameSnapshotDTO.class);
+
+                // 3. Render xe tăng từ snapshot
+                if (snapshot != null && snapshot.getTanks() != null) {
+                    for (TankSnapshotDTO tank : snapshot.getTanks()) {
+                        if (tank.isAlive()) {
+                            drawTank(tank);
+                        }
+                    }
+                }
+
+                // 4. Hiển thị FPS
+                renderFpsInfo();
+            }
+        }.start();
+    }
+
+    private void drawTank(TankSnapshotDTO tank) {
+        gc.save();
+
+        gc.translate(tank.getX(), tank.getY());
+        
+        // FIX LỖI 1: Cộng thêm 90 độ để lệch góc chuẩn theo quy ước 0 độ = sang phải của Hoàng
+        gc.rotate(tank.getAngle() + 90.0);
+
+        double halfSize = TANK_SIZE / 2.0;
+
+        // Thân xe
+        gc.setFill(Color.FORESTGREEN);
+        gc.fillRect(-halfSize, -halfSize, TANK_SIZE, TANK_SIZE);
+
+        // Xích xe
+        double treadWidth = TANK_SIZE * 0.14;
+        gc.setFill(Color.DARKSLATEGRAY);
+        gc.fillRect(-halfSize - treadWidth, -halfSize, treadWidth, TANK_SIZE);
+        gc.fillRect(halfSize, -halfSize, treadWidth, TANK_SIZE);
+
+        // Nòng súng (Mặc định thiết kế hướng lên phía trên -Y)
+        double cannonWidth = TANK_SIZE * 0.16;
+        double cannonLength = TANK_SIZE * 0.55;
+        gc.setFill(Color.ORANGE);
+        gc.fillRect(-cannonWidth / 2, -halfSize - cannonLength + (TANK_SIZE * 0.2), cannonWidth, cannonLength);
+
+        // Tháp pháo
+        double turretSize = TANK_SIZE * 0.5;
+        gc.setFill(Color.LIMEGREEN);
+        gc.fillOval(-turretSize / 2, -turretSize / 2, turretSize, turretSize);
+
+        gc.restore();
+    }
+
+    private void updateFpsCounter(long now) {
+        frameCounter++;
+        if (now - lastFpsCheck >= 1_000_000_000L) {
+            currentFps = frameCounter;
+            frameCounter = 0;
+            lastFpsCheck = now;
+        }
+    }
+
+    private void renderFpsInfo() {
+        gc.setFill(Color.YELLOW);
+        gc.fillText("FPS: " + currentFps, 12, 24);
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}
