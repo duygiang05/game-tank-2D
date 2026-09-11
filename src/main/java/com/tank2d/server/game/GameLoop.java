@@ -6,12 +6,22 @@ import com.tank2d.server.physics.TankMovementProcessor;
 import com.tank2d.common.dto.game.TankSnapshotDTO;
 import com.tank2d.common.dto.game.BulletSnapshotDTO;
 import com.tank2d.common.dto.game.GameSnapshotDTO;
-
+import java.util.concurrent.atomic.AtomicInteger;
+import com.tank2d.server.physics.BulletMovementProcessor;
+import com.tank2d.server.input.PlayerInputHandler;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import com.tank2d.server.physics.BulletMovementProcessor;
+import com.tank2d.server.physics.CollisionDetector;
+import com.tank2d.server.map.GameMap;
+import com.tank2d.server.game.event.CombatEvent;
+import com.tank2d.server.game.event.CombatEventListener;
+import com.tank2d.server.game.event.SnapshotListener;
+import com.tank2d.common.config.ConfigLoader;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class GameLoop implements Runnable {
 
@@ -24,17 +34,41 @@ public class GameLoop implements Runnable {
     private final int tickRate;
     private final double timePerTickNs;
     private long tickCount = 0L;
-
+    private final AtomicInteger bulletIdSeq = new AtomicInteger(1);
     public GameLoop(int serverTickRate) {
-        this.tickRate = serverTickRate;
+    this.tickRate = serverTickRate;
         this.timePerTickNs = 1_000_000_000.0 / this.tickRate;
+
+        var physics = ConfigLoader.getPhysicsStats();
+        this.tankSize = physics.has("tank_size") ? physics.get("tank_size").getAsInt() : 36;
+        this.bulletSize = physics.has("bullet_size") ? physics.get("bullet_size").getAsInt() : 8;
+
+        var damage = ConfigLoader.getDamageStats();
+        this.normalBulletDamage = damage.has("normal_bullet") ? damage.get("normal_bullet").getAsInt() : 1;
     }
 
     public void addTank(TankEntity tank) { tanks.put(tank.getId(), tank); }
     public TankEntity getTank(int id) { return tanks.get(id); }
     public void addBullet(BulletEntity bullet) { bullets.put(bullet.getId(), bullet); }
+    public Map<Integer, BulletEntity> getBullets() { return bullets; }
     public void stopLoop() { running.set(false); }
+    public BulletEntity spawnBullet(int ownerId, double x, double y, double vx, double vy) {
+        int newId = bulletIdSeq.getAndIncrement();
+        BulletEntity bullet = new BulletEntity(newId, ownerId, x, y, vx, vy);
+        bullets.put(newId, bullet);
+        return bullet;
+    }
+    private GameMap gameMap; // gán từ bên ngoài khi phòng chơi khởi tạo map
+    private CombatEventListener combatListener;
+    private SnapshotListener snapshotListener;
 
+    private final int tankSize;
+    private final int bulletSize;
+    private final int normalBulletDamage;
+
+    public void setGameMap(GameMap gameMap) { this.gameMap = gameMap; }
+    public void setCombatListener(CombatEventListener listener) { this.combatListener = listener; }
+    public void setSnapshotListener(SnapshotListener listener) { this.snapshotListener = listener; }
     @Override
     public void run() {
         running.set(true);
@@ -70,10 +104,49 @@ public class GameLoop implements Runnable {
 
     private void updatePhysics(double deltaTime) {
         tickCount++;
+
+        // 1. Lưu vị trí cũ để có thể revert khi va chạm tường/xe khác
+        Map<Integer, double[]> prevPositions = new HashMap<>();
+        for (TankEntity tank : tanks.values()) {
+            prevPositions.put(tank.getId(), new double[]{tank.getX(), tank.getY()});
+        }
+
+        // 2. Di chuyển xe theo input hiện tại
         for (TankEntity tank : tanks.values()) {
             TankMovementProcessor.update(tank, deltaTime);
         }
-        // Bullet movement/collision xử lý ở task riêng (AABB), chưa nằm trong 2 task hiện tại
+
+        // 3. Chặn xe đi xuyên tường / ra biên map
+        for (TankEntity tank : tanks.values()) {
+            double[] prev = prevPositions.get(tank.getId());
+            CollisionDetector.resolveTankMapCollision(tank, gameMap, prev[0], prev[1], tankSize);
+        }
+
+        // 4. Chặn xe đè lên xe khác
+        CollisionDetector.resolveTankTankCollision(tanks.values(), tankSize, prevPositions);
+
+        // 5. Di chuyển đạn
+        for (BulletEntity bullet : bullets.values()) {
+            BulletMovementProcessor.update(bullet, deltaTime);
+        }
+
+        // 6. Va chạm Đạn-Xe / Đạn-Tường, phát sự kiện cho Giang
+        List<CombatEvent> events = CollisionDetector.resolveBulletCollisions(
+                bullets.values(), tanks.values(), gameMap, bulletSize, tankSize, normalBulletDamage);
+
+        if (combatListener != null) {
+            for (CombatEvent e : events) {
+                combatListener.onCombatEvent(e); // "lập tức" - gọi ngay trong tick va chạm, không trì hoãn
+            }
+        }
+
+        // 7. Dọn đạn đã tiêu (trúng xe/tường/ra biên)
+        bullets.values().removeIf(b -> !b.isAlive());
+
+        // 8. Gửi snapshot định kỳ cho Giang broadcast
+        if (snapshotListener != null) {
+            snapshotListener.onSnapshotReady(buildSnapshot());
+        }
     }
 
     public Map<Integer, TankEntity> getTanks() { return tanks; }
@@ -84,7 +157,7 @@ public class GameLoop implements Runnable {
         for (TankEntity tank : tanks.values()) {
             tankDTOs.add(new TankSnapshotDTO(
                     tank.getId(), tank.getX(), tank.getY(), tank.getAngle(),
-                    3, true // HP/trạng thái thật lấy từ combat system (Giang) khi có
+                    tank.getHp(), tank.isAlive() 
             ));
         }
 
@@ -97,25 +170,5 @@ public class GameLoop implements Runnable {
         }
 
         return new GameSnapshotDTO(tickCount, tankDTOs, bulletDTOs);
-    }
-
-    public static void main(String[] args) throws InterruptedException {
-        GameLoop loop = new GameLoop(30);
-        TankEntity tank = new TankEntity(1, 100, 100, 0, 4.0, 90.0);
-        tank.setMoveState(TankEntity.MoveState.FORWARD);
-        loop.addTank(tank);
-
-        for (int t = 1; t <= 60; t++) {
-            if (t == 30) tank.setRotateState(TankEntity.RotateState.LEFT);
-            loop.tick(1.0 / 30.0);
-            System.out.printf("Tick %d: x=%.2f, y=%.2f, angle=%.2f%n",
-                    t, tank.getX(), tank.getY(), tank.getAngle());
-            Thread.sleep(33);
-        }
-
-        GameSnapshotDTO snapshot = loop.buildSnapshot();
-        String json = new com.google.gson.Gson().toJson(snapshot);
-        System.out.println("\n=== GAME_SNAPSHOT mẫu gửi cho Tùng ===");
-        System.out.println(json);
     }
 }
