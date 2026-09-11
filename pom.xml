@@ -1,6 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.tank2d</groupId>
@@ -16,12 +17,14 @@
     </properties>
 
     <dependencies>
+
         <!-- JavaFX Controls & FXML -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
             <version>${javafx.version}</version>
         </dependency>
+
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
@@ -35,7 +38,7 @@
             <version>2.10.1</version>
         </dependency>
 
-        <!-- Environment Config (.env) -->
+        <!-- Environment Config -->
         <dependency>
             <groupId>io.github.cdimascio</groupId>
             <artifactId>dotenv-java</artifactId>
@@ -56,7 +59,7 @@
             <version>8.3.0</version>
         </dependency>
 
-        <!-- Database Connection Pool (HikariCP) -->
+        <!-- Database Connection Pool -->
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
@@ -69,10 +72,12 @@
             <artifactId>jbcrypt</artifactId>
             <version>0.4</version>
         </dependency>
+
     </dependencies>
 
     <build>
         <plugins>
+
             <!-- Compiler Plugin for Java 21 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -82,6 +87,18 @@
                     <release>21</release>
                 </configuration>
             </plugin>
+
+            <!-- JavaFX Maven Plugin -->
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <mainClass>com.tank2d.Tank2DOnline</mainClass>
+                </configuration>
+            </plugin>
+
         </plugins>
     </build>
+
 </project>

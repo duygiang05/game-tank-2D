@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+
+<VBox alignment="CENTER"
+      spacing="15.0"
+      prefHeight="400.0"
+      prefWidth="600.0"
+      xmlns="http://javafx.com/javafx/21"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.tank2d.client.controller.LoginController">
+
+    <children>
+
+        <!-- Login Form -->
+        <VBox fx:id="loginForm"
+              alignment="CENTER"
+              spacing="15.0">
+
+            <children>
+
+                <Label text="Tank 2D">
+                    <font>
+                        <Font size="24.0"/>
+                    </font>
+                </Label>
+
+                <Label text="Login">
+                    <font>
+                        <Font size="18.0"/>
+                    </font>
+                </Label>
+
+                <TextField fx:id="usernameField"
+                           prefWidth="300.0"
+                           promptText="Username"/>
+
+                <PasswordField fx:id="passwordField"
+                               prefWidth="300.0"
+                               promptText="Password"/>
+
+                <Button fx:id="loginButton"
+                        text="Login"
+                        prefWidth="120.0"
+                        prefHeight="35.0"
+                        onAction="#handleLogin"/>
+
+                <Button text="Register"
+                        prefWidth="120.0"
+                        prefHeight="35.0"
+                        onAction="#showRegister"/>
+
+            </children>
+
+        </VBox>
+
+        <!-- Register Form -->
+        <VBox fx:id="registerForm"
+              alignment="CENTER"
+              spacing="15.0"
+              visible="false"
+              managed="false">
+
+            <children>
+
+                <Label text="Tank 2D">
+                    <font>
+                        <Font size="24.0"/>
+                    </font>
+                </Label>
+
+                <Label text="Register">
+                    <font>
+                        <Font size="18.0"/>
+                    </font>
+                </Label>
+
+                <TextField fx:id="registerUsernameField"
+                           prefWidth="300.0"
+                           promptText="Username"/>
+
+                <PasswordField fx:id="registerPasswordField"
+                               prefWidth="300.0"
+                               promptText="Password"/>
+
+                <PasswordField fx:id="confirmPasswordField"
+                               prefWidth="300.0"
+                               promptText="Confirm Password"/>
+
+                <Button text="Register"
+                        prefWidth="120.0"
+                        prefHeight="35.0"
+                        onAction="#handleRegister"/>
+
+                <Button text="Login"
+                        prefWidth="120.0"
+                        prefHeight="35.0"
+                        onAction="#showLogin"/>
+
+            </children>
+
+        </VBox>
+
+    </children>
+
+</VBox>
