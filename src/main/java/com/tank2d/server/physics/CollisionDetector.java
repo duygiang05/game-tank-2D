@@ -69,13 +69,12 @@ public final class CollisionDetector {
             // 1. Đạn - Xe (kiểm tra trước, ưu tiên gây sát thương nếu trùng cả tường lẫn xe ở biên)
             TankEntity hitTank = findTankHitByBullet(bullet, tanks, bulletSize, tankSize);
             if (hitTank != null) {
-                hitTank.takeDamage(normalBulletDamage);
                 bullet.setAlive(false);
                 events.add(new CombatEvent(
                         bullet.getId(), bullet.getOwnerId(), hitTank.getId(),
                         normalBulletDamage, CombatEvent.EventType.BULLET_HIT_TANK
                 ));
-                continue; // đạn đã tiêu, không cần check tường nữa
+                continue;
             }
 
             // 2. Đạn - Tường (chỉ xét nếu chưa trúng xe)

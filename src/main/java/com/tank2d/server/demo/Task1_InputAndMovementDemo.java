@@ -6,10 +6,6 @@ import com.tank2d.server.input.PlayerInputHandler;
 import com.tank2d.server.model.BulletEntity;
 import com.tank2d.server.model.TankEntity;
 
-/**
- * DEMO NGHIỆM THU — TASK 1: Xử lý Input điều khiển & Di chuyển đạn.
- * Không cần map/collision — chỉ kiểm chứng đúng công thức di chuyển + bắn đạn.
- */
 public class Task1_InputAndMovementDemo {
 
     public static void main(String[] args) throws InterruptedException {
@@ -18,7 +14,7 @@ public class Task1_InputAndMovementDemo {
 
         double tankSpeed = ConfigLoader.getTankSpeedPerSecond();
         TankEntity tank = new TankEntity(1, 100, 100, 0, tankSpeed, 90.0);
-        tank.initHp(ConfigLoader.getMaxHp());
+        tank.setHp(ConfigLoader.getMaxHp());
         loop.addTank(tank);
 
         System.out.println("=== TIÊU CHÍ 1: Xe di chuyển & bẻ lái tự do (PLAYER_INPUT) ===");

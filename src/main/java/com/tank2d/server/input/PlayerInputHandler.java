@@ -1,8 +1,6 @@
 package com.tank2d.server.input;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.tank2d.common.config.ConfigLoader;
 import com.tank2d.common.dto.game.PlayerInputDTO;
 import com.tank2d.server.game.GameLoop;
 import com.tank2d.server.model.TankEntity;
@@ -23,23 +21,7 @@ public class PlayerInputHandler {
 
     public boolean handleShootRequest(GameLoop loop, TankEntity tank) {
         if (loop == null || tank == null) return false;
-
-        long cooldownMs = ConfigLoader.getFireCooldownMs();
-        long now = System.currentTimeMillis();
-
-        if (!tank.canShoot(cooldownMs, now)) {
-            return false; // đang khóa spam đạn
-        }
-
-        double bulletSpeed = ConfigLoader.getBulletSpeedPerSecond();
-
-        double radians = Math.toRadians(tank.getAngle());
-        double vx = bulletSpeed * Math.cos(radians);
-        double vy = bulletSpeed * Math.sin(radians);
-
-        loop.spawnBullet(tank.getId(), tank.getX(), tank.getY(), vx, vy);
-        tank.registerShot(now);
-        return true;
+        return loop.handleShootRequest(tank); // chỉ forward, KHÔNG tự tính toán gì cả
     }
 
     private TankEntity.MoveState parseMoveState(String raw) {
@@ -47,7 +29,7 @@ public class PlayerInputHandler {
         try {
             return TankEntity.MoveState.valueOf(raw);
         } catch (IllegalArgumentException e) {
-            return TankEntity.MoveState.NONE; // dữ liệu client gửi sai định dạng -> an toàn về NONE
+            return TankEntity.MoveState.NONE;
         }
     }
 

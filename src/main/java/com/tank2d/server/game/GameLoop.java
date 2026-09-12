@@ -6,9 +6,7 @@ import com.tank2d.server.physics.TankMovementProcessor;
 import com.tank2d.common.dto.game.TankSnapshotDTO;
 import com.tank2d.common.dto.game.BulletSnapshotDTO;
 import com.tank2d.common.dto.game.GameSnapshotDTO;
-import java.util.concurrent.atomic.AtomicInteger;
-import com.tank2d.server.physics.BulletMovementProcessor;
-import com.tank2d.server.input.PlayerInputHandler;
+import com.tank2d.server.physics.ShootingProcessor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -58,6 +56,13 @@ public class GameLoop implements Runnable {
         bullets.put(newId, bullet);
         return bullet;
     }
+    public boolean handleShootRequest(TankEntity tank) {
+        ShootingProcessor.ShotResult result = ShootingProcessor.tryShoot(tank, System.currentTimeMillis());
+        if (!result.success) return false;
+
+        spawnBullet(tank.getId(), tank.getX(), tank.getY(), result.vx, result.vy);
+        return true;
+    }
     private GameMap gameMap; // gán từ bên ngoài khi phòng chơi khởi tạo map
     private CombatEventListener combatListener;
     private SnapshotListener snapshotListener;
@@ -99,7 +104,6 @@ public class GameLoop implements Runnable {
         LOGGER.info("GameLoop stopped.");
     }
 
-    /** Dùng để test đơn lẻ (main test) thay vì chạy cả vòng lặp vô hạn của run(). */
     public void tick(double deltaTime) { updatePhysics(deltaTime); }
 
     private void updatePhysics(double deltaTime) {
