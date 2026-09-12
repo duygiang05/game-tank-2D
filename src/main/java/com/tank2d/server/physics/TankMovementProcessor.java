@@ -7,6 +7,7 @@ public final class TankMovementProcessor {
     private TankMovementProcessor() {} // utility class, không cần khởi tạo
 
     public static void update(TankEntity tank, double deltaTime) {
+        if (!tank.isAlive()) return;
         double angle = tank.getAngle();
 
         if (tank.getRotateState() == TankEntity.RotateState.LEFT) {
