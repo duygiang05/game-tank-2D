@@ -1,0 +1,44 @@
+.root {
+    -fx-background-color: #1e1e2f;
+    -fx-font-family: "Arial";
+}
+
+.label {
+    -fx-text-fill: white;
+}
+
+.button {
+    -fx-background-color: #3498db;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8px;
+    -fx-cursor: hand;
+}
+
+.button:hover {
+    -fx-background-color: #2980b9;
+}
+
+.list-view {
+    -fx-background-color: #2b2b40;
+    -fx-border-color: #555577;
+    -fx-border-radius: 8px;
+}
+
+.list-cell {
+    -fx-background-color: #2b2b40;
+    -fx-text-fill: white;
+    -fx-font-size: 15px;
+    -fx-padding: 12px;
+}
+
+.list-cell:selected {
+    -fx-background-color: #3498db;
+    -fx-text-fill: white;
+}
+
+#statusLabel {
+    -fx-text-fill: #cccccc;
+    -fx-font-size: 14px;
+}
