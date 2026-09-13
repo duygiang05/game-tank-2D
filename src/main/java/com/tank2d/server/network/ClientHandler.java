@@ -134,6 +134,10 @@ public class ClientHandler implements Runnable {
 
     private void handleCreateRoom() {
         try {
+            if (currentUser == null) {
+                System.out.println("[Lobby] Client chưa đăng nhập, không thể tạo phòng.");
+                return;
+            }
             roomManager.createRoom(currentUser);
 
             String roomsJson
