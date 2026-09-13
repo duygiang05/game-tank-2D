@@ -27,14 +27,26 @@ public class GameLoop implements Runnable {
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     private final Map<Integer, TankEntity> tanks = new ConcurrentHashMap<>();
-    private final Map<Integer, BulletEntity> bullets = new ConcurrentHashMap<>(); // sẵn cho task đạn sau
+    private final Map<Integer, BulletEntity> bullets = new ConcurrentHashMap<>();
 
     private final int tickRate;
     private final double timePerTickNs;
     private long tickCount = 0L;
     private final AtomicInteger bulletIdSeq = new AtomicInteger(1);
+
+    private GameMap gameMap;
+    private CombatEventListener combatListener;
+    private SnapshotListener snapshotListener;
+    
+    // [TÍCH HỢP 1]: Thêm GameStateManager
+    private GameStateManager stateManager;
+
+    private final int tankSize;
+    private final int bulletSize;
+    private final int normalBulletDamage;
+
     public GameLoop(int serverTickRate) {
-    this.tickRate = serverTickRate;
+        this.tickRate = serverTickRate;
         this.timePerTickNs = 1_000_000_000.0 / this.tickRate;
 
         var physics = ConfigLoader.getPhysicsStats();
@@ -50,12 +62,14 @@ public class GameLoop implements Runnable {
     public void addBullet(BulletEntity bullet) { bullets.put(bullet.getId(), bullet); }
     public Map<Integer, BulletEntity> getBullets() { return bullets; }
     public void stopLoop() { running.set(false); }
+
     public BulletEntity spawnBullet(int ownerId, double x, double y, double vx, double vy) {
         int newId = bulletIdSeq.getAndIncrement();
         BulletEntity bullet = new BulletEntity(newId, ownerId, x, y, vx, vy);
         bullets.put(newId, bullet);
         return bullet;
     }
+
     public boolean handleShootRequest(TankEntity tank) {
         ShootingProcessor.ShotResult result = ShootingProcessor.tryShoot(tank, System.currentTimeMillis());
         if (!result.success) return false;
@@ -63,17 +77,18 @@ public class GameLoop implements Runnable {
         spawnBullet(tank.getId(), tank.getX(), tank.getY(), result.vx, result.vy);
         return true;
     }
-    private GameMap gameMap; // gán từ bên ngoài khi phòng chơi khởi tạo map
-    private CombatEventListener combatListener;
-    private SnapshotListener snapshotListener;
-
-    private final int tankSize;
-    private final int bulletSize;
-    private final int normalBulletDamage;
 
     public void setGameMap(GameMap gameMap) { this.gameMap = gameMap; }
     public void setCombatListener(CombatEventListener listener) { this.combatListener = listener; }
     public void setSnapshotListener(SnapshotListener listener) { this.snapshotListener = listener; }
+
+    // [TÍCH HỢP 2]: Setter cho GameStateManager, tự động đăng ký làm combatListener luôn
+    public void setStateManager(GameStateManager stateManager) {
+        this.stateManager = stateManager;
+        this.setCombatListener(stateManager);
+    }
+    public GameStateManager getStateManager() { return stateManager; }
+
     @Override
     public void run() {
         running.set(true);
@@ -109,6 +124,15 @@ public class GameLoop implements Runnable {
     private void updatePhysics(double deltaTime) {
         tickCount++;
 
+        // [TÍCH HỢP 3]: Cập nhật nhịp đếm trận đấu, bộ đếm hồi sinh xe & check Game Over
+        if (stateManager != null) {
+            stateManager.update(deltaTime);
+            if (stateManager.isGameOver()) {
+                // Game đã ngã ngũ thì ngừng tính vật lý và dừng gửi snapshot trận đấu
+                return;
+            }
+        }
+
         // 1. Lưu vị trí cũ để có thể revert khi va chạm tường/xe khác
         Map<Integer, double[]> prevPositions = new HashMap<>();
         for (TankEntity tank : tanks.values()) {
@@ -134,20 +158,20 @@ public class GameLoop implements Runnable {
             BulletMovementProcessor.update(bullet, deltaTime);
         }
 
-        // 6. Va chạm Đạn-Xe / Đạn-Tường, phát sự kiện cho Giang
+        // 6. Va chạm Đạn-Xe / Đạn-Tường, phát sự kiện cho Giang (qua combatListener)
         List<CombatEvent> events = CollisionDetector.resolveBulletCollisions(
                 bullets.values(), tanks.values(), gameMap, bulletSize, tankSize, normalBulletDamage);
 
         if (combatListener != null) {
             for (CombatEvent e : events) {
-                combatListener.onCombatEvent(e); // "lập tức" - gọi ngay trong tick va chạm, không trì hoãn
+                combatListener.onCombatEvent(e);
             }
         }
 
         // 7. Dọn đạn đã tiêu (trúng xe/tường/ra biên)
         bullets.values().removeIf(b -> !b.isAlive());
 
-        // 8. Gửi snapshot định kỳ cho Giang broadcast
+        // 8. Gửi snapshot định kỳ cho Client broadcast
         if (snapshotListener != null) {
             snapshotListener.onSnapshotReady(buildSnapshot());
         }
