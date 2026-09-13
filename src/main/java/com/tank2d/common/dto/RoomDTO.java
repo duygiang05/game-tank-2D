@@ -12,8 +12,8 @@ public class RoomDTO {
     }
 
     public RoomDTO(int roomId, String roomName,
-                   int currentPlayers, int maxPlayers,
-                   String status) {
+            int currentPlayers, int maxPlayers,
+            String status) {
         this.roomId = roomId;
         this.roomName = roomName;
         this.currentPlayers = currentPlayers;

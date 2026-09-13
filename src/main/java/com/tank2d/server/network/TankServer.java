@@ -3,8 +3,7 @@ package com.tank2d.server.network;
 import com.tank2d.common.config.ConfigLoader;
 import com.tank2d.server.dao.UserDAO;
 import com.tank2d.server.db.DatabaseConnection;
-import com.tank2d.server.manager.RoomManager;
-
+import com.tank2d.server.room.RoomManager;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -56,8 +55,8 @@ public class TankServer {
                             + clientSocket.getRemoteSocketAddress()
                     );
 
-                    ClientHandler handler =
-                            new ClientHandler(
+                    ClientHandler handler
+                            = new ClientHandler(
                                     clientSocket,
                                     userDAO,
                                     roomManager
@@ -126,8 +125,8 @@ public class TankServer {
 
     public static void main(String[] args) {
 
-        int port =
-                ConfigLoader.getEnvInt(
+        int port
+                = ConfigLoader.getEnvInt(
                         "SERVER_PORT",
                         8888
                 );
@@ -151,8 +150,8 @@ public class TankServer {
             );
         }
 
-        TankServer server =
-                new TankServer(port);
+        TankServer server
+                = new TankServer(port);
 
         server.start();
     }

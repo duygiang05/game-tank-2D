@@ -6,6 +6,7 @@ import com.tank2d.client.network.ClientSocket;
 import com.tank2d.common.dto.RoomDTO;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
+import com.tank2d.client.ClientSession;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -20,7 +21,7 @@ import java.util.List;
 public class LobbyController {
 
     @FXML
-    private ListView<String> roomListView;
+    private ListView<RoomDTO> roomListView;
 
     @FXML
     private Button createRoomButton;
@@ -30,25 +31,45 @@ public class LobbyController {
 
     @FXML
     private Label statusLabel;
-
     private final Gson gson = new Gson();
+    private final ClientSession session
+            = ClientSession.getInstance();
 
     @FXML
     private void initialize() {
         statusLabel.setText("Đang tải danh sách phòng...");
         loadRooms();
+
+        roomListView.setCellFactory(listView -> new javafx.scene.control.ListCell<RoomDTO>() {
+            @Override
+            protected void updateItem(RoomDTO room, boolean empty) {
+                super.updateItem(room, empty);
+
+                if (empty || room == null) {
+                    setText(null);
+                } else {
+                    setText(
+                            room.getRoomName()
+                            + "   |   "
+                            + room.getCurrentPlayers()
+                            + "/"
+                            + room.getMaxPlayers()
+                            + "   |   "
+                            + room.getStatus()
+                    );
+                }
+            }
+        });
     }
 
     private void loadRooms() {
 
         Thread roomThread = new Thread(() -> {
 
-            ClientSocket clientSocket = new ClientSocket();
-
             try {
-                clientSocket.connect();
+                ClientSocket clientSocket
+                        = session.getClientSocket();
 
-                // Gửi yêu cầu lấy danh sách phòng
                 Packet request = new Packet(
                         PacketType.LOBBY_GET_ROOMS_REQ,
                         ""
@@ -56,7 +77,6 @@ public class LobbyController {
 
                 clientSocket.sendPacket(request);
 
-                // Nhận phản hồi từ Server
                 Packet response = clientSocket.receivePacket();
 
                 if (response == null) {
@@ -69,29 +89,20 @@ public class LobbyController {
                     return;
                 }
 
-                // Chuyển JSON thành danh sách RoomDTO
-                Type roomListType =
-                        new TypeToken<List<RoomDTO>>() {}.getType();
+                Type roomListType
+                        = new TypeToken<List<RoomDTO>>() {
+                        }.getType();
 
-                List<RoomDTO> rooms =
-                        gson.fromJson(response.getData(), roomListType);
+                List<RoomDTO> rooms
+                        = gson.fromJson(
+                                response.getData(),
+                                roomListType
+                        );
 
                 Platform.runLater(() -> {
 
                     roomListView.getItems().clear();
-
-                    for (RoomDTO room : rooms) {
-                        String roomInfo =
-                                room.getRoomName()
-                                + "   |   "
-                                + room.getCurrentPlayers()
-                                + "/"
-                                + room.getMaxPlayers()
-                                + "   |   "
-                                + room.getStatus();
-
-                        roomListView.getItems().add(roomInfo);
-                    }
+                    roomListView.getItems().addAll(rooms);
 
                     if (rooms.isEmpty()) {
                         statusLabel.setText(
@@ -116,223 +127,188 @@ public class LobbyController {
                         + e.getMessage()
                 );
 
-            } finally {
-                clientSocket.close();
             }
-
         });
 
         roomThread.setDaemon(true);
         roomThread.start();
     }
 
-  @FXML
-private void handleCreateRoom() {
-
-    statusLabel.setText("Đang tạo phòng...");
-
-    Thread createRoomThread = new Thread(() -> {
-
-        ClientSocket clientSocket = new ClientSocket();
-
-        try {
-            clientSocket.connect();
-
-            Packet request = new Packet(
-                    PacketType.ROOM_CREATE_REQ,
-                    ""
-            );
-
-            clientSocket.sendPacket(request);
-
-            Packet response = clientSocket.receivePacket();
-
-            if (response == null) {
-                showError("Không nhận được phản hồi từ Server!");
-                return;
-            }
-
-            if (response.getType() != PacketType.LOBBY_ROOMS_RES) {
-                showError("Server trả về phản hồi không hợp lệ!");
-                return;
-            }
-
-            Type roomListType =
-                    new TypeToken<List<RoomDTO>>() {}.getType();
-
-            List<RoomDTO> rooms =
-                    gson.fromJson(
-                            response.getData(),
-                            roomListType
-                    );
-
-            Platform.runLater(() -> {
-
-                roomListView.getItems().clear();
-
-                for (RoomDTO room : rooms) {
-
-                    String roomInfo =
-                            room.getRoomName()
-                            + "   |   "
-                            + room.getCurrentPlayers()
-                            + "/"
-                            + room.getMaxPlayers()
-                            + "   |   "
-                            + room.getStatus();
-
-                    roomListView.getItems().add(roomInfo);
-                }
-
-                statusLabel.setText(
-                        "Tạo phòng thành công!"
-                );
-            });
-
-        } catch (IOException e) {
-
-            showError(
-                    "Không thể kết nối tới Server!"
-            );
-
-            System.err.println(
-                    "[Lobby] Lỗi tạo phòng: "
-                    + e.getMessage()
-            );
-
-        } finally {
-            clientSocket.close();
-        }
-
-    });
-
-    createRoomThread.setDaemon(true);
-    createRoomThread.start();
-}
     @FXML
-private void handleJoinRoom() {
+    private void handleCreateRoom() {
 
-    String selectedRoom =
-            roomListView.getSelectionModel().getSelectedItem();
+        statusLabel.setText("Đang tạo phòng...");
 
-    if (selectedRoom == null) {
-        statusLabel.setText(
-                "Vui lòng chọn một phòng!"
-        );
-        return;
-    }
+        Thread createRoomThread = new Thread(() -> {
 
-    // Lấy Room ID từ chuỗi hiển thị
-    // Ví dụ: "Room 01   |   1/8   |   Waiting"
-    String roomName = selectedRoom.split("\\|")[0].trim();
+            try {
+                ClientSocket clientSocket
+                        = session.getClientSocket();
 
-    int roomId;
-
-    try {
-        roomId = Integer.parseInt(
-                roomName.replace("Room", "").trim()
-        );
-    } catch (NumberFormatException e) {
-        statusLabel.setText(
-                "Không xác định được ID phòng!"
-        );
-        return;
-    }
-
-    final int selectedRoomId = roomId;
-
-    statusLabel.setText(
-            "Đang vào " + selectedRoom + "..."
-    );
-
-    Thread joinRoomThread = new Thread(() -> {
-
-        ClientSocket clientSocket = new ClientSocket();
-
-        try {
-            clientSocket.connect();
-
-            // Gửi yêu cầu vào phòng
-            Packet request = new Packet(
-                    PacketType.ROOM_JOIN_REQ,
-                    gson.toJson(selectedRoomId)
-            );
-
-            clientSocket.sendPacket(request);
-
-            // Nhận trạng thái phòng từ Server
-            Packet response =
-                    clientSocket.receivePacket();
-
-            if (response == null) {
-                showError(
-                        "Không nhận được phản hồi từ Server!"
+                Packet request = new Packet(
+                        PacketType.ROOM_CREATE_REQ,
+                        ""
                 );
-                return;
-            }
 
-            if (response.getType()
-                    != PacketType.ROOM_STATE_UPDATE) {
+                clientSocket.sendPacket(request);
 
-                showError(
-                        "Server trả về phản hồi không hợp lệ!"
-                );
-                return;
-            }
+                Packet response = clientSocket.receivePacket();
 
-            RoomDTO room =
-                    gson.fromJson(
-                            response.getData(),
-                            RoomDTO.class
-                    );
-
-            Platform.runLater(() -> {
-
-                if (room != null) {
-
-                    statusLabel.setText(
-                            "Vào phòng thành công! "
-                            + room.getRoomName()
-                            + " - "
-                            + room.getCurrentPlayers()
-                            + "/"
-                            + room.getMaxPlayers()
-                    );
-
-                    // Cập nhật lại danh sách phòng
-                    loadRooms();
-                } else {
-
-                    statusLabel.setText(
-                            "Không thể vào phòng!"
-                    );
+                if (response == null) {
+                    showError("Không nhận được phản hồi từ Server!");
+                    return;
                 }
-            });
 
-        } catch (IOException e) {
+                if (response.getType() != PacketType.LOBBY_ROOMS_RES) {
+                    showError("Server trả về phản hồi không hợp lệ!");
+                    return;
+                }
 
-            showError(
-                    "Không thể kết nối tới Server!"
+                Type roomListType
+                        = new TypeToken<List<RoomDTO>>() {
+                        }.getType();
+
+                List<RoomDTO> rooms
+                        = gson.fromJson(
+                                response.getData(),
+                                roomListType
+                        );
+
+                Platform.runLater(() -> {
+
+                    roomListView.getItems().clear();
+                    roomListView.getItems().addAll(rooms);
+
+                    statusLabel.setText(
+                            "Tạo phòng thành công!"
+                    );
+                });
+
+            } catch (IOException e) {
+
+                showError(
+                        "Không thể kết nối tới Server!"
+                );
+
+                System.err.println(
+                        "[Lobby] Lỗi tạo phòng: "
+                        + e.getMessage()
+                );
+
+            }
+        });
+
+        createRoomThread.setDaemon(true);
+        createRoomThread.start();
+    }
+
+    @FXML
+    private void handleJoinRoom() {
+
+        RoomDTO selectedRoom
+                = roomListView
+                        .getSelectionModel()
+                        .getSelectedItem();
+
+        if (selectedRoom == null) {
+            statusLabel.setText(
+                    "Vui lòng chọn một phòng!"
             );
-
-            System.err.println(
-                    "[Lobby] Lỗi vào phòng: "
-                    + e.getMessage()
-            );
-
-        } finally {
-            clientSocket.close();
+            return;
         }
 
-    });
+        int selectedRoomId
+                = selectedRoom.getRoomId();
 
-    joinRoomThread.setDaemon(true);
-    joinRoomThread.start();
-}
-private void showError(String message) {
-    Platform.runLater(() -> {
-        statusLabel.setText(message);
-    });
-}
+        statusLabel.setText(
+                "Đang vào "
+                + selectedRoom.getRoomName()
+                + "..."
+        );
 
+        Thread joinRoomThread = new Thread(() -> {
+
+            try {
+                ClientSocket clientSocket
+                        = session.getClientSocket();
+
+                Packet request = new Packet(
+                        PacketType.ROOM_JOIN_REQ,
+                        gson.toJson(selectedRoomId)
+                );
+
+                clientSocket.sendPacket(request);
+
+                Packet response
+                        = clientSocket.receivePacket();
+
+                if (response == null) {
+                    showError(
+                            "Không nhận được phản hồi từ Server!"
+                    );
+                    return;
+                }
+
+                if (response.getType()
+                        != PacketType.ROOM_STATE_UPDATE) {
+
+                    showError(
+                            "Server trả về phản hồi không hợp lệ!"
+                    );
+                    return;
+                }
+
+                RoomDTO room
+                        = gson.fromJson(
+                                response.getData(),
+                                RoomDTO.class
+                        );
+
+                Platform.runLater(() -> {
+
+                    if (room != null) {
+
+                        statusLabel.setText(
+                                "Vào phòng thành công! "
+                                + room.getRoomName()
+                                + " - "
+                                + room.getCurrentPlayers()
+                                + "/"
+                                + room.getMaxPlayers()
+                        );
+
+                        loadRooms();
+
+                    } else {
+
+                        statusLabel.setText(
+                                "Không thể vào phòng!"
+                        );
+                    }
+                });
+
+            } catch (IOException e) {
+
+                showError(
+                        "Không thể kết nối tới Server!"
+                );
+
+                System.err.println(
+                        "[Lobby] Lỗi vào phòng: "
+                        + e.getMessage()
+                );
+
+            }
+
+        });
+
+        joinRoomThread.setDaemon(true);
+        joinRoomThread.start();
+    }
+
+    private void showError(String message) {
+        Platform.runLater(() -> {
+            statusLabel.setText(message);
+        });
+    }
 }
