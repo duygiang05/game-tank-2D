@@ -9,7 +9,9 @@ import com.tank2d.common.protocol.NetworkUtil;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
 import com.tank2d.server.dao.UserDAO;
+import com.tank2d.server.room.Room;
 import com.tank2d.server.room.RoomManager;
+
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -30,6 +32,7 @@ public class ClientHandler implements Runnable {
     private DataOutputStream dos;
     private volatile boolean isRunning;
     private User currentUser; // Lưu thông tin người chơi sau khi xác thực thành công
+    private int currentRoomId = -1;
 
     public ClientHandler(Socket socket, UserDAO userDAO,
             RoomManager roomManager) {
@@ -138,20 +141,22 @@ public class ClientHandler implements Runnable {
                 System.out.println("[Lobby] Client chưa đăng nhập, không thể tạo phòng.");
                 return;
             }
-            roomManager.createRoom(currentUser);
 
-            String roomsJson
-                    = gson.toJson(roomManager.getAllRooms());
+            Room room = roomManager.createRoom(currentUser);
+            currentRoomId = room.getRoomId();
 
             Packet response = new Packet(
-                    PacketType.LOBBY_ROOMS_RES,
-                    roomsJson
+                    PacketType.ROOM_STATE_UPDATE,
+                    gson.toJson(roomManager.getRoomDTO(currentRoomId))
             );
 
             NetworkUtil.sendPacket(dos, response);
 
             System.out.println(
-                    "[Lobby] Client đã tạo phòng mới."
+                    "[Lobby] User "
+                    + currentUser.getUsername()
+                    + " đã tạo phòng "
+                    + room.getRoomName()
             );
 
         } catch (IOException e) {
@@ -169,6 +174,8 @@ public class ClientHandler implements Runnable {
             boolean success = roomManager.joinRoom(roomId, currentUser);
 
             if (success) {
+                currentRoomId = roomId;
+
                 System.out.println(
                         "[Lobby] Client đã vào phòng ID: " + roomId
                 );
@@ -245,25 +252,37 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    public void closeConnection() {
-        isRunning = false;
-        try {
-            if (dis != null) {
-                dis.close();
-            }
-            if (dos != null) {
-                dos.close();
-            }
-            if (socket != null && !socket.isClosed()) {
-                socket.close();
-            }
-        } catch (IOException e) {
-            System.err.println("[ClientHandler] Lỗi khi giải phóng socket: " + e.getMessage());
-        }
-        System.out.println("[ClientHandler] Đã đóng tài nguyên kết nối an toàn.");
+   public void closeConnection() {
+    isRunning = false;
+
+    // Nếu người chơi đang ở trong phòng thì xóa khỏi phòng
+    if (currentUser != null && currentRoomId != -1) {
+        roomManager.leaveRoom(currentRoomId, currentUser.getId());
+
+        System.out.println(
+                "[Lobby] User "
+                + currentUser.getUsername()
+                + " đã rời phòng ID: "
+                + currentRoomId
+        );
+
+        currentRoomId = -1;
     }
 
-    public User getCurrentUser() {
-        return currentUser;
+    try {
+        if (dis != null) {
+            dis.close();
+        }
+        if (dos != null) {
+            dos.close();
+        }
+        if (socket != null && !socket.isClosed()) {
+            socket.close();
+        }
+    } catch (IOException e) {
+        System.err.println("[ClientHandler] Lỗi khi giải phóng socket: " + e.getMessage());
     }
+
+    System.out.println("[ClientHandler] Đã đóng tài nguyên kết nối an toàn.");
+}
 }

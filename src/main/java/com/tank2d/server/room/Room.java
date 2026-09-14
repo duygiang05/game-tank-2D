@@ -41,21 +41,28 @@ public class Room {
         return maxPlayers;
     }
 
-    public List<User> getPlayers() {
+    public synchronized List<User> getPlayers() {
         return new ArrayList<>(players);
     }
 
-    public Map<Integer, Boolean> getReadyStates() {
+    public synchronized Map<Integer, Boolean> getReadyStates() {
         return new LinkedHashMap<>(readyStates);
     }
 
-    public String getStatus() {
+    public synchronized String getStatus() {
         return status;
     }
 
-    public boolean addPlayer(User user) {
+    public synchronized boolean addPlayer(User user) {
         if (user == null) {
             return false;
+        }
+
+        // Không cho một user vào cùng một phòng 2 lần
+        for (User player : players) {
+            if (player.getId() == user.getId()) {
+                return false;
+            }
         }
 
         if (players.size() >= maxPlayers) {
@@ -70,7 +77,7 @@ public class Room {
         return true;
     }
 
-    public boolean removePlayer(int userId) {
+    public synchronized boolean removePlayer(int userId) {
         boolean removed = players.removeIf(
                 user -> user.getId() == userId
         );
@@ -83,7 +90,7 @@ public class Room {
         return removed;
     }
 
-    public boolean setReady(int userId, boolean ready) {
+    public synchronized boolean setReady(int userId, boolean ready) {
         if (!readyStates.containsKey(userId)) {
             return false;
         }
@@ -92,11 +99,11 @@ public class Room {
         return true;
     }
 
-    public boolean isReady(int userId) {
+    public synchronized boolean isReady(int userId) {
         return readyStates.getOrDefault(userId, false);
     }
 
-    public boolean areAllPlayersReady() {
+    public synchronized boolean areAllPlayersReady() {
         if (players.isEmpty()) {
             return false;
         }
@@ -106,7 +113,7 @@ public class Room {
                 .allMatch(Boolean::booleanValue);
     }
 
-    public int getCurrentPlayers() {
+    public synchronized int getCurrentPlayers() {
         return players.size();
     }
 
