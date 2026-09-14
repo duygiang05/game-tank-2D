@@ -9,6 +9,9 @@ import com.tank2d.common.protocol.NetworkUtil;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
 import com.tank2d.server.dao.UserDAO;
+import com.tank2d.server.room.Room;
+import com.tank2d.server.room.RoomManager;
+
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -16,21 +19,26 @@ import java.io.IOException;
 import java.net.Socket;
 
 /**
- * Worker xử lý kết nối riêng biệt cho từng Client qua TCP Socket.
- * Được quản lý bởi ExecutorService (Thread Pool) trong TankServer.
+ * Worker xử lý kết nối riêng biệt cho từng Client qua TCP Socket. Được quản lý
+ * bởi ExecutorService (Thread Pool) trong TankServer.
  */
 public class ClientHandler implements Runnable {
+
     private final Socket socket;
     private final UserDAO userDAO;
+    private final RoomManager roomManager;
     private final Gson gson;
     private DataInputStream dis;
     private DataOutputStream dos;
     private volatile boolean isRunning;
     private User currentUser; // Lưu thông tin người chơi sau khi xác thực thành công
+    private int currentRoomId = -1;
 
-    public ClientHandler(Socket socket, UserDAO userDAO) {
+    public ClientHandler(Socket socket, UserDAO userDAO,
+            RoomManager roomManager) {
         this.socket = socket;
         this.userDAO = userDAO;
+        this.roomManager = roomManager;
         this.gson = new Gson();
         this.isRunning = true;
     }
@@ -64,7 +72,9 @@ public class ClientHandler implements Runnable {
     }
 
     private void dispatchPacket(Packet packet) {
-        if (packet.getType() == null) return;
+        if (packet.getType() == null) {
+            return;
+        }
 
         switch (packet.getType()) {
             case AUTH_LOGIN_REQ:
@@ -73,6 +83,18 @@ public class ClientHandler implements Runnable {
 
             case AUTH_REGISTER_REQ:
                 handleRegister(packet.getData());
+                break;
+
+            case LOBBY_GET_ROOMS_REQ:
+                handleGetRooms();
+                break;
+
+            case ROOM_CREATE_REQ:
+                handleCreateRoom();
+                break;
+
+            case ROOM_JOIN_REQ:
+                handleJoinRoom(packet.getData());
                 break;
 
             default:
@@ -113,6 +135,71 @@ public class ClientHandler implements Runnable {
         }
     }
 
+    private void handleCreateRoom() {
+        try {
+            if (currentUser == null) {
+                System.out.println("[Lobby] Client chưa đăng nhập, không thể tạo phòng.");
+                return;
+            }
+
+            Room room = roomManager.createRoom(currentUser);
+            currentRoomId = room.getRoomId();
+
+            Packet response = new Packet(
+                    PacketType.ROOM_STATE_UPDATE,
+                    gson.toJson(roomManager.getRoomDTO(currentRoomId))
+            );
+
+            NetworkUtil.sendPacket(dos, response);
+
+            System.out.println(
+                    "[Lobby] User "
+                    + currentUser.getUsername()
+                    + " đã tạo phòng "
+                    + room.getRoomName()
+            );
+
+        } catch (IOException e) {
+            System.err.println(
+                    "[Lobby] Lỗi tạo phòng: "
+                    + e.getMessage()
+            );
+        }
+    }
+
+    private void handleJoinRoom(String rawJson) {
+        try {
+            int roomId = gson.fromJson(rawJson, Integer.class);
+
+            boolean success = roomManager.joinRoom(roomId, currentUser);
+
+            if (success) {
+                currentRoomId = roomId;
+
+                System.out.println(
+                        "[Lobby] Client đã vào phòng ID: " + roomId
+                );
+            } else {
+                System.out.println(
+                        "[Lobby] Client không thể vào phòng ID: " + roomId
+                );
+            }
+
+            Packet response = new Packet(
+                    PacketType.ROOM_STATE_UPDATE,
+                    gson.toJson(roomManager.getRoomDTO(roomId))
+            );
+
+            NetworkUtil.sendPacket(dos, response);
+
+        } catch (Exception e) {
+            System.err.println(
+                    "[Lobby] Lỗi xử lý ROOM_JOIN_REQ: "
+                    + e.getMessage()
+            );
+        }
+    }
+
     private void handleRegister(String rawJson) {
         RegisterResponse res;
         try {
@@ -144,19 +231,58 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    public void closeConnection() {
-        isRunning = false;
+    private void handleGetRooms() {
         try {
-            if (dis != null) dis.close();
-            if (dos != null) dos.close();
-            if (socket != null && !socket.isClosed()) socket.close();
+            String roomsJson = gson.toJson(roomManager.getAllRooms());
+
+            Packet response = new Packet(
+                    PacketType.LOBBY_ROOMS_RES,
+                    roomsJson
+            );
+
+            NetworkUtil.sendPacket(dos, response);
+
+            System.out.println("[Lobby] Đã gửi danh sách phòng cho Client.");
+
         } catch (IOException e) {
-            System.err.println("[ClientHandler] Lỗi khi giải phóng socket: " + e.getMessage());
+            System.err.println(
+                    "[Lobby] Lỗi gửi danh sách phòng: "
+                    + e.getMessage()
+            );
         }
-        System.out.println("[ClientHandler] Đã đóng tài nguyên kết nối an toàn.");
     }
 
-    public User getCurrentUser() {
-        return currentUser;
+   public void closeConnection() {
+    isRunning = false;
+
+    // Nếu người chơi đang ở trong phòng thì xóa khỏi phòng
+    if (currentUser != null && currentRoomId != -1) {
+        roomManager.leaveRoom(currentRoomId, currentUser.getId());
+
+        System.out.println(
+                "[Lobby] User "
+                + currentUser.getUsername()
+                + " đã rời phòng ID: "
+                + currentRoomId
+        );
+
+        currentRoomId = -1;
     }
+
+    try {
+        if (dis != null) {
+            dis.close();
+        }
+        if (dos != null) {
+            dos.close();
+        }
+        if (socket != null && !socket.isClosed()) {
+            socket.close();
+        }
+    } catch (IOException e) {
+        System.err.println("[ClientHandler] Lỗi khi giải phóng socket: " + e.getMessage());
+    }
+
+    System.out.println("[ClientHandler] Đã đóng tài nguyên kết nối an toàn.");
+}
 }

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.tank2d.client.controller.RoomController"
+            prefWidth="800"
+            prefHeight="600">
+
+    <top>
+        <VBox alignment="CENTER" spacing="10">
+            <padding>
+                <Insets top="25" right="20" bottom="20" left="20"/>
+            </padding>
+
+            <Label fx:id="roomNameLabel"
+                   text="ROOM"
+                   style="-fx-font-size: 28px; -fx-font-weight: bold;"/>
+
+            <Label fx:id="roomStatusLabel"
+                   text="Đang chờ người chơi..."/>
+        </VBox>
+    </top>
+
+    <center>
+        <VBox alignment="CENTER" spacing="15">
+            <padding>
+                <Insets top="20" right="40" bottom="20" left="40"/>
+            </padding>
+
+            <Label text="Danh sách người chơi"
+                   style="-fx-font-size: 20px; -fx-font-weight: bold;"/>
+
+            <ListView fx:id="playerListView"
+                      prefHeight="300"/>
+        </VBox>
+    </center>
+
+    <bottom>
+        <HBox alignment="CENTER" spacing="20">
+            <padding>
+                <Insets top="20" right="20" bottom="30" left="20"/>
+            </padding>
+
+            <Button fx:id="readyButton"
+                    text="SẴN SÀNG"
+                    prefWidth="150"
+                    prefHeight="40"
+                    onAction="#handleReady"/>
+
+            <Button fx:id="leaveButton"
+                    text="RỜI PHÒNG"
+                    prefWidth="150"
+                    prefHeight="40"
+                    onAction="#handleLeave"/>
+        </HBox>
+    </bottom>
+
+</BorderPane>
