@@ -8,8 +8,8 @@ import java.sql.Connection;
 import java.sql.SQLException;
 
 /**
- * Quản lý kết nối Cơ sở dữ liệu MySQL sử dụng Connection Pool (HikariCP).
- * Đảm bảo tái sử dụng kết nối, tối ưu hiệu năng và an toàn đa luồng.
+ * Quản lý kết nối Cơ sở dữ liệu MySQL sử dụng Connection Pool (HikariCP). Đảm
+ * bảo tái sử dụng kết nối, tối ưu hiệu năng và an toàn đa luồng.
  */
 public class DatabaseConnection {
 
@@ -42,7 +42,8 @@ public class DatabaseConnection {
             dataSource = new HikariDataSource(config);
             System.out.println("[DatabaseConnection] Khởi tạo HikariCP Connection Pool thành công!");
         } catch (Exception e) {
-            System.err.println("[DatabaseConnection] Lỗi khởi tạo Connection Pool: " + e.getMessage());
+            System.err.println("[DatabaseConnection] Lỗi khởi tạo Connection Pool:");
+            e.printStackTrace();
         }
     }
 
