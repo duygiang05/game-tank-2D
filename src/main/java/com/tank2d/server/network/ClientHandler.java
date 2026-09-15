@@ -106,6 +106,9 @@ public class ClientHandler implements Runnable {
             case ROOM_READY_REQ:
                 handleReady(packet.getData());
                 break;
+                case ROOM_START_REQ:
+    handleStartGame();
+    break;
             case ROOM_LEAVE_REQ:
                 handleLeaveRoom();
                 break;
@@ -167,6 +170,7 @@ public class ClientHandler implements Runnable {
             );
 
             NetworkUtil.sendPacket(dos, response);
+            broadcastLobbyRooms();
 
             System.out.println(
                     "[Lobby] User "
@@ -265,20 +269,31 @@ public class ClientHandler implements Runnable {
 // Kiểm tra tất cả người chơi đã Ready chưa
             Room room = roomManager.getRoom(currentRoomId);
 
-            if (room != null
-                    && room.getCurrentPlayers() == room.getMaxPlayers()
-                    && room.areAllPlayersReady()) {
-
-                System.out.println(
-                        "[Room] Tất cả người chơi đã Ready. Bắt đầu trận!"
-                );
-
-                broadcastGameStart();
-            }
-
         } catch (Exception e) {
             System.err.println(
                     "[Room] Lỗi xử lý ROOM_READY_REQ: "
+                    + e.getMessage()
+            );
+        }
+    }
+
+    private void broadcastLobbyRooms() {
+        try {
+            Packet packet = new Packet(
+                    PacketType.LOBBY_ROOMS_RES,
+                    gson.toJson(roomManager.getAllRooms())
+            );
+
+            for (ClientHandler client : connectedClients) {
+                // Chỉ gửi cho những client đang ở Lobby
+                if (client.currentRoomId == -1) {
+                    NetworkUtil.sendPacket(client.dos, packet);
+                }
+            }
+
+        } catch (IOException e) {
+            System.err.println(
+                    "[Lobby] Lỗi broadcast danh sách phòng: "
                     + e.getMessage()
             );
         }
@@ -344,7 +359,84 @@ public class ClientHandler implements Runnable {
                 }
             }
         }
+    }  
+    private void handleStartGame() {
+
+    try {
+
+        if (currentUser == null) {
+            System.out.println(
+                    "[Game] Client chưa đăng nhập."
+            );
+            return;
+        }
+
+        if (currentRoomId == -1) {
+            System.out.println(
+                    "[Game] Client chưa ở trong phòng."
+            );
+            return;
+        }
+
+        Room room =
+                roomManager.getRoom(currentRoomId);
+
+        if (room == null) {
+            System.out.println(
+                    "[Game] Không tìm thấy phòng."
+            );
+            return;
+        }
+
+        // Chỉ Host mới được bắt đầu
+        if (!room.isHost(currentUser.getId())) {
+
+            System.out.println(
+                    "[Game] User "
+                    + currentUser.getUsername()
+                    + " không phải Host, không được Start."
+            );
+
+            return;
+        }
+
+        // Phải đủ người
+        if (room.getCurrentPlayers()
+                < room.getMaxPlayers()) {
+
+            System.out.println(
+                    "[Game] Chưa đủ người chơi."
+            );
+
+            return;
+        }
+
+        // Tất cả người chơi phải Ready
+        if (!room.areAllPlayersReady()) {
+
+            System.out.println(
+                    "[Game] Chưa phải tất cả người chơi Ready."
+            );
+
+            return;
+        }
+
+        System.out.println(
+                "[Game] Host "
+                + currentUser.getUsername()
+                + " bắt đầu trận!"
+        );
+
+        broadcastGameStart();
+
+    } catch (Exception e) {
+
+        System.err.println(
+                "[Game] Lỗi xử lý ROOM_START_REQ: "
+                + e.getMessage()
+        );
     }
+}
 
     private void handleRegister(String rawJson) {
         RegisterResponse res;

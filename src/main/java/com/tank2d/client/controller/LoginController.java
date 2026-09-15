@@ -1,14 +1,14 @@
 package com.tank2d.client.controller;
 
 import com.google.gson.Gson;
+import com.tank2d.client.ClientSession;
 import com.tank2d.client.network.ClientSocket;
 import com.tank2d.common.dto.LoginRequest;
 import com.tank2d.common.dto.LoginResponse;
 import com.tank2d.common.dto.RegisterResponse;
+import com.tank2d.common.model.User;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
-import com.tank2d.client.ClientSession;
-import com.tank2d.common.model.User;
 
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
@@ -19,6 +19,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 
 import java.io.IOException;
+import java.util.function.Consumer;
 
 public class LoginController {
 
@@ -51,6 +52,11 @@ public class LoginController {
 
     private final Gson gson = new Gson();
 
+    private final ClientSession session = ClientSession.getInstance();
+
+    // Listener dùng chung với Reader Thread
+    private final Consumer<Packet> packetListener = this::handleServerPacket;
+
     // =========================
     // XỬ LÝ LOGIN
     // =========================
@@ -72,103 +78,53 @@ public class LoginController {
             return;
         }
 
-        // Chạy network ở thread riêng
         Thread loginThread = new Thread(() -> {
 
-            ClientSession session = ClientSession.getInstance();
-
             try {
+
+                // Kết nối ClientSession
                 session.connect();
 
                 ClientSocket clientSocket = session.getClientSocket();
-                // 2. Tạo LoginRequest
-                LoginRequest request
-                        = new LoginRequest(username, password);
 
-                // 3. Chuyển request thành JSON
-                String requestJson
-                        = gson.toJson(request);
+                if (clientSocket == null || !clientSocket.isConnected()) {
+                    showError("Không thể kết nối tới Server!");
+                    return;
+                }
 
-                // 4. Đóng gói thành Packet
-                Packet packet
-                        = new Packet(
+                /*
+                 * QUAN TRỌNG:
+                 * Không gọi receivePacket() ở đây.
+                 *
+                 * ClientSession đã có Reader Thread.
+                 * Reader Thread sẽ nhận AUTH_LOGIN_RES
+                 * và chuyển packet vào handleServerPacket().
+                 */
+                session.addPacketListener(packetListener);
+
+                // Tạo LoginRequest
+                LoginRequest request =
+                        new LoginRequest(username, password);
+
+                String requestJson =
+                        gson.toJson(request);
+
+                Packet packet =
+                        new Packet(
                                 PacketType.AUTH_LOGIN_REQ,
                                 requestJson
                         );
 
-                // 5. Gửi Packet tới Server
+                // Chỉ gửi request
                 clientSocket.sendPacket(packet);
 
-                // 6. Nhận phản hồi từ Server
-                Packet responsePacket
-                        = clientSocket.receivePacket();
-
-                if (responsePacket == null) {
-
-                    showError(
-                            "Không nhận được phản hồi từ Server!"
-                    );
-
-                    return;
-                }
-
-                // Kiểm tra loại Packet
-                if (responsePacket.getType()
-                        != PacketType.AUTH_LOGIN_RES) {
-
-                    showError(
-                            "Server trả về phản hồi không hợp lệ!"
-                    );
-
-                    return;
-                }
-
-                // 7. Chuyển JSON thành LoginResponse
-                LoginResponse response
-                        = gson.fromJson(
-                                responsePacket.getData(),
-                                LoginResponse.class
-                        );
-
-                // 8. Cập nhật giao diện JavaFX
-                Platform.runLater(() -> {
-
-                    if (response.isSuccess()) {
-                        session.setCurrentUser(
-                                new User(
-                                        response.getUserId(),
-                                        response.getUsername()
-                                )
-                        );
-
-                        // Hiển thị thông báo đăng nhập thành công
-                        Alert alert
-                                = new Alert(
-                                        Alert.AlertType.INFORMATION
-                                );
-
-                        alert.setTitle("Đăng nhập");
-                        alert.setHeaderText(null);
-                        alert.setContentText(
-                                response.getMessage()
-                        );
-
-                        alert.showAndWait();
-
-                        // Sau khi bấm OK → mở Lobby
-                        openLobby();
-
-                    } else {
-
-                        showAlert(
-                                Alert.AlertType.ERROR,
-                                "Lỗi đăng nhập",
-                                response.getMessage()
-                        );
-                    }
-                });
+                System.out.println(
+                        "[Login] Đã gửi yêu cầu đăng nhập: " + username
+                );
 
             } catch (IOException e) {
+
+                session.removePacketListener(packetListener);
 
                 showError(
                         "Không thể kết nối tới Server!\n"
@@ -179,7 +135,6 @@ public class LoginController {
                         "[Login] Lỗi kết nối: "
                         + e.getMessage()
                 );
-
             }
 
         });
@@ -189,19 +144,105 @@ public class LoginController {
     }
 
     // =========================
+    // NHẬN PACKET TỪ SERVER
+    // =========================
+    private void handleServerPacket(Packet packet) {
+
+        if (packet == null || packet.getType() == null) {
+            return;
+        }
+
+        if (packet.getType() != PacketType.AUTH_LOGIN_RES) {
+            return;
+        }
+
+        System.out.println(
+                "[Login] Nhận AUTH_LOGIN_RES từ Server."
+        );
+
+        try {
+
+            LoginResponse response =
+                    gson.fromJson(
+                            packet.getData(),
+                            LoginResponse.class
+                    );
+
+            // Không cần LoginController nghe nữa
+            session.removePacketListener(packetListener);
+
+            Platform.runLater(() -> {
+
+                if (response.isSuccess()) {
+
+                    // Lưu thông tin user
+                    session.setCurrentUser(
+                            new User(
+                                    response.getUserId(),
+                                    response.getUsername()
+                            )
+                    );
+
+                    System.out.println(
+                            "[Login] Đăng nhập thành công: "
+                            + response.getUsername()
+                    );
+
+                    Alert alert =
+                            new Alert(
+                                    Alert.AlertType.INFORMATION
+                            );
+
+                    alert.setTitle("Đăng nhập");
+                    alert.setHeaderText(null);
+                    alert.setContentText(
+                            response.getMessage()
+                    );
+
+                    alert.showAndWait();
+
+                    // Mở Lobby
+                    openLobby();
+
+                } else {
+
+                    showAlert(
+                            Alert.AlertType.ERROR,
+                            "Lỗi đăng nhập",
+                            response.getMessage()
+                    );
+                }
+            });
+
+        } catch (Exception e) {
+
+            session.removePacketListener(packetListener);
+
+            System.err.println(
+                    "[Login] Lỗi xử lý AUTH_LOGIN_RES: "
+                    + e.getMessage()
+            );
+
+            showError(
+                    "Không thể xử lý phản hồi đăng nhập!"
+            );
+        }
+    }
+
+    // =========================
     // XỬ LÝ REGISTER
     // =========================
     @FXML
     private void handleRegister(ActionEvent event) {
 
-        String username
-                = registerUsernameField.getText().trim();
+        String username =
+                registerUsernameField.getText().trim();
 
-        String password
-                = registerPasswordField.getText().trim();
+        String password =
+                registerPasswordField.getText().trim();
 
-        String confirmPassword
-                = confirmPasswordField.getText().trim();
+        String confirmPassword =
+                confirmPasswordField.getText().trim();
 
         // Validate
         if (username.isEmpty()
@@ -229,41 +270,38 @@ public class LoginController {
             return;
         }
 
-        // Chạy network ở thread riêng
         Thread registerThread = new Thread(() -> {
 
-            ClientSocket clientSocket
-                    = new ClientSocket();
+            ClientSocket clientSocket =
+                    new ClientSocket();
 
             try {
 
-                // 1. Kết nối Server
+                // Kết nối Server
                 clientSocket.connect();
 
-                // 2. Tạo LoginRequest
-                LoginRequest request
-                        = new LoginRequest(
+                // Tạo LoginRequest
+                LoginRequest request =
+                        new LoginRequest(
                                 username,
                                 password
                         );
 
-                // 3. Chuyển request thành JSON
-                String requestJson
-                        = gson.toJson(request);
+                String requestJson =
+                        gson.toJson(request);
 
-                // 4. Đóng gói Packet
-                Packet packet
-                        = new Packet(
+                Packet packet =
+                        new Packet(
                                 PacketType.AUTH_REGISTER_REQ,
                                 requestJson
                         );
 
-                // 5. Gửi tới Server
+                // Gửi tới Server
                 clientSocket.sendPacket(packet);
 
-                // 6. Nhận response
-                Packet responsePacket
-                        = clientSocket.receivePacket();
+                // Register dùng socket riêng nên vẫn nhận response trực tiếp
+                Packet responsePacket =
+                        clientSocket.receivePacket();
 
                 if (responsePacket == null) {
 
@@ -274,7 +312,6 @@ public class LoginController {
                     return;
                 }
 
-                // 7. Kiểm tra PacketType
                 if (responsePacket.getType()
                         != PacketType.AUTH_REGISTER_RES) {
 
@@ -285,14 +322,12 @@ public class LoginController {
                     return;
                 }
 
-                // 8. Chuyển JSON thành RegisterResponse
-                RegisterResponse response
-                        = gson.fromJson(
+                RegisterResponse response =
+                        gson.fromJson(
                                 responsePacket.getData(),
                                 RegisterResponse.class
                         );
 
-                // 9. Hiển thị kết quả
                 Platform.runLater(() -> {
 
                     if (response.isSuccess()) {
@@ -377,21 +412,21 @@ public class LoginController {
 
         try {
 
-            javafx.fxml.FXMLLoader loader
-                    = new javafx.fxml.FXMLLoader(
+            javafx.fxml.FXMLLoader loader =
+                    new javafx.fxml.FXMLLoader(
                             getClass().getResource(
                                     "/com/tank2d/client/view/lobby.fxml"
                             )
                     );
 
-            javafx.scene.Parent lobbyRoot
-                    = loader.load();
+            javafx.scene.Parent lobbyRoot =
+                    loader.load();
 
-            javafx.scene.Scene lobbyScene
-                    = new javafx.scene.Scene(lobbyRoot);
+            javafx.scene.Scene lobbyScene =
+                    new javafx.scene.Scene(lobbyRoot);
 
-            javafx.stage.Stage stage
-                    = (javafx.stage.Stage) usernameField
+            javafx.stage.Stage stage =
+                    (javafx.stage.Stage) usernameField
                             .getScene()
                             .getWindow();
 
@@ -421,8 +456,8 @@ public class LoginController {
 
         Platform.runLater(() -> {
 
-            Alert alert
-                    = new Alert(type);
+            Alert alert =
+                    new Alert(type);
 
             alert.setTitle(title);
             alert.setHeaderText(null);

@@ -5,6 +5,7 @@ import com.tank2d.client.ClientSession;
 import com.tank2d.client.network.ClientSocket;
 import com.tank2d.client.view.GameCanvasApp;
 import com.tank2d.common.dto.RoomDTO;
+import com.tank2d.common.model.User;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
 
@@ -18,6 +19,8 @@ import javafx.scene.control.ListView;
 import javafx.stage.Stage;
 
 import java.io.IOException;
+import java.util.Map;
+import java.util.function.Consumer;
 
 public class RoomController {
 
@@ -38,22 +41,53 @@ public class RoomController {
 
     private final Gson gson = new Gson();
 
-    private final ClientSession session
-            = ClientSession.getInstance();
+    private final ClientSession session =
+            ClientSession.getInstance();
+
+    private final Consumer<Packet> packetListener =
+            this::handleServerPacket;
 
     private RoomDTO currentRoom;
 
-    private volatile boolean listening = true;
+    private boolean listenerRegistered = false;
+
+    // =========================
+    // SET ROOM
+    // =========================
 
     public void setRoom(RoomDTO room) {
+
         this.currentRoom = room;
 
         if (room == null) {
             return;
         }
 
+        updateRoomUI(room);
+
+        if (!listenerRegistered) {
+
+            session.addPacketListener(packetListener);
+
+            listenerRegistered = true;
+
+            System.out.println(
+                    "[Room] Đã đăng ký Room Packet Listener."
+            );
+        }
+    }
+
+    // =========================
+    // UPDATE ROOM UI
+    // =========================
+
+    private void updateRoomUI(RoomDTO room) {
+
         Platform.runLater(() -> {
-            roomNameLabel.setText(room.getRoomName());
+
+            roomNameLabel.setText(
+                    room.getRoomName()
+            );
 
             roomStatusLabel.setText(
                     room.getCurrentPlayers()
@@ -66,104 +100,181 @@ public class RoomController {
             playerListView.getItems().clear();
 
             if (room.getPlayerNames() != null) {
+
                 playerListView.getItems().addAll(
                         room.getPlayerNames()
                 );
             }
-        });
 
-        // Bắt đầu lắng nghe Server
-        startServerListener();
+            updateButton(room);
+        });
     }
 
-    /**
-     * Luồng riêng lắng nghe các packet Server gửi xuống
-     */
-    private void startServerListener() {
+    // =========================
+    // UPDATE BUTTON
+    // =========================
 
-        Thread listenerThread = new Thread(() -> {
+    private void updateButton(RoomDTO room) {
 
-            try {
-                ClientSocket clientSocket = session.getClientSocket();
+        User currentUser =
+                session.getCurrentUser();
 
-                if (clientSocket == null) {
-                    System.err.println(
-                            "[Room] ClientSocket không tồn tại!"
-                    );
-                    return;
-                }
+        if (currentUser == null) {
+            return;
+        }
 
-                System.out.println(
-                        "[Room] Bắt đầu lắng nghe Server..."
+        boolean isHost =
+                room.getHostId()
+                == currentUser.getId();
+
+        if (isHost) {
+
+            /*
+             * Host không cần Ready.
+             * Host dùng nút này để Start.
+             */
+            readyButton.setText("BẮT ĐẦU");
+
+            /*
+             * Chỉ bật Start khi:
+             * 1. Đủ người
+             * 2. Tất cả người chơi Ready
+             */
+            boolean canStart =
+                    room.getCurrentPlayers()
+                    == room.getMaxPlayers()
+                    && areAllPlayersReady(room);
+
+            readyButton.setDisable(!canStart);
+
+        } else {
+
+            /*
+             * Player thường dùng nút này để Ready.
+             */
+            boolean isReady =
+                    isCurrentUserReady(room);
+
+            if (isReady) {
+
+                readyButton.setText(
+                        "ĐÃ SẴN SÀNG"
                 );
 
-                while (listening && clientSocket.isConnected()) {
+                readyButton.setDisable(true);
 
-                    Packet packet = clientSocket.receivePacket();
+            } else {
 
-                    if (packet == null) {
-                        break;
-                    }
+                readyButton.setText(
+                        "SẴN SÀNG"
+                );
 
-                    handleServerPacket(packet);
-                }
-
-            } catch (IOException e) {
-
-                if (listening) {
-                    System.err.println(
-                            "[Room] Lỗi nhận packet từ Server: "
-                            + e.getMessage()
-                    );
-                }
+                readyButton.setDisable(false);
             }
-
-        });
-
-        listenerThread.setDaemon(true);
-        listenerThread.setName("Room-Server-Listener");
-        listenerThread.start();
+        }
     }
 
-    /**
-     * Xử lý packet Server gửi xuống
-     */
-    private void handleServerPacket(Packet packet) {
+    // =========================
+    // CHECK CURRENT USER READY
+    // =========================
 
-        if (packet.getType() == null) {
+    private boolean isCurrentUserReady(
+            RoomDTO room) {
+
+        User currentUser =
+                session.getCurrentUser();
+
+        if (currentUser == null
+                || room.getReadyStates() == null) {
+
+            return false;
+        }
+
+        return room.getReadyStates()
+                .getOrDefault(
+                        currentUser.getId(),
+                        false
+                );
+    }
+
+    // =========================
+    // CHECK ALL READY
+    // =========================
+
+    private boolean areAllPlayersReady(
+            RoomDTO room) {
+
+        if (room.getReadyStates() == null) {
+            return false;
+        }
+
+        if (room.getReadyStates().isEmpty()) {
+            return false;
+        }
+
+        for (Map.Entry<Integer, Boolean> entry :
+                room.getReadyStates().entrySet()) {
+
+            if (!Boolean.TRUE.equals(
+                    entry.getValue())) {
+
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // =========================
+    // RECEIVE PACKET
+    // =========================
+
+    private void handleServerPacket(
+            Packet packet) {
+
+        if (packet == null
+                || packet.getType() == null) {
+
             return;
         }
 
         switch (packet.getType()) {
 
             case ROOM_STATE_UPDATE:
-                handleRoomStateUpdate(packet.getData());
+
+                handleRoomStateUpdate(
+                        packet.getData()
+                );
+
                 break;
 
             case GAME_START_NOTIFY:
-                handleGameStart(packet.getData());
+
+                handleGameStart(
+                        packet.getData()
+                );
+
                 break;
 
             default:
-                System.out.println(
-                        "[Room] Nhận packet: "
-                        + packet.getType()
-                );
                 break;
         }
     }
 
-    /**
-     * Đồng bộ trạng thái phòng
-     */
-    private void handleRoomStateUpdate(String rawJson) {
+    // =========================
+    // ROOM STATE UPDATE
+    // =========================
+
+    private void handleRoomStateUpdate(
+            String rawJson) {
 
         try {
 
-            RoomDTO room = gson.fromJson(
-                    rawJson,
-                    RoomDTO.class
-            );
+            RoomDTO room =
+                    gson.fromJson(
+                            rawJson,
+                            RoomDTO.class
+                    );
 
             if (room == null) {
                 return;
@@ -171,28 +282,16 @@ public class RoomController {
 
             currentRoom = room;
 
-            Platform.runLater(() -> {
+            updateRoomUI(room);
 
-                roomNameLabel.setText(
-                        room.getRoomName()
-                );
-
-                roomStatusLabel.setText(
-                        room.getCurrentPlayers()
-                        + "/"
-                        + room.getMaxPlayers()
-                        + " người chơi - "
-                        + room.getStatus()
-                );
-
-                playerListView.getItems().clear();
-
-                if (room.getPlayerNames() != null) {
-                    playerListView.getItems().addAll(
-                            room.getPlayerNames()
-                    );
-                }
-            });
+            System.out.println(
+                    "[Room] Cập nhật Room: "
+                    + room.getRoomName()
+                    + " | "
+                    + room.getCurrentPlayers()
+                    + "/"
+                    + room.getMaxPlayers()
+            );
 
         } catch (Exception e) {
 
@@ -203,35 +302,177 @@ public class RoomController {
         }
     }
 
-    /**
-     * Nhận tín hiệu bắt đầu trận
-     */
-    private void handleGameStart(String rawJson) {
+    // =========================
+    // BUTTON
+    // =========================
+
+    @FXML
+    private void handleReady() {
+
+        if (currentRoom == null) {
+            return;
+        }
+
+        User currentUser =
+                session.getCurrentUser();
+
+        if (currentUser == null) {
+            return;
+        }
+
+        /*
+         * Nếu là Host → gửi Start
+         */
+        if (currentRoom.getHostId()
+                == currentUser.getId()) {
+
+            handleStartGame();
+
+            return;
+        }
+
+        /*
+         * Nếu là Player thường → Ready
+         */
+        sendReady();
+    }
+
+    // =========================
+    // SEND READY
+    // =========================
+
+    private void sendReady() {
+
+        try {
+
+            ClientSocket clientSocket =
+                    session.getClientSocket();
+
+            if (clientSocket == null
+                    || !clientSocket.isConnected()) {
+
+                roomStatusLabel.setText(
+                        "Chưa kết nối Server!"
+                );
+
+                return;
+            }
+
+            Packet request =
+                    new Packet(
+                            PacketType.ROOM_READY_REQ,
+                            "true"
+                    );
+
+            clientSocket.sendPacket(request);
+
+            readyButton.setDisable(true);
+
+            readyButton.setText(
+                    "ĐÃ SẴN SÀNG"
+            );
+
+            System.out.println(
+                    "[Room] Đã gửi READY."
+            );
+
+        } catch (IOException e) {
+
+            roomStatusLabel.setText(
+                    "Không thể gửi trạng thái Ready!"
+            );
+
+            System.err.println(
+                    "[Room] Lỗi Ready: "
+                    + e.getMessage()
+            );
+        }
+    }
+
+    // =========================
+    // START GAME
+    // =========================
+
+    private void handleStartGame() {
+
+        try {
+
+            ClientSocket clientSocket =
+                    session.getClientSocket();
+
+            if (clientSocket == null
+                    || !clientSocket.isConnected()) {
+
+                roomStatusLabel.setText(
+                        "Chưa kết nối Server!"
+                );
+
+                return;
+            }
+
+            Packet request =
+                    new Packet(
+                            PacketType.ROOM_START_REQ,
+                            ""
+                    );
+
+            clientSocket.sendPacket(request);
+
+            readyButton.setDisable(true);
+
+            System.out.println(
+                    "[Room] Host đã gửi ROOM_START_REQ."
+            );
+
+        } catch (IOException e) {
+
+            roomStatusLabel.setText(
+                    "Không thể bắt đầu trận!"
+            );
+
+            System.err.println(
+                    "[Room] Lỗi Start: "
+                    + e.getMessage()
+            );
+        }
+    }
+
+    // =========================
+    // GAME START
+    // =========================
+
+    private void handleGameStart(
+            String rawJson) {
 
         System.out.println(
                 "[Room] Nhận GAME_START_NOTIFY!"
         );
 
-        listening = false;
+        removePacketListener();
 
         Platform.runLater(() -> {
 
             try {
 
-                GameCanvasApp gameCanvasApp
-                        = new GameCanvasApp();
+                GameCanvasApp gameCanvasApp =
+                        new GameCanvasApp();
 
-                Scene gameScene
-                        = gameCanvasApp.createGameScene();
+                Scene gameScene =
+                        gameCanvasApp.createGameScene();
 
-                Stage stage
-                        = (Stage) roomNameLabel
+                Stage stage =
+                        (Stage) roomNameLabel
                                 .getScene()
                                 .getWindow();
 
                 stage.setScene(gameScene);
-                stage.setTitle("Tank 2D - Game");
+
+                stage.setTitle(
+                        "Tank 2D - Game"
+                );
+
                 stage.setResizable(false);
+
                 stage.show();
 
                 System.out.println(
@@ -248,52 +489,17 @@ public class RoomController {
         });
     }
 
-    @FXML
-    private void handleReady() {
-
-        try {
-
-            ClientSocket clientSocket
-                    = session.getClientSocket();
-
-            if (clientSocket == null
-                    || !clientSocket.isConnected()) {
-
-                roomStatusLabel.setText(
-                        "Chưa kết nối Server!"
-                );
-                return;
-            }
-
-            Packet request = new Packet(
-                    PacketType.ROOM_READY_REQ,
-                    "true"
-            );
-
-            clientSocket.sendPacket(request);
-
-            readyButton.setDisable(true);
-            readyButton.setText("ĐÃ SẴN SÀNG");
-
-        } catch (IOException e) {
-
-            roomStatusLabel.setText(
-                    "Không thể gửi trạng thái Ready!"
-            );
-
-            System.err.println(
-                    "[Room] Lỗi Ready: "
-                    + e.getMessage()
-            );
-        }
-    }
+    // =========================
+    // LEAVE ROOM
+    // =========================
 
     @FXML
     private void handleLeave() {
 
         try {
-            ClientSocket clientSocket
-                    = session.getClientSocket();
+
+            ClientSocket clientSocket =
+                    session.getClientSocket();
 
             if (clientSocket != null
                     && clientSocket.isConnected()) {
@@ -303,6 +509,10 @@ public class RoomController {
                                 PacketType.ROOM_LEAVE_REQ,
                                 ""
                         )
+                );
+
+                System.out.println(
+                        "[Room] Đã gửi yêu cầu rời phòng."
                 );
             }
 
@@ -314,27 +524,42 @@ public class RoomController {
             );
         }
 
-        listening = false;
+        removePacketListener();
 
         Platform.runLater(() -> {
 
             try {
-                FXMLLoader loader = new FXMLLoader(
-                        RoomController.class.getResource(
-                                "/com/tank2d/client/view/lobby.fxml"
-                        )
-                );
 
-                Scene lobbyScene = new Scene(loader.load());
+                FXMLLoader loader =
+                        new FXMLLoader(
+                                RoomController.class.getResource(
+                                        "/com/tank2d/client/view/lobby.fxml"
+                                )
+                        );
 
-                Stage stage
-                        = (Stage) leaveButton
+                Scene lobbyScene =
+                        new Scene(
+                                loader.load()
+                        );
+
+                Stage stage =
+                        (Stage) leaveButton
                                 .getScene()
                                 .getWindow();
 
-                stage.setScene(lobbyScene);
-                stage.setTitle("Tank 2D Online - Lobby");
+                stage.setScene(
+                        lobbyScene
+                );
+
+                stage.setTitle(
+                        "Tank 2D Online - Lobby"
+                );
+
                 stage.show();
+
+                System.out.println(
+                        "[Room] Đã quay lại Lobby."
+                );
 
             } catch (IOException e) {
 
@@ -344,5 +569,25 @@ public class RoomController {
                 );
             }
         });
+    }
+
+    // =========================
+    // REMOVE LISTENER
+    // =========================
+
+    private void removePacketListener() {
+
+        if (listenerRegistered) {
+
+            session.removePacketListener(
+                    packetListener
+            );
+
+            listenerRegistered = false;
+
+            System.out.println(
+                    "[Room] Đã xóa Room Packet Listener."
+            );
+        }
     }
 }

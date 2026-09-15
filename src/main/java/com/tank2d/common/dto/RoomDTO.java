@@ -1,6 +1,7 @@
 package com.tank2d.common.dto;
 
 import java.util.List;
+import java.util.Map;
 
 public class RoomDTO {
 
@@ -9,14 +10,29 @@ public class RoomDTO {
     private int currentPlayers;
     private int maxPlayers;
     private String status;
+
+    // Danh sách tên người chơi
     private List<String> playerNames;
+
+    // ID của Host
+    private int hostId;
+
+    // Trạng thái Ready của từng người chơi
+    // userId -> true/false
+    private Map<Integer, Boolean> readyStates;
 
     public RoomDTO() {
     }
 
-    public RoomDTO(int roomId, String roomName,
-            int currentPlayers, int maxPlayers,
-            String status, List<String> playerNames) {
+    public RoomDTO(
+            int roomId,
+            String roomName,
+            int currentPlayers,
+            int maxPlayers,
+            String status,
+            List<String> playerNames,
+            int hostId,
+            Map<Integer, Boolean> readyStates) {
 
         this.roomId = roomId;
         this.roomName = roomName;
@@ -24,7 +40,13 @@ public class RoomDTO {
         this.maxPlayers = maxPlayers;
         this.status = status;
         this.playerNames = playerNames;
+        this.hostId = hostId;
+        this.readyStates = readyStates;
     }
+
+    // =========================
+    // ROOM ID
+    // =========================
 
     public int getRoomId() {
         return roomId;
@@ -34,6 +56,10 @@ public class RoomDTO {
         this.roomId = roomId;
     }
 
+    // =========================
+    // ROOM NAME
+    // =========================
+
     public String getRoomName() {
         return roomName;
     }
@@ -41,6 +67,10 @@ public class RoomDTO {
     public void setRoomName(String roomName) {
         this.roomName = roomName;
     }
+
+    // =========================
+    // CURRENT PLAYERS
+    // =========================
 
     public int getCurrentPlayers() {
         return currentPlayers;
@@ -50,6 +80,10 @@ public class RoomDTO {
         this.currentPlayers = currentPlayers;
     }
 
+    // =========================
+    // MAX PLAYERS
+    // =========================
+
     public int getMaxPlayers() {
         return maxPlayers;
     }
@@ -57,6 +91,10 @@ public class RoomDTO {
     public void setMaxPlayers(int maxPlayers) {
         this.maxPlayers = maxPlayers;
     }
+
+    // =========================
+    // STATUS
+    // =========================
 
     public String getStatus() {
         return status;
@@ -66,11 +104,43 @@ public class RoomDTO {
         this.status = status;
     }
 
+    // =========================
+    // PLAYER NAMES
+    // =========================
+
     public List<String> getPlayerNames() {
         return playerNames;
     }
 
-    public void setPlayerNames(List<String> playerNames) {
+    public void setPlayerNames(
+            List<String> playerNames) {
+
         this.playerNames = playerNames;
+    }
+
+    // =========================
+    // HOST
+    // =========================
+
+    public int getHostId() {
+        return hostId;
+    }
+
+    public void setHostId(int hostId) {
+        this.hostId = hostId;
+    }
+
+    // =========================
+    // READY STATES
+    // =========================
+
+    public Map<Integer, Boolean> getReadyStates() {
+        return readyStates;
+    }
+
+    public void setReadyStates(
+            Map<Integer, Boolean> readyStates) {
+
+        this.readyStates = readyStates;
     }
 }
