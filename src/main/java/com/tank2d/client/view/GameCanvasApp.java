@@ -3,7 +3,6 @@ package com.tank2d.client.view;
 import com.google.gson.Gson;
 import com.tank2d.common.dto.game.GameSnapshotDTO;
 import com.tank2d.common.dto.game.TankSnapshotDTO;
-import com.tank2d.common.dto.game.BulletSnapshotDTO; 
 
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
