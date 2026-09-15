@@ -498,7 +498,10 @@ public class ClientHandler implements Runnable {
                 socket.close();
             }
         } catch (IOException e) {
-            System.err.println("[ClientHandler] Lỗi khi giải phóng socket: " + e.getMessage());
+            System.err.println(
+                    "[Lobby] Lỗi gửi danh sách phòng: "
+                    + e.getMessage()
+            );
         }
 
         System.out.println("[ClientHandler] Đã đóng tài nguyên kết nối an toàn.");
