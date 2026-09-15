@@ -1,5 +1,7 @@
 package com.tank2d.common.dto;
 
+import java.util.List;
+
 public class RoomDTO {
 
     private int roomId;
@@ -7,18 +9,21 @@ public class RoomDTO {
     private int currentPlayers;
     private int maxPlayers;
     private String status;
+    private List<String> playerNames;
 
     public RoomDTO() {
     }
 
     public RoomDTO(int roomId, String roomName,
             int currentPlayers, int maxPlayers,
-            String status) {
+            String status, List<String> playerNames) {
+
         this.roomId = roomId;
         this.roomName = roomName;
         this.currentPlayers = currentPlayers;
         this.maxPlayers = maxPlayers;
         this.status = status;
+        this.playerNames = playerNames;
     }
 
     public int getRoomId() {
@@ -59,5 +64,13 @@ public class RoomDTO {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public List<String> getPlayerNames() {
+        return playerNames;
+    }
+
+    public void setPlayerNames(List<String> playerNames) {
+        this.playerNames = playerNames;
     }
 }

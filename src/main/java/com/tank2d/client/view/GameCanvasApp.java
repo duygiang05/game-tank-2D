@@ -37,21 +37,27 @@ public class GameCanvasApp extends Application {
             + "\"bullets\":[]" // Danh sách đạn (nếu có)
             + "}";
 
-    @Override
-    public void start(Stage primaryStage) {
-        canvas = new Canvas(CANVAS_WIDTH, CANVAS_HEIGHT);
-        gc = canvas.getGraphicsContext2D();
+   @Override
+public void start(Stage primaryStage) {
+    Scene scene = createGameScene();
 
-        StackPane root = new StackPane(canvas);
-        Scene scene = new Scene(root, CANVAS_WIDTH, CANVAS_HEIGHT);
+    primaryStage.setTitle("Tank 2D - Game");
+    primaryStage.setScene(scene);
+    primaryStage.setResizable(false);
+    primaryStage.show();
+}
 
-        primaryStage.setTitle("Tank 2D - Canvas Render Engine (Tùng)");
-        primaryStage.setScene(scene);
-        primaryStage.setResizable(false);
-        primaryStage.show();
+public Scene createGameScene() {
+    canvas = new Canvas(CANVAS_WIDTH, CANVAS_HEIGHT);
+    gc = canvas.getGraphicsContext2D();
 
-        startRenderLoop();
-    }
+    StackPane root = new StackPane(canvas);
+    Scene scene = new Scene(root, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    startRenderLoop();
+
+    return scene;
+}
 
     private void startRenderLoop() {
         new AnimationTimer() {

@@ -118,14 +118,35 @@ public class RoomManager {
 
         return toRoomDTO(room);
     }
+    public synchronized boolean setPlayerReady(
+        int roomId,
+        int userId,
+        boolean ready) {
+
+    Room room = rooms.get(roomId);
+
+    if (room == null) {
+        return false;
+    }
+
+    return room.setReady(userId, ready);
+}
 
     private RoomDTO toRoomDTO(Room room) {
-        return new RoomDTO(
-                room.getRoomId(),
-                room.getRoomName(),
-                room.getCurrentPlayers(),
-                room.getMaxPlayers(),
-                room.getStatus()
-        );
+
+    List<String> playerNames = new ArrayList<>();
+
+    for (User user : room.getPlayers()) {
+        playerNames.add(user.getUsername());
     }
+
+    return new RoomDTO(
+            room.getRoomId(),
+            room.getRoomName(),
+            room.getCurrentPlayers(),
+            room.getMaxPlayers(),
+            room.getStatus(),
+            playerNames
+    );
+}
 }
