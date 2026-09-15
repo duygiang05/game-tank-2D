@@ -40,7 +40,6 @@ public class GameCanvasApp extends Application {
     private GraphicsContext gc;
     private final Gson gson = new Gson();
 
-    // Socket kết nối từ Session đăng nhập
     private ClientSocket clientSocket;
 
     // FPS Counter
@@ -52,22 +51,9 @@ public class GameCanvasApp extends Application {
     private final Set<KeyCode> activeKeys = new HashSet<>();
     private boolean spacePressed = false;
 
-    // Danh sách Snapshot
+    // Danh sách Snapshot Render (CopyOnWriteArrayList chống ConcurrentModificationException)
     private final List<TankSnapshotDTO> tanks = new CopyOnWriteArrayList<>();
     private final List<BulletSnapshotDTO> bullets = new CopyOnWriteArrayList<>();
-    private int bulletIdCounter = 1;
-
-    // Tọa độ và trạng thái xe người chơi (Tank #1)
-    private double playerX = 250.0;
-    private double playerY = 300.0;
-    private double playerAngle = 0.0; // 0 độ: quay sang phải, 90 độ: quay xuống dưới, 180 độ: sang trái, 270 độ: lên trên
-    private int playerHp = 100;
-
-    // Tọa độ xe đối thủ (Tank #2)
-    private double enemyX = 550.0;
-    private double enemyY = 300.0;
-    private double enemyAngle = 180.0;
-    private int enemyHp = 100;
 
     @Override
     public void start(Stage primaryStage) {
@@ -77,13 +63,16 @@ public class GameCanvasApp extends Application {
         StackPane root = new StackPane(canvas);
         Scene scene = new Scene(root, CANVAS_WIDTH, CANVAS_HEIGHT);
 
+        // KHỞI TẠO XE MẶC ĐỊNH SẴN ĐỂ MÀN HÌNH KHÔNG BỊ ĐEN RỖNG KHI CHỜ SERVER GỬI SNAPSHOT
+        initDefaultTanks();
+
         // LẮNG NGHE SỰ KIỆN BÀN PHÍM
         scene.setOnKeyPressed(e -> {
             activeKeys.add(e.getCode());
             if (e.getCode() == KeyCode.SPACE && !spacePressed) {
                 spacePressed = true;
-                spawnBullet();        // 1. Sinh đạn cục bộ (code cũ)
-                sendShootRequest();   // 2. Gửi PLAYER_SHOOT_REQ lên Server
+                spawnLocalBullet();
+                sendShootRequest();
             }
         });
 
@@ -98,70 +87,120 @@ public class GameCanvasApp extends Application {
         primaryStage.setScene(scene);
         primaryStage.setResizable(false);
         primaryStage.show();
+        
+        canvas.setFocusTraversable(true);
+        canvas.requestFocus();
 
-        // 1. DÙNG LẠI KẾT NỐI MẠNG TỪ CLIENTSESSION & MỞ LUỒNG HỨNG GAME_SNAPSHOT
+        // 1. KẾT NỐI MẠNG TỪ CLIENTSESSION
         initNetworkFromSession();
 
-        // 2. CHẠY VÒNG LẶP RENDER DỰNG HÌNH (60 FPS)
+        // 2. VÒNG LẶP RENDER DỰNG HÌNH & GỬI INPUT (60 FPS)
         startRenderLoop();
     }
 
-    private void initNetworkFromSession() {
-        // Lấy socket sẵn có qua ClientSession.getInstance().getClientSocket()
-        this.clientSocket = ClientSession.getInstance().getClientSocket();
+    private void initDefaultTanks() {
+        tanks.clear();
+        tanks.add(new TankSnapshotDTO(1, 250.0, 300.0, 0.0, 100, true));
+        tanks.add(new TankSnapshotDTO(2, 550.0, 300.0, 180.0, 100, true));
+    }
+    
+    private int localBulletId = 1000;
 
-        // Nếu socket đã kết nối, mở luồng đọc dữ liệu từ Server
-        if (this.clientSocket != null && this.clientSocket.isConnected()) {
-            Thread networkReadThread = new Thread(() -> {
-                while (clientSocket != null && clientSocket.isConnected()) {
-                    try {
-                        Packet packet = clientSocket.receivePacket();
-                        if (packet != null && packet.getType() == PacketType.GAME_SNAPSHOT) {
-                            handleGameSnapshot(packet.getData());
-                        }
-                    } catch (IOException e) {
-                        System.err.println("[GameCanvasApp] Mất kết nối đọc từ Server: " + e.getMessage());
-                        break;
-                    }
-                }
-            });
-            networkReadThread.setDaemon(true);
-            networkReadThread.start();
+private void spawnLocalBullet() {
+    if (tanks.isEmpty()) return;
+
+    TankSnapshotDTO player = tanks.get(0);
+    double rad = Math.toRadians(player.getAngle());
+    double speed = 7.0;
+
+    double startX = player.getX() + Math.cos(rad) * (TANK_SIZE / 2.0 + 5);
+    double startY = player.getY() + Math.sin(rad) * (TANK_SIZE / 2.0 + 5);
+
+    double vx = Math.cos(rad) * speed;
+    double vy = Math.sin(rad) * speed;
+
+    bullets.add(new BulletSnapshotDTO(localBulletId++, player.getId(), startX, startY, vx, vy));
+}
+
+private void updateLocalBulletPhysics() {
+    for (BulletSnapshotDTO b : bullets) {
+        b.setX(b.getX() + b.getVx());
+        setBulletY(b, b.getY() + b.getVy());
+    }
+
+    bullets.removeIf(b -> b.getX() < 0 || b.getX() > CANVAS_WIDTH || b.getY() < 0 || b.getY() > CANVAS_HEIGHT);
+}
+
+private void setBulletY(BulletSnapshotDTO bullet, double newY) {
+    try {
+        java.lang.reflect.Field fieldY = BulletSnapshotDTO.class.getDeclaredField("y");
+        fieldY.setAccessible(true);
+        fieldY.setDouble(bullet, newY);
+    } catch (Exception ignored) {}
+}
+
+private void initNetworkFromSession() {
+    // 1. Lấy socket từ Session
+    this.clientSocket = ClientSession.getInstance().getClientSocket();
+
+    // 2. NẾU NULL: Tự khởi tạo và GỌI CONNECT()
+    if (this.clientSocket == null || !this.clientSocket.isConnected()) {
+        System.out.println("[GameCanvasApp] Tự động tạo và kết nối Socket tới localhost:8888...");
+        try {
+            this.clientSocket = new ClientSocket("localhost", 8888);
+            this.clientSocket.connect(); // <--- ĐÂY LÀ DÒNG QUAN TRỌNG NHẤT BỊ THIẾU!
+        } catch (Exception e) {
+            System.err.println("[GameCanvasApp] Kết nối Server thất bại: " + e.getMessage());
         }
     }
 
-    // HỨNG DỮ LIỆU GAME_SNAPSHOT TỪ SERVER ĐỂ CẬP NHẬT XE VÀ ĐẠN REALTIME
+    // 3. Khởi tạo luồng đọc Snapshot từ Server
+    if (this.clientSocket != null && this.clientSocket.isConnected()) {
+        System.out.println("[GameCanvasApp] Socket đã kết nối thành công! Đang lắng nghe Snapshot...");
+        
+        Thread networkReadThread = new Thread(() -> {
+            while (clientSocket != null && clientSocket.isConnected()) {
+                try {
+                    Packet packet = clientSocket.receivePacket();
+                    if (packet != null && packet.getType() == PacketType.GAME_SNAPSHOT) {
+                        handleGameSnapshot(packet.getData());
+                    }
+                } catch (Exception e) {
+                    System.err.println("[GameCanvasApp] Lỗi đọc Packet: " + e.getMessage());
+                    try {
+                        Thread.sleep(10);
+                    } catch (InterruptedException ignored) {}
+                }
+            }
+        });
+        networkReadThread.setDaemon(true);
+        networkReadThread.start();
+    } else {
+        System.err.println("[GameCanvasApp] CẢNH BÁO: Không thể kết nối tới Server!");
+    }
+}
+
     private void handleGameSnapshot(String jsonPayload) {
         if (jsonPayload == null || jsonPayload.isEmpty()) return;
 
-        GameSnapshotDTO snapshot = gson.fromJson(jsonPayload, GameSnapshotDTO.class);
-        if (snapshot != null) {
-            // Cập nhật đạn từ Server
-            if (snapshot.getBullets() != null) {
-                this.bullets.clear();
-                this.bullets.addAll(snapshot.getBullets());
-            }
+        try {
+            GameSnapshotDTO snapshot = gson.fromJson(jsonPayload, GameSnapshotDTO.class);
+            if (snapshot != null) {
+                if (snapshot.getBullets() != null) {
+                    this.bullets.clear();
+                    this.bullets.addAll(snapshot.getBullets());
+                }
 
-            // Cập nhật trạng thái xe từ Server
-            if (snapshot.getTanks() != null && !snapshot.getTanks().isEmpty()) {
-                for (TankSnapshotDTO tankDTO : snapshot.getTanks()) {
-                    if (tankDTO.getId() == 1) {
-                        this.playerX = tankDTO.getX();
-                        this.playerY = tankDTO.getY();
-                        this.playerAngle = tankDTO.getAngle();
-                        this.playerHp = tankDTO.getHp();
-                    } else if (tankDTO.getId() == 2) {
-                        this.enemyX = tankDTO.getX();
-                        this.enemyY = tankDTO.getY();
-                        this.enemyAngle = tankDTO.getAngle();
-                        this.enemyHp = tankDTO.getHp();
-                    }
+                if (snapshot.getTanks() != null && !snapshot.getTanks().isEmpty()) {
+                    this.tanks.clear();
+                    this.tanks.addAll(snapshot.getTanks());
                 }
             }
+        } catch (Exception e) {
+            System.err.println("[GameCanvasApp] Lỗi parse GameSnapshotDTO: " + e.getMessage());
         }
     }
 
-    // GỬI GÓI TIN DI CHUYỂN PLAYER_INPUT LÊN SERVER
     private void sendInputToServer() {
         if (clientSocket == null || !clientSocket.isConnected()) return;
 
@@ -186,7 +225,6 @@ public class GameCanvasApp extends Application {
         }
     }
 
-    // GỬI GÓI TIN BẮN ĐẠN PLAYER_SHOOT_REQ LÊN SERVER
     private void sendShootRequest() {
         if (clientSocket == null || !clientSocket.isConnected()) return;
 
@@ -197,112 +235,70 @@ public class GameCanvasApp extends Application {
         }
     }
 
-    private void startRenderLoop() {
+private void startRenderLoop() {
         new AnimationTimer() {
             @Override
             public void handle(long now) {
                 updateFpsCounter(now);
 
-                // 1. Gửi gói tin di chuyển lên Server
+                // 1. Gửi phím bấm lên Server (cho luồng Server)
                 sendInputToServer();
 
-                // 2. Tính toán chuyển động xe và đạn cục bộ
-                updatePhysics();
+                // 2. Tính toán vật lý cục bộ để di chuyển xe ngay lập tức trên màn hình
+                updateLocalPhysics();
 
-                // 3. Xóa màn hình
+                // 3. Xóa và vẽ lại Canvas
                 gc.setFill(Color.rgb(22, 24, 29));
                 gc.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-                // 4. Vẽ đạn
                 renderBullets();
-
-                // 5. Vẽ xe tăng & thanh máu (HP Bar)
                 renderTanks();
-
-                // 6. Vẽ bảng điểm thu nhỏ (Mini-Scoreboard)
                 renderMiniScoreboard();
-
-                // 7. Hiển thị thông số FPS và phím bấm
                 renderOverlayInfo();
             }
         }.start();
     }
 
-    private void updatePhysics() {
-        // --- ĐIỀU KHIỂN XE TĂNG ---
-        // A/D: Xoay thân & nòng xe
-        double rotateSpeed = 2;
+    // TÍNH TOÁN DI CHUYỂN CỤC BỘ (Giúp xe phản hồi bàn phím ngay lập tức)
+    private void updateLocalPhysics() {
+        if (tanks.isEmpty()) return;
+
+        // Lấy xe đầu tiên (Xe Player #1)
+        TankSnapshotDTO playerTank = tanks.get(0);
+        double x = playerTank.getX();
+        double y = playerTank.getY();
+        double angle = playerTank.getAngle();
+
+        double rotateSpeed = 3.0;
+        double moveSpeed = 2.5;
+
         if (activeKeys.contains(KeyCode.A) || activeKeys.contains(KeyCode.LEFT)) {
-            playerAngle = (playerAngle - rotateSpeed + 360.0) % 360.0;
+            angle = (angle - rotateSpeed + 360.0) % 360.0;
         }
         if (activeKeys.contains(KeyCode.D) || activeKeys.contains(KeyCode.RIGHT)) {
-            playerAngle = (playerAngle + rotateSpeed) % 360.0;
+            angle = (angle + rotateSpeed) % 360.0;
         }
 
-        // W/S: Tiến / Lùi theo hướng góc xe đang quay
-        double moveSpeed = 1;
-        double rad = Math.toRadians(playerAngle);
+        double rad = Math.toRadians(angle);
         if (activeKeys.contains(KeyCode.W) || activeKeys.contains(KeyCode.UP)) {
-            playerX += Math.cos(rad) * moveSpeed;
-            playerY += Math.sin(rad) * moveSpeed;
+            x += Math.cos(rad) * moveSpeed;
+            y += Math.sin(rad) * moveSpeed;
         }
         if (activeKeys.contains(KeyCode.S) || activeKeys.contains(KeyCode.DOWN)) {
-            playerX -= Math.cos(rad) * moveSpeed;
-            playerY -= Math.sin(rad) * moveSpeed;
+            x -= Math.cos(rad) * moveSpeed;
+            y -= Math.sin(rad) * moveSpeed;
         }
 
-        // Giữ xe trong màn hình
-        playerX = Math.max(30, Math.min(CANVAS_WIDTH - 30, playerX));
-        playerY = Math.max(30, Math.min(CANVAS_HEIGHT - 30, playerY));
+        // Giới hạn trong khung hình Canvas
+        x = Math.max(30, Math.min(CANVAS_WIDTH - 30, x));
+        y = Math.max(30, Math.min(CANVAS_HEIGHT - 30, y));
 
-        // --- CẬP NHẬT TỌA ĐỘ ĐẠN BAY (CẢ TRỤC X VÀ TRỤC Y) ---
-        for (BulletSnapshotDTO b : bullets) {
-            b.setX(b.getX() + b.getVx());
-            // Cập nhật trục Y thông qua phản xạ hoặc trực tiếp theo vy
-            setBulletY(b, b.getY() + b.getVy());
-
-            // Kiểm tra va chạm đơn giản với xe đối thủ (Tank #2) để demo tụt máu
-            double dist = Math.hypot(b.getX() - enemyX, b.getY() - enemyY);
-            if (dist < TANK_SIZE / 1.5) {
-                enemyHp = Math.max(0, enemyHp - 10);
-                b.setX(-999); // Đánh dấu xóa đạn
-            }
-        }
-
-        // Xóa đạn ra ngoài map hoặc đã trúng mục tiêu
-        bullets.removeIf(b -> b.getX() < 0 || b.getX() > CANVAS_WIDTH || b.getY() < 0 || b.getY() > CANVAS_HEIGHT);
-
-        // Cập nhật Snapshot xe
-        tanks.clear();
-        tanks.add(new TankSnapshotDTO(1, playerX, playerY, playerAngle, playerHp, true));
-        tanks.add(new TankSnapshotDTO(2, enemyX, enemyY, enemyAngle, enemyHp, true));
-    }
-
-    // Hàm hỗ trợ cập nhật Y nếu DTO thiếu hàm setY()
-    private void setBulletY(BulletSnapshotDTO bullet, double newY) {
-        try {
-            java.lang.reflect.Field fieldY = BulletSnapshotDTO.class.getDeclaredField("y");
-            fieldY.setAccessible(true);
-            fieldY.setDouble(bullet, newY);
-        } catch (Exception ignored) {
-            // Trường hợp file BulletSnapshotDTO của bạn đã có hàm setY(), có thể gọi trực tiếp bullet.setY(newY)
-        }
-    }
-
-    private void spawnBullet() {
-        double bulletSpeed = 8.5;
-        double rad = Math.toRadians(playerAngle);
-
-        // Vận tốc đạn phân rã theo góc quay nòng pháo
-        double vx = Math.cos(rad) * bulletSpeed;
-        double vy = Math.sin(rad) * bulletSpeed;
-
-        // Vị trí xuất phát từ đầu nòng pháo (cách tâm xe 24px theo hướng quay)
-        double spawnOffset = 24.0;
-        double startX = playerX + Math.cos(rad) * spawnOffset;
-        double startY = playerY + Math.sin(rad) * spawnOffset;
-
-        bullets.add(new BulletSnapshotDTO(bulletIdCounter++, 1, startX, startY, vx, vy));
+        // Cập nhật lại vị trí tạm thời để Canvas vẽ ngay
+        playerTank.setX(x);
+        playerTank.setY(y);
+        playerTank.setAngle(angle);
+        
+        updateLocalBulletPhysics();
     }
 
     private void renderBullets() {
@@ -325,7 +321,6 @@ public class GameCanvasApp extends Application {
         gc.save();
         gc.translate(tank.getX(), tank.getY());
 
-        // Lệch 90 độ chuẩn quy ước sprite: 0 độ = sang phải
         gc.rotate(tank.getAngle() + 90.0);
 
         double halfSize = TANK_SIZE / 2.0;
@@ -362,39 +357,35 @@ public class GameCanvasApp extends Application {
 
         double hpRatio = Math.max(0, (double) tank.getHp() / MAX_HP);
 
-        // Nền máu màu đỏ
         gc.setFill(Color.RED);
         gc.fillRect(x, y, barW, barH);
 
-        // Lượng máu còn lại màu xanh lá
         gc.setFill(Color.LIME);
         gc.fillRect(x, y, barW * hpRatio, barH);
 
-        // Viền thanh máu
         gc.setStroke(Color.WHITE);
         gc.setLineWidth(1.0);
         gc.strokeRect(x, y, barW, barH);
     }
 
     private void renderMiniScoreboard() {
+        if (tanks.isEmpty()) return;
+
         int sbWidth = 175;
         int sbHeight = 30 + (tanks.size() * 20);
         int startX = CANVAS_WIDTH - sbWidth - 15;
         int startY = 15;
 
-        // Khung nền xám tối
         gc.setFill(Color.rgb(0, 0, 0, 0.75));
         gc.fillRect(startX, startY, sbWidth, sbHeight);
         gc.setStroke(Color.DARKGRAY);
         gc.setLineWidth(1.5);
         gc.strokeRect(startX, startY, sbWidth, sbHeight);
 
-        // Tiêu đề
         gc.setFont(Font.font("Consolas", FontWeight.BOLD, 12));
         gc.setFill(Color.GOLD);
         gc.fillText("BẢNG ĐIỂM CHIẾN ĐẤU", startX + 12, startY + 20);
 
-        // Danh sách hiển thị máu
         int lineY = startY + 38;
         for (TankSnapshotDTO tank : tanks) {
             gc.setFill(tank.getId() == 1 ? Color.LIGHTGREEN : Color.LIGHTCORAL);
@@ -404,15 +395,13 @@ public class GameCanvasApp extends Application {
     }
 
     private void renderOverlayInfo() {
-        // FPS
         gc.setFont(Font.font("Consolas", FontWeight.BOLD, 14));
         gc.setFill(Color.YELLOW);
         gc.fillText("FPS: " + currentFps, 15, 25);
 
-        // Hướng dẫn
         gc.setFont(Font.font("Arial", 12));
         gc.setFill(Color.LIGHTGRAY);
-        gc.fillText("A/D: Xoay xe | W/S: Tiến/Lùi | SPACE: Bắn đạn theo góc nòng", 15, 580);
+        gc.fillText("A/D: Xoay xe | W/S: Tiến/Lùi | SPACE: Bắn đạn", 15, 580);
     }
 
     private void updateFpsCounter(long now) {
