@@ -17,38 +17,63 @@ public class RoomManager {
         rooms = new LinkedHashMap<>();
     }
 
+    // =========================
+    // CREATE ROOM
+    // =========================
+
     public synchronized Room createRoom(User creator) {
+
+        if (creator == null) {
+            return null;
+        }
+
         int roomId = nextRoomId++;
 
+        /*
+         * Người tạo phòng chính là Host.
+         */
         Room room = new Room(
                 roomId,
-                "Room " + String.format("%02d", roomId)
+                "Room " + String.format("%02d", roomId),
+                creator.getId()
         );
 
-        if (creator != null) {
-            room.addPlayer(creator);
-        }
+        room.addPlayer(creator);
 
         rooms.put(roomId, room);
 
         System.out.println(
                 "[RoomManager] Tạo phòng: "
                 + room.getRoomName()
+                + " | Host: "
+                + creator.getUsername()
+                + " (ID: "
+                + creator.getId()
+                + ")"
         );
 
         return room;
     }
 
-    public synchronized boolean joinRoom(int roomId, User user) {
+    // =========================
+    // JOIN ROOM
+    // =========================
+
+    public synchronized boolean joinRoom(
+            int roomId,
+            User user) {
+
         Room room = rooms.get(roomId);
 
         if (room == null || user == null) {
             return false;
         }
 
-        boolean success = room.addPlayer(user);
+        boolean success =
+                room.addPlayer(user);
 
         if (success) {
+
             System.out.println(
                     "[RoomManager] "
                     + user.getUsername()
@@ -65,16 +90,25 @@ public class RoomManager {
         return success;
     }
 
-    public synchronized boolean leaveRoom(int roomId, int userId) {
+    // =========================
+    // LEAVE ROOM
+    // =========================
+
+    public synchronized boolean leaveRoom(
+            int roomId,
+            int userId) {
+
         Room room = rooms.get(roomId);
 
         if (room == null) {
             return false;
         }
 
-        boolean success = room.removePlayer(userId);
+        boolean success =
+                room.removePlayer(userId);
 
         if (success) {
+
             System.out.println(
                     "[RoomManager] User "
                     + userId
@@ -83,6 +117,7 @@ public class RoomManager {
             );
 
             if (room.getCurrentPlayers() == 0) {
+
                 rooms.remove(roomId);
 
                 System.out.println(
@@ -95,22 +130,44 @@ public class RoomManager {
         return success;
     }
 
-    public synchronized Room getRoom(int roomId) {
+    // =========================
+    // GET ROOM
+    // =========================
+
+    public synchronized Room getRoom(
+            int roomId) {
+
         return rooms.get(roomId);
     }
 
+    // =========================
+    // GET ALL ROOMS
+    // =========================
+
     public synchronized List<RoomDTO> getAllRooms() {
-        List<RoomDTO> roomDTOs = new ArrayList<>();
+
+        List<RoomDTO> roomDTOs =
+                new ArrayList<>();
 
         for (Room room : rooms.values()) {
-            roomDTOs.add(toRoomDTO(room));
+
+            roomDTOs.add(
+                    toRoomDTO(room)
+            );
         }
 
         return roomDTOs;
     }
 
-    public synchronized RoomDTO getRoomDTO(int roomId) {
-        Room room = rooms.get(roomId);
+    // =========================
+    // GET ROOM DTO
+    // =========================
+
+    public synchronized RoomDTO getRoomDTO(
+            int roomId) {
+
+        Room room =
+                rooms.get(roomId);
 
         if (room == null) {
             return null;
@@ -119,13 +176,49 @@ public class RoomManager {
         return toRoomDTO(room);
     }
 
-    private RoomDTO toRoomDTO(Room room) {
-        return new RoomDTO(
-                room.getRoomId(),
-                room.getRoomName(),
-                room.getCurrentPlayers(),
-                room.getMaxPlayers(),
-                room.getStatus()
+    // =========================
+    // SET PLAYER READY
+    // =========================
+
+    public synchronized boolean setPlayerReady(
+            int roomId,
+            int userId,
+            boolean ready) {
+
+        Room room =
+                rooms.get(roomId);
+
+        if (room == null) {
+            return false;
+        }
+
+        return room.setReady(
+                userId,
+                ready
         );
     }
+
+    // =========================
+    // CONVERT ROOM → DTO
+    // =========================
+
+    private RoomDTO toRoomDTO(Room room) {
+
+    List<String> playerNames = new ArrayList<>();
+
+    for (User user : room.getPlayers()) {
+        playerNames.add(user.getUsername());
+    }
+
+    return new RoomDTO(
+            room.getRoomId(),
+            room.getRoomName(),
+            room.getCurrentPlayers(),
+            room.getMaxPlayers(),
+            room.getStatus(),
+            playerNames,
+            room.getHostId(),
+            room.getReadyStates()
+    );
+}
 }

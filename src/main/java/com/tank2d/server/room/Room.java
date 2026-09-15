@@ -13,14 +13,20 @@ public class Room {
     private final String roomName;
     private final int maxPlayers;
 
+    // ID của người tạo phòng
+    private final int hostId;
+
     private final List<User> players;
     private final Map<Integer, Boolean> readyStates;
 
     private String status;
 
-    public Room(int roomId, String roomName) {
+    public Room(int roomId, String roomName, int hostId) {
+
         this.roomId = roomId;
         this.roomName = roomName;
+        this.hostId = hostId;
+
         this.maxPlayers = 2;
 
         this.players = new ArrayList<>();
@@ -41,9 +47,29 @@ public class Room {
         return maxPlayers;
     }
 
+    // =========================
+    // HOST
+    // =========================
+
+    public int getHostId() {
+        return hostId;
+    }
+
+    public synchronized boolean isHost(int userId) {
+        return hostId == userId;
+    }
+
+    // =========================
+    // PLAYERS
+    // =========================
+
     public synchronized List<User> getPlayers() {
         return new ArrayList<>(players);
     }
+
+    // =========================
+    // READY STATES
+    // =========================
 
     public synchronized Map<Integer, Boolean> getReadyStates() {
         return new LinkedHashMap<>(readyStates);
@@ -53,13 +79,19 @@ public class Room {
         return status;
     }
 
+    // =========================
+    // ADD PLAYER
+    // =========================
+
     public synchronized boolean addPlayer(User user) {
+
         if (user == null) {
             return false;
         }
 
         // Không cho một user vào cùng một phòng 2 lần
         for (User player : players) {
+
             if (player.getId() == user.getId()) {
                 return false;
             }
@@ -70,40 +102,81 @@ public class Room {
         }
 
         players.add(user);
-        readyStates.put(user.getId(), false);
+
+        /*
+         * Host luôn được xem là Ready.
+         * Người chơi thường ban đầu chưa Ready.
+         */
+        if (user.getId() == hostId) {
+            readyStates.put(user.getId(), true);
+        } else {
+            readyStates.put(user.getId(), false);
+        }
 
         updateStatus();
 
         return true;
     }
 
+    // =========================
+    // REMOVE PLAYER
+    // =========================
+
     public synchronized boolean removePlayer(int userId) {
+
         boolean removed = players.removeIf(
                 user -> user.getId() == userId
         );
 
         if (removed) {
+
             readyStates.remove(userId);
+
             updateStatus();
         }
 
         return removed;
     }
 
-    public synchronized boolean setReady(int userId, boolean ready) {
+    // =========================
+    // SET READY
+    // =========================
+
+    public synchronized boolean setReady(
+            int userId,
+            boolean ready) {
+
         if (!readyStates.containsKey(userId)) {
             return false;
         }
 
-        readyStates.put(userId, ready);
+        /*
+         * Host luôn Ready.
+         * Không cho Host chuyển về Not Ready.
+         */
+        if (userId == hostId) {
+            readyStates.put(userId, true);
+        } else {
+            readyStates.put(userId, ready);
+        }
+
         return true;
     }
 
+    // =========================
+    // CHECK READY
+    // =========================
+
     public synchronized boolean isReady(int userId) {
-        return readyStates.getOrDefault(userId, false);
+
+        return readyStates.getOrDefault(
+                userId,
+                false
+        );
     }
 
     public synchronized boolean areAllPlayersReady() {
+
         if (players.isEmpty()) {
             return false;
         }
@@ -113,14 +186,27 @@ public class Room {
                 .allMatch(Boolean::booleanValue);
     }
 
+    // =========================
+    // PLAYERS COUNT
+    // =========================
+
     public synchronized int getCurrentPlayers() {
+
         return players.size();
     }
 
+    // =========================
+    // ROOM STATUS
+    // =========================
+
     private void updateStatus() {
+
         if (players.size() >= maxPlayers) {
+
             status = "Full";
+
         } else {
+
             status = "Waiting";
         }
     }
