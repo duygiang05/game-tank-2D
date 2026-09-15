@@ -1,9 +1,13 @@
 package com.tank2d.client.view;
 
 import com.google.gson.Gson;
+import com.tank2d.client.ClientSession;
+import com.tank2d.client.network.ClientSocket;
 import com.tank2d.common.dto.game.BulletSnapshotDTO;
 import com.tank2d.common.dto.game.GameSnapshotDTO;
 import com.tank2d.common.dto.game.TankSnapshotDTO;
+import com.tank2d.common.protocol.Packet;
+import com.tank2d.common.protocol.PacketType;
 
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
@@ -17,8 +21,11 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -33,13 +40,17 @@ public class GameCanvasApp extends Application {
     private GraphicsContext gc;
     private final Gson gson = new Gson();
 
+    // Socket kết nối từ Session đăng nhập
+    private ClientSocket clientSocket;
+
     // FPS Counter
     private long lastFpsCheck = System.nanoTime();
     private int frameCounter = 0;
     private int currentFps = 0;
 
-    // Quản lý Input phím bấm
+    // Quản lý trạng thái bàn phím
     private final Set<KeyCode> activeKeys = new HashSet<>();
+    private boolean spacePressed = false;
 
     // Danh sách Snapshot
     private final List<TankSnapshotDTO> tanks = new CopyOnWriteArrayList<>();
@@ -69,19 +80,121 @@ public class GameCanvasApp extends Application {
         // LẮNG NGHE SỰ KIỆN BÀN PHÍM
         scene.setOnKeyPressed(e -> {
             activeKeys.add(e.getCode());
-            if (e.getCode() == KeyCode.SPACE) {
-                spawnBullet();
+            if (e.getCode() == KeyCode.SPACE && !spacePressed) {
+                spacePressed = true;
+                spawnBullet();        // 1. Sinh đạn cục bộ (code cũ)
+                sendShootRequest();   // 2. Gửi PLAYER_SHOOT_REQ lên Server
             }
         });
 
-        scene.setOnKeyReleased(e -> activeKeys.remove(e.getCode()));
+        scene.setOnKeyReleased(e -> {
+            activeKeys.remove(e.getCode());
+            if (e.getCode() == KeyCode.SPACE) {
+                spacePressed = false;
+            }
+        });
 
         primaryStage.setTitle("Tank 2D - Canvas Render Engine (Task 7)");
         primaryStage.setScene(scene);
         primaryStage.setResizable(false);
         primaryStage.show();
 
+        // 1. DÙNG LẠI KẾT NỐI MẠNG TỪ CLIENTSESSION & MỞ LUỒNG HỨNG GAME_SNAPSHOT
+        initNetworkFromSession();
+
+        // 2. CHẠY VÒNG LẶP RENDER DỰNG HÌNH (60 FPS)
         startRenderLoop();
+    }
+
+    private void initNetworkFromSession() {
+        // Lấy socket sẵn có qua ClientSession.getInstance().getClientSocket()
+        this.clientSocket = ClientSession.getInstance().getClientSocket();
+
+        // Nếu socket đã kết nối, mở luồng đọc dữ liệu từ Server
+        if (this.clientSocket != null && this.clientSocket.isConnected()) {
+            Thread networkReadThread = new Thread(() -> {
+                while (clientSocket != null && clientSocket.isConnected()) {
+                    try {
+                        Packet packet = clientSocket.receivePacket();
+                        if (packet != null && packet.getType() == PacketType.GAME_SNAPSHOT) {
+                            handleGameSnapshot(packet.getData());
+                        }
+                    } catch (IOException e) {
+                        System.err.println("[GameCanvasApp] Mất kết nối đọc từ Server: " + e.getMessage());
+                        break;
+                    }
+                }
+            });
+            networkReadThread.setDaemon(true);
+            networkReadThread.start();
+        }
+    }
+
+    // HỨNG DỮ LIỆU GAME_SNAPSHOT TỪ SERVER ĐỂ CẬP NHẬT XE VÀ ĐẠN REALTIME
+    private void handleGameSnapshot(String jsonPayload) {
+        if (jsonPayload == null || jsonPayload.isEmpty()) return;
+
+        GameSnapshotDTO snapshot = gson.fromJson(jsonPayload, GameSnapshotDTO.class);
+        if (snapshot != null) {
+            // Cập nhật đạn từ Server
+            if (snapshot.getBullets() != null) {
+                this.bullets.clear();
+                this.bullets.addAll(snapshot.getBullets());
+            }
+
+            // Cập nhật trạng thái xe từ Server
+            if (snapshot.getTanks() != null && !snapshot.getTanks().isEmpty()) {
+                for (TankSnapshotDTO tankDTO : snapshot.getTanks()) {
+                    if (tankDTO.getId() == 1) {
+                        this.playerX = tankDTO.getX();
+                        this.playerY = tankDTO.getY();
+                        this.playerAngle = tankDTO.getAngle();
+                        this.playerHp = tankDTO.getHp();
+                    } else if (tankDTO.getId() == 2) {
+                        this.enemyX = tankDTO.getX();
+                        this.enemyY = tankDTO.getY();
+                        this.enemyAngle = tankDTO.getAngle();
+                        this.enemyHp = tankDTO.getHp();
+                    }
+                }
+            }
+        }
+    }
+
+    // GỬI GÓI TIN DI CHUYỂN PLAYER_INPUT LÊN SERVER
+    private void sendInputToServer() {
+        if (clientSocket == null || !clientSocket.isConnected()) return;
+
+        boolean up = activeKeys.contains(KeyCode.W) || activeKeys.contains(KeyCode.UP);
+        boolean down = activeKeys.contains(KeyCode.S) || activeKeys.contains(KeyCode.DOWN);
+        boolean left = activeKeys.contains(KeyCode.A) || activeKeys.contains(KeyCode.LEFT);
+        boolean right = activeKeys.contains(KeyCode.D) || activeKeys.contains(KeyCode.RIGHT);
+
+        if (up || down || left || right) {
+            Map<String, Boolean> inputMap = new HashMap<>();
+            inputMap.put("up", up);
+            inputMap.put("down", down);
+            inputMap.put("left", left);
+            inputMap.put("right", right);
+
+            String jsonPayload = gson.toJson(inputMap);
+            try {
+                clientSocket.sendPacket(new Packet(PacketType.PLAYER_INPUT, jsonPayload));
+            } catch (IOException e) {
+                System.err.println("[GameCanvasApp] Lỗi gửi PLAYER_INPUT: " + e.getMessage());
+            }
+        }
+    }
+
+    // GỬI GÓI TIN BẮN ĐẠN PLAYER_SHOOT_REQ LÊN SERVER
+    private void sendShootRequest() {
+        if (clientSocket == null || !clientSocket.isConnected()) return;
+
+        try {
+            clientSocket.sendPacket(new Packet(PacketType.PLAYER_SHOOT_REQ, "{}"));
+        } catch (IOException e) {
+            System.err.println("[GameCanvasApp] Lỗi gửi PLAYER_SHOOT_REQ: " + e.getMessage());
+        }
     }
 
     private void startRenderLoop() {
@@ -90,23 +203,26 @@ public class GameCanvasApp extends Application {
             public void handle(long now) {
                 updateFpsCounter(now);
 
-                // 1. Tính toán chuyển động xe và đạn
+                // 1. Gửi gói tin di chuyển lên Server
+                sendInputToServer();
+
+                // 2. Tính toán chuyển động xe và đạn cục bộ
                 updatePhysics();
 
-                // 2. Xóa màn hình
+                // 3. Xóa màn hình
                 gc.setFill(Color.rgb(22, 24, 29));
                 gc.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-                // 3. Vẽ đạn
+                // 4. Vẽ đạn
                 renderBullets();
 
-                // 4. Vẽ xe tăng & thanh máu (HP Bar)
+                // 5. Vẽ xe tăng & thanh máu (HP Bar)
                 renderTanks();
 
-                // 5. Vẽ bảng điểm thu nhỏ (Mini-Scoreboard)
+                // 6. Vẽ bảng điểm thu nhỏ (Mini-Scoreboard)
                 renderMiniScoreboard();
 
-                // 6. Hiển thị thông số FPS và phím bấm
+                // 7. Hiển thị thông số FPS và phím bấm
                 renderOverlayInfo();
             }
         }.start();
