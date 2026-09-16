@@ -31,4 +31,16 @@ public class TankSnapshotDTO {
     public double getAngle() { return angle; }
     public int getHp() { return hp; }
     public boolean isAlive() { return isAlive; }
+
+    public void setX(double x) {
+        this.x = x;
+    }
+
+    public void setY(double y) {
+        this.y = y;
+    }
+
+    public void setAngle(double angle) {
+       this.angle = angle;
+    }
 }
