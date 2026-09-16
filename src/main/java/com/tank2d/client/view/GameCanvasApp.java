@@ -33,6 +33,7 @@ public class GameCanvasApp extends Application {
     private static final double TANK_SIZE = 36.0;
     private static final double BULLET_SIZE = 8.0;
     private static final double LERP_FACTOR = 0.3;
+    private static final double MAX_HP = 3.0;
 
     private Canvas canvas;
     private GraphicsContext gc;
@@ -112,22 +113,9 @@ public class GameCanvasApp extends Application {
     // =========================================================================
     private void initNetworkReceiver() {
         this.clientSocket = ClientSession.getInstance().getClientSocket();
-        if (this.clientSocket != null && this.clientSocket.isConnected()) {
-            Thread networkThread = new Thread(() -> {
-                while (clientSocket != null && clientSocket.isConnected()) {
-                    try {
-                        Packet packet = clientSocket.receivePacket();
-                        if (packet != null) {
-                            processIncomingPacket(packet);
-                        }
-                    } catch (Exception e) {
-                        try { Thread.sleep(10); } catch (InterruptedException ignored) {}
-                    }
-                }
-            });
-            networkThread.setDaemon(true);
-            networkThread.start();
-        }
+        
+        // Đăng ký trực tiếp bộ xử lý vào luồng duy nhất của ClientSession
+        ClientSession.getInstance().addPacketListener(this::processIncomingPacket);
     }
 
     private void processIncomingPacket(Packet packet) {
@@ -255,14 +243,29 @@ public class GameCanvasApp extends Application {
             gc.translate(tank.getX(), tank.getY());
             gc.rotate(tank.getAngle() + 90.0);
 
-            gc.setFill(tank.getId() == 1 ? Color.FORESTGREEN : Color.INDIANRED);
-            gc.fillRect(-TANK_SIZE / 2.0, -TANK_SIZE / 2.0, TANK_SIZE, TANK_SIZE);
+            // Xe 1 màu xanh lá tươi, Xe 2 màu đỏ cam
+            Color bodyColor = (tank.getId() == 1) ? Color.web("#4CAF50") : Color.web("#F44336");
 
+            // 1. Hai vệt xích đen 2 bên
+            gc.setFill(Color.web("#333333"));
+            gc.fillRect(-TANK_SIZE / 2.0 - 2, -TANK_SIZE / 2.0, 5, TANK_SIZE);
+            gc.fillRect(TANK_SIZE / 2.0 - 3, -TANK_SIZE / 2.0, 5, TANK_SIZE);
+
+            // 2. Thân xe vuông vức
+            gc.setFill(bodyColor);
+            gc.fillRect(-TANK_SIZE / 2.0 + 3, -TANK_SIZE / 2.0, TANK_SIZE - 6, TANK_SIZE);
+
+            // 3. Nòng súng chỉ hướng bắn
             gc.setFill(Color.BLACK);
-            gc.fillRect(-3, -TANK_SIZE / 2.0 - 8, 6, 12);
+            gc.fillRect(-2.5, -TANK_SIZE / 2.0 - 10, 5, 12);
+
+            // 4. Tháp pháo tròn ở giữa
+            gc.setFill(Color.web("#212121"));
+            gc.fillOval(-7, -7, 14, 14);
+
             gc.restore();
 
-            // Thanh HP
+            // 5. Thanh HP đơn giản
             double barWidth = 36.0;
             double barHeight = 5.0;
             double barX = tank.getX() - barWidth / 2.0;
@@ -271,7 +274,7 @@ public class GameCanvasApp extends Application {
             gc.setFill(Color.DARKRED);
             gc.fillRect(barX, barY, barWidth, barHeight);
 
-            double hpRatio = Math.max(0, Math.min(1.0, tank.getHp() / 100.0));
+            double hpRatio = Math.max(0.0, Math.min(1.0, (double) tank.getHp() / MAX_HP));
             gc.setFill(Color.LIME);
             gc.fillRect(barX, barY, barWidth * hpRatio, barHeight);
 
