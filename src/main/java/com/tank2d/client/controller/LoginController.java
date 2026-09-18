@@ -1,10 +1,12 @@
 package com.tank2d.client.controller;
 
 import com.google.gson.Gson;
+import com.tank2d.client.ClientSession;
 import com.tank2d.client.network.ClientSocket;
 import com.tank2d.common.dto.LoginRequest;
 import com.tank2d.common.dto.LoginResponse;
 import com.tank2d.common.dto.RegisterResponse;
+import com.tank2d.common.model.User;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
 
@@ -17,10 +19,13 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 
 import java.io.IOException;
+import java.util.function.Consumer;
 
 public class LoginController {
 
-    // Login form
+    // =========================
+    // LOGIN FORM
+    // =========================
     @FXML
     private VBox loginForm;
 
@@ -30,7 +35,9 @@ public class LoginController {
     @FXML
     private PasswordField passwordField;
 
-    // Register form
+    // =========================
+    // REGISTER FORM
+    // =========================
     @FXML
     private VBox registerForm;
 
@@ -45,87 +52,305 @@ public class LoginController {
 
     private final Gson gson = new Gson();
 
-    // Xử lý Login
+    private final ClientSession session = ClientSession.getInstance();
+
+    // Listener dùng chung với Reader Thread
+    private final Consumer<Packet> packetListener = this::handleServerPacket;
+
+    // =========================
+    // XỬ LÝ LOGIN
+    // =========================
     @FXML
     private void handleLogin(ActionEvent event) {
 
         String username = usernameField.getText().trim();
         String password = passwordField.getText().trim();
 
-        // Validate
+        // Validate dữ liệu
         if (username.isEmpty() || password.isEmpty()) {
+
             showAlert(
                     Alert.AlertType.ERROR,
                     "Lỗi đăng nhập",
                     "Vui lòng nhập đầy đủ Username và Password!"
             );
+
             return;
         }
 
-        // Chạy network ở thread riêng để không làm treo JavaFX UI
         Thread loginThread = new Thread(() -> {
 
-            ClientSocket clientSocket = new ClientSocket();
-
             try {
-                // 1. Kết nối tới Server
-                clientSocket.connect();
 
-                // 2. Tạo LoginRequest
+                // Kết nối ClientSession
+                session.connect();
+
+                ClientSocket clientSocket = session.getClientSocket();
+
+                if (clientSocket == null || !clientSocket.isConnected()) {
+                    showError("Không thể kết nối tới Server!");
+                    return;
+                }
+
+                /*
+                 * QUAN TRỌNG:
+                 * Không gọi receivePacket() ở đây.
+                 *
+                 * ClientSession đã có Reader Thread.
+                 * Reader Thread sẽ nhận AUTH_LOGIN_RES
+                 * và chuyển packet vào handleServerPacket().
+                 */
+                session.addPacketListener(packetListener);
+
+                // Tạo LoginRequest
                 LoginRequest request =
                         new LoginRequest(username, password);
 
-                // 3. Chuyển LoginRequest thành JSON
-                String requestJson = gson.toJson(request);
+                String requestJson =
+                        gson.toJson(request);
 
-                // 4. Đóng gói thành Packet AUTH_LOGIN_REQ
-                Packet packet = new Packet(
-                        PacketType.AUTH_LOGIN_REQ,
-                        requestJson
-                );
-
-                // 5. Gửi Packet tới Server
-                clientSocket.sendPacket(packet);
-
-                // 6. Nhận phản hồi từ Server
-                Packet responsePacket = clientSocket.receivePacket();
-
-                if (responsePacket == null) {
-                    showError("Không nhận được phản hồi từ Server!");
-                    return;
-                }
-
-                // Kiểm tra loại Packet
-                if (responsePacket.getType()
-                        != PacketType.AUTH_LOGIN_RES) {
-
-                    showError("Server trả về phản hồi không hợp lệ!");
-                    return;
-                }
-
-                // 7. Chuyển JSON response thành LoginResponse
-                LoginResponse response =
-                        gson.fromJson(
-                                responsePacket.getData(),
-                                LoginResponse.class
+                Packet packet =
+                        new Packet(
+                                PacketType.AUTH_LOGIN_REQ,
+                                requestJson
                         );
 
-                // 8. Hiển thị kết quả trên JavaFX UI
+                // Chỉ gửi request
+                clientSocket.sendPacket(packet);
+
+                System.out.println(
+                        "[Login] Đã gửi yêu cầu đăng nhập: " + username
+                );
+
+            } catch (IOException e) {
+
+                session.removePacketListener(packetListener);
+
+                showError(
+                        "Không thể kết nối tới Server!\n"
+                        + "Vui lòng kiểm tra Server đang chạy."
+                );
+
+                System.err.println(
+                        "[Login] Lỗi kết nối: "
+                        + e.getMessage()
+                );
+            }
+
+        });
+
+        loginThread.setDaemon(true);
+        loginThread.start();
+    }
+
+    // =========================
+    // NHẬN PACKET TỪ SERVER
+    // =========================
+    private void handleServerPacket(Packet packet) {
+
+        if (packet == null || packet.getType() == null) {
+            return;
+        }
+
+        if (packet.getType() != PacketType.AUTH_LOGIN_RES) {
+            return;
+        }
+
+        System.out.println(
+                "[Login] Nhận AUTH_LOGIN_RES từ Server."
+        );
+
+        try {
+
+            LoginResponse response =
+                    gson.fromJson(
+                            packet.getData(),
+                            LoginResponse.class
+                    );
+
+            // Không cần LoginController nghe nữa
+            session.removePacketListener(packetListener);
+
+            Platform.runLater(() -> {
+
+                if (response.isSuccess()) {
+
+                    // Lưu thông tin user
+                    session.setCurrentUser(
+                            new User(
+                                    response.getUserId(),
+                                    response.getUsername()
+                            )
+                    );
+
+                    System.out.println(
+                            "[Login] Đăng nhập thành công: "
+                            + response.getUsername()
+                    );
+
+                    Alert alert =
+                            new Alert(
+                                    Alert.AlertType.INFORMATION
+                            );
+
+                    alert.setTitle("Đăng nhập");
+                    alert.setHeaderText(null);
+                    alert.setContentText(
+                            response.getMessage()
+                    );
+
+                    alert.showAndWait();
+
+                    // Mở Lobby
+                    openLobby();
+
+                } else {
+
+                    showAlert(
+                            Alert.AlertType.ERROR,
+                            "Lỗi đăng nhập",
+                            response.getMessage()
+                    );
+                }
+            });
+
+        } catch (Exception e) {
+
+            session.removePacketListener(packetListener);
+
+            System.err.println(
+                    "[Login] Lỗi xử lý AUTH_LOGIN_RES: "
+                    + e.getMessage()
+            );
+
+            showError(
+                    "Không thể xử lý phản hồi đăng nhập!"
+            );
+        }
+    }
+
+    // =========================
+    // XỬ LÝ REGISTER
+    // =========================
+    @FXML
+    private void handleRegister(ActionEvent event) {
+
+        String username =
+                registerUsernameField.getText().trim();
+
+        String password =
+                registerPasswordField.getText().trim();
+
+        String confirmPassword =
+                confirmPasswordField.getText().trim();
+
+        // Validate
+        if (username.isEmpty()
+                || password.isEmpty()
+                || confirmPassword.isEmpty()) {
+
+            showAlert(
+                    Alert.AlertType.ERROR,
+                    "Lỗi đăng ký",
+                    "Vui lòng nhập đầy đủ thông tin!"
+            );
+
+            return;
+        }
+
+        // Kiểm tra password
+        if (!password.equals(confirmPassword)) {
+
+            showAlert(
+                    Alert.AlertType.ERROR,
+                    "Lỗi đăng ký",
+                    "Mật khẩu xác nhận không khớp!"
+            );
+
+            return;
+        }
+
+        Thread registerThread = new Thread(() -> {
+
+            ClientSocket clientSocket =
+                    new ClientSocket();
+
+            try {
+
+                // Kết nối Server
+                clientSocket.connect();
+
+                // Tạo LoginRequest
+                LoginRequest request =
+                        new LoginRequest(
+                                username,
+                                password
+                        );
+
+                String requestJson =
+                        gson.toJson(request);
+
+                Packet packet =
+                        new Packet(
+                                PacketType.AUTH_REGISTER_REQ,
+                                requestJson
+                        );
+
+                // Gửi tới Server
+                clientSocket.sendPacket(packet);
+
+                // Register dùng socket riêng nên vẫn nhận response trực tiếp
+                Packet responsePacket =
+                        clientSocket.receivePacket();
+
+                if (responsePacket == null) {
+
+                    showError(
+                            "Không nhận được phản hồi từ Server!"
+                    );
+
+                    return;
+                }
+
+                if (responsePacket.getType()
+                        != PacketType.AUTH_REGISTER_RES) {
+
+                    showError(
+                            "Server trả về phản hồi không hợp lệ!"
+                    );
+
+                    return;
+                }
+
+                RegisterResponse response =
+                        gson.fromJson(
+                                responsePacket.getData(),
+                                RegisterResponse.class
+                        );
+
                 Platform.runLater(() -> {
 
                     if (response.isSuccess()) {
 
                         showAlert(
                                 Alert.AlertType.INFORMATION,
-                                "Đăng nhập",
+                                "Đăng ký",
                                 response.getMessage()
                         );
+
+                        // Xóa form
+                        registerUsernameField.clear();
+                        registerPasswordField.clear();
+                        confirmPasswordField.clear();
+
+                        // Quay về Login
+                        showLogin(null);
 
                     } else {
 
                         showAlert(
                                 Alert.AlertType.ERROR,
-                                "Lỗi đăng nhập",
+                                "Lỗi đăng ký",
                                 response.getMessage()
                         );
                     }
@@ -139,155 +364,24 @@ public class LoginController {
                 );
 
                 System.err.println(
-                        "[Login] Lỗi kết nối: "
+                        "[Register] Lỗi kết nối: "
                         + e.getMessage()
                 );
 
             } finally {
 
-                // Đóng socket sau khi Login xong
                 clientSocket.close();
             }
 
         });
 
-        loginThread.setDaemon(true);
-        loginThread.start();
+        registerThread.setDaemon(true);
+        registerThread.start();
     }
 
-    // Xử lý Register
-    @FXML
-private void handleRegister(ActionEvent event) {
-
-    String username = registerUsernameField.getText().trim();
-    String password = registerPasswordField.getText().trim();
-    String confirmPassword = confirmPasswordField.getText().trim();
-
-    // Validate
-    if (username.isEmpty()
-            || password.isEmpty()
-            || confirmPassword.isEmpty()) {
-
-        showAlert(
-                Alert.AlertType.ERROR,
-                "Lỗi đăng ký",
-                "Vui lòng nhập đầy đủ thông tin!"
-        );
-        return;
-    }
-
-    if (!password.equals(confirmPassword)) {
-
-        showAlert(
-                Alert.AlertType.ERROR,
-                "Lỗi đăng ký",
-                "Mật khẩu xác nhận không khớp!"
-        );
-        return;
-    }
-
-    // Chạy network ở thread riêng
-    Thread registerThread = new Thread(() -> {
-
-        ClientSocket clientSocket = new ClientSocket();
-
-        try {
-            // 1. Kết nối Server
-            clientSocket.connect();
-
-            // 2. Tạo LoginRequest
-            LoginRequest request =
-                    new LoginRequest(username, password);
-
-            // 3. Chuyển request thành JSON
-            String requestJson = gson.toJson(request);
-
-            // 4. Đóng gói Packet
-            Packet packet = new Packet(
-                    PacketType.AUTH_REGISTER_REQ,
-                    requestJson
-            );
-
-            // 5. Gửi tới Server
-            clientSocket.sendPacket(packet);
-
-            // 6. Nhận response
-            Packet responsePacket =
-                    clientSocket.receivePacket();
-
-            if (responsePacket == null) {
-                showError("Không nhận được phản hồi từ Server!");
-                return;
-            }
-
-            // 7. Kiểm tra PacketType
-            if (responsePacket.getType()
-                    != PacketType.AUTH_REGISTER_RES) {
-
-                showError(
-                        "Server trả về phản hồi không hợp lệ!"
-                );
-                return;
-            }
-
-            // 8. Chuyển JSON thành RegisterResponse
-            RegisterResponse response =
-                    gson.fromJson(
-                            responsePacket.getData(),
-                            RegisterResponse.class
-                    );
-
-            // 9. Hiển thị kết quả
-            Platform.runLater(() -> {
-
-                if (response.isSuccess()) {
-
-                    showAlert(
-                            Alert.AlertType.INFORMATION,
-                            "Đăng ký",
-                            response.getMessage()
-                    );
-
-                    // Xóa form sau khi đăng ký thành công
-                    registerUsernameField.clear();
-                    registerPasswordField.clear();
-                    confirmPasswordField.clear();
-
-                    // Quay về Login
-                    showLogin(null);
-
-                } else {
-
-                    showAlert(
-                            Alert.AlertType.ERROR,
-                            "Lỗi đăng ký",
-                            response.getMessage()
-                    );
-                }
-            });
-
-        } catch (IOException e) {
-
-            showError(
-                    "Không thể kết nối tới Server!\n"
-                    + "Vui lòng kiểm tra Server đang chạy."
-            );
-
-            System.err.println(
-                    "[Register] Lỗi kết nối: "
-                    + e.getMessage()
-            );
-
-        } finally {
-
-            clientSocket.close();
-        }
-
-    });
-
-    registerThread.setDaemon(true);
-    registerThread.start();
-}
+    // =========================
+    // CHUYỂN LOGIN → REGISTER
+    // =========================
     @FXML
     private void showRegister(ActionEvent event) {
 
@@ -298,7 +392,9 @@ private void handleRegister(ActionEvent event) {
         registerForm.setManaged(true);
     }
 
-    // Chuyển về Login
+    // =========================
+    // CHUYỂN REGISTER → LOGIN
+    // =========================
     @FXML
     private void showLogin(ActionEvent event) {
 
@@ -309,7 +405,50 @@ private void handleRegister(ActionEvent event) {
         loginForm.setManaged(true);
     }
 
-    // Hiển thị Alert trên JavaFX UI thread
+    // =========================
+    // MỞ LOBBY
+    // =========================
+    private void openLobby() {
+
+        try {
+
+            javafx.fxml.FXMLLoader loader =
+                    new javafx.fxml.FXMLLoader(
+                            getClass().getResource(
+                                    "/com/tank2d/client/view/lobby.fxml"
+                            )
+                    );
+
+            javafx.scene.Parent lobbyRoot =
+                    loader.load();
+
+            javafx.scene.Scene lobbyScene =
+                    new javafx.scene.Scene(lobbyRoot);
+
+            javafx.stage.Stage stage =
+                    (javafx.stage.Stage) usernameField
+                            .getScene()
+                            .getWindow();
+
+            stage.setScene(lobbyScene);
+
+            stage.setTitle(
+                    "Tank 2D Online - Lobby"
+            );
+
+        } catch (IOException e) {
+
+            e.printStackTrace();
+
+            showError(
+                    "Không thể mở màn hình Lobby!"
+            );
+        }
+    }
+
+    // =========================
+    // HIỂN THỊ ALERT
+    // =========================
     private void showAlert(
             Alert.AlertType type,
             String title,
@@ -317,16 +456,20 @@ private void handleRegister(ActionEvent event) {
 
         Platform.runLater(() -> {
 
-            Alert alert = new Alert(type);
+            Alert alert =
+                    new Alert(type);
+
             alert.setTitle(title);
             alert.setHeaderText(null);
             alert.setContentText(message);
-            alert.showAndWait();
 
+            alert.showAndWait();
         });
     }
 
-    // Hiển thị lỗi từ background thread
+    // =========================
+    // HIỂN THỊ LỖI
+    // =========================
     private void showError(String message) {
 
         Platform.runLater(() -> {
@@ -336,7 +479,6 @@ private void handleRegister(ActionEvent event) {
                     "Lỗi kết nối",
                     message
             );
-
         });
     }
 }

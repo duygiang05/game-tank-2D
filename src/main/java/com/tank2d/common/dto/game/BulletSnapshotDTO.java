@@ -31,4 +31,8 @@ public class BulletSnapshotDTO {
     public double getY() { return y; }
     public double getVx() { return vx; }
     public double getVy() { return vy; }
+    
+    public void setX(double x) {
+        this.x = x;
+    }
 }

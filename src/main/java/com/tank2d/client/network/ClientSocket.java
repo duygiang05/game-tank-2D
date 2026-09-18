@@ -52,6 +52,22 @@ public class ClientSocket {
         return NetworkUtil.readPacket(dis);
     }
 
+    public synchronized Packet sendAndReceivePacket(Packet packet)
+            throws IOException {
+
+        if (!isConnected()) {
+            throw new IOException(
+                    "Client chưa kết nối tới Server!"
+            );
+        }
+
+        // Gửi request
+        NetworkUtil.sendPacket(dos, packet);
+
+        // Chờ đúng response trước khi thread khác được dùng socket
+        return NetworkUtil.readPacket(dis);
+    }
+
     public boolean isConnected() {
         return socket != null
                 && socket.isConnected()
