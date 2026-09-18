@@ -9,6 +9,7 @@ import com.tank2d.common.protocol.NetworkUtil;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
 import com.tank2d.server.dao.UserDAO;
+import com.tank2d.server.game.GameStateManager;
 import com.tank2d.server.model.TankEntity;
 import com.tank2d.server.room.Room;
 import com.tank2d.server.room.RoomManager;
@@ -23,13 +24,13 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Worker xử lý kết nối riêng biệt cho từng Client qua TCP Socket.
- * Được quản lý bởi ExecutorService (Thread Pool) trong TankServer.
+ * Worker xử lý kết nối riêng biệt cho từng Client qua TCP Socket. Được quản lý
+ * bởi ExecutorService (Thread Pool) trong TankServer.
  */
 public class ClientHandler implements Runnable {
 
-    private static final Set<ClientHandler> connectedClients =
-            ConcurrentHashMap.newKeySet();
+    private static final Set<ClientHandler> connectedClients
+            = ConcurrentHashMap.newKeySet();
 
     private final Socket socket;
     private final UserDAO userDAO;
@@ -62,8 +63,8 @@ public class ClientHandler implements Runnable {
     @Override
     public void run() {
 
-        String clientAddress =
-                socket.getRemoteSocketAddress().toString();
+        String clientAddress
+                = socket.getRemoteSocketAddress().toString();
 
         System.out.println(
                 "[ClientHandler] Khởi tạo phiên làm việc với Client: "
@@ -113,7 +114,6 @@ public class ClientHandler implements Runnable {
     // =========================================================
     // DISPATCH PACKET
     // =========================================================
-
     private void dispatchPacket(Packet packet) {
 
         if (packet.getType() == null) {
@@ -146,6 +146,10 @@ public class ClientHandler implements Runnable {
                 handleReady(packet.getData());
                 break;
 
+            case ROOM_DURATION_REQ:
+                handleRoomDuration(packet.getData());
+                break;
+
             case ROOM_START_REQ:
                 handleStartGame();
                 break;
@@ -163,12 +167,10 @@ public class ClientHandler implements Runnable {
                 break;
 
             default:
-
                 System.out.println(
                         "[ClientHandler] Nhận packet chưa hỗ trợ: "
                         + packet.getType()
                 );
-
                 break;
         }
     }
@@ -176,23 +178,22 @@ public class ClientHandler implements Runnable {
     // =========================================================
     // LOGIN
     // =========================================================
-
     private void handleLogin(String rawJson) {
 
         LoginResponse res;
 
         try {
 
-            LoginRequest req =
-                    gson.fromJson(rawJson, LoginRequest.class);
+            LoginRequest req
+                    = gson.fromJson(rawJson, LoginRequest.class);
 
             System.out.println(
                     "[Auth] Yêu cầu đăng nhập từ tài khoản: "
                     + req.getUsername()
             );
 
-            User user =
-                    userDAO.login(
+            User user
+                    = userDAO.login(
                             req.getUsername(),
                             req.getPassword()
                     );
@@ -248,8 +249,8 @@ public class ClientHandler implements Runnable {
 
         try {
 
-            Packet resPacket =
-                    new Packet(
+            Packet resPacket
+                    = new Packet(
                             PacketType.AUTH_LOGIN_RES,
                             gson.toJson(res)
                     );
@@ -271,7 +272,6 @@ public class ClientHandler implements Runnable {
     // =========================================================
     // CREATE ROOM
     // =========================================================
-
     private void handleCreateRoom() {
 
         try {
@@ -286,14 +286,14 @@ public class ClientHandler implements Runnable {
                 return;
             }
 
-            Room room =
-                    roomManager.createRoom(currentUser);
+            Room room
+                    = roomManager.createRoom(currentUser);
 
-            currentRoomId =
-                    room.getRoomId();
+            currentRoomId
+                    = room.getRoomId();
 
-            Packet response =
-                    new Packet(
+            Packet response
+                    = new Packet(
                             PacketType.ROOM_STATE_UPDATE,
                             gson.toJson(
                                     roomManager.getRoomDTO(
@@ -328,27 +328,26 @@ public class ClientHandler implements Runnable {
     // =========================================================
     // JOIN ROOM
     // =========================================================
-
     private void handleJoinRoom(String rawJson) {
 
         try {
 
-            int roomId =
-                    gson.fromJson(
+            int roomId
+                    = gson.fromJson(
                             rawJson,
                             Integer.class
                     );
 
-            boolean success =
-                    roomManager.joinRoom(
+            boolean success
+                    = roomManager.joinRoom(
                             roomId,
                             currentUser
                     );
 
             if (success) {
 
-                currentRoomId =
-                        roomId;
+                currentRoomId
+                        = roomId;
 
                 System.out.println(
                         "[Lobby] Client đã vào phòng ID: "
@@ -365,8 +364,8 @@ public class ClientHandler implements Runnable {
                         + roomId
                 );
 
-                Packet response =
-                        new Packet(
+                Packet response
+                        = new Packet(
                                 PacketType.ROOM_STATE_UPDATE,
                                 gson.toJson(
                                         roomManager.getRoomDTO(
@@ -393,7 +392,6 @@ public class ClientHandler implements Runnable {
     // =========================================================
     // READY
     // =========================================================
-
     private void handleReady(String rawJson) {
 
         try {
@@ -416,14 +414,14 @@ public class ClientHandler implements Runnable {
                 return;
             }
 
-            boolean ready =
-                    gson.fromJson(
+            boolean ready
+                    = gson.fromJson(
                             rawJson,
                             Boolean.class
                     );
 
-            boolean success =
-                    roomManager.setPlayerReady(
+            boolean success
+                    = roomManager.setPlayerReady(
                             currentRoomId,
                             currentUser.getId(),
                             ready
@@ -461,6 +459,105 @@ public class ClientHandler implements Runnable {
     // =========================================================
     // PLAYER INPUT
     // =========================================================
+    // =========================================================
+// ROOM DURATION
+// =========================================================
+    private void handleRoomDuration(String rawJson) {
+
+        try {
+
+            if (currentUser == null) {
+
+                System.out.println(
+                        "[Room] Client chưa đăng nhập."
+                );
+
+                return;
+            }
+
+            if (currentRoomId == -1) {
+
+                System.out.println(
+                        "[Room] Client chưa ở trong phòng."
+                );
+
+                return;
+            }
+
+            Room room
+                    = roomManager.getRoom(
+                            currentRoomId
+                    );
+
+            if (room == null) {
+
+                System.out.println(
+                        "[Room] Không tìm thấy phòng."
+                );
+
+                return;
+            }
+
+            // Chỉ Host được thay đổi thời lượng
+            if (!room.isHost(
+                    currentUser.getId())) {
+
+                System.out.println(
+                        "[Room] User "
+                        + currentUser.getUsername()
+                        + " không phải Host."
+                );
+
+                return;
+            }
+
+            int duration
+                    = gson.fromJson(
+                            rawJson,
+                            Integer.class
+                    );
+
+            // Chỉ chấp nhận 45 / 60 / 90 giây
+            if (duration != 45
+                    && duration != 60
+                    && duration != 90) {
+
+                System.out.println(
+                        "[Room] Thời lượng không hợp lệ: "
+                        + duration
+                );
+
+                return;
+            }
+
+            boolean success
+                    = roomManager.setRoomDuration(
+                            currentRoomId,
+                            duration
+                    );
+
+            if (success) {
+
+                System.out.println(
+                        "[Room] Host "
+                        + currentUser.getUsername()
+                        + " chọn "
+                        + duration
+                        + " giây."
+                );
+
+                // Đồng bộ duration cho tất cả người trong phòng
+                broadcastRoomState();
+            }
+
+        } catch (Exception e) {
+
+            System.err.println(
+                    "[Room] Lỗi xử lý ROOM_DURATION_REQ: "
+                    + e.getMessage()
+            );
+        }
+    }
 
     private void handlePlayerInput(String rawJson) {
 
@@ -468,8 +565,8 @@ public class ClientHandler implements Runnable {
             return;
         }
 
-        TankEntity tank =
-                currentGameLoop.getTank(myTankId);
+        TankEntity tank
+                = currentGameLoop.getTank(myTankId);
 
         if (tank == null || !tank.isAlive()) {
             return;
@@ -477,39 +574,39 @@ public class ClientHandler implements Runnable {
 
         try {
 
-            java.lang.reflect.Type type =
-                    new com.google.gson.reflect.TypeToken<
+            java.lang.reflect.Type type
+                    = new com.google.gson.reflect.TypeToken<
                             Map<String, Boolean>>() {
                     }.getType();
 
-            Map<String, Boolean> input =
-                    gson.fromJson(
+            Map<String, Boolean> input
+                    = gson.fromJson(
                             rawJson,
                             type
                     );
 
             if (input != null) {
 
-                boolean up =
-                        input.getOrDefault(
+                boolean up
+                        = input.getOrDefault(
                                 "up",
                                 false
                         );
 
-                boolean down =
-                        input.getOrDefault(
+                boolean down
+                        = input.getOrDefault(
                                 "down",
                                 false
                         );
 
-                boolean left =
-                        input.getOrDefault(
+                boolean left
+                        = input.getOrDefault(
                                 "left",
                                 false
                         );
 
-                boolean right =
-                        input.getOrDefault(
+                boolean right
+                        = input.getOrDefault(
                                 "right",
                                 false
                         );
@@ -562,15 +659,14 @@ public class ClientHandler implements Runnable {
     // =========================================================
     // PLAYER SHOOT
     // =========================================================
-
     private void handlePlayerShoot() {
 
         if (currentGameLoop == null || myTankId == -1) {
             return;
         }
 
-        TankEntity tank =
-                currentGameLoop.getTank(myTankId);
+        TankEntity tank
+                = currentGameLoop.getTank(myTankId);
 
         if (tank != null && tank.isAlive()) {
 
@@ -583,21 +679,20 @@ public class ClientHandler implements Runnable {
     // =========================================================
     // BROADCAST LOBBY
     // =========================================================
-
     private void broadcastLobbyRooms() {
 
         try {
 
-            Packet packet =
-                    new Packet(
+            Packet packet
+                    = new Packet(
                             PacketType.LOBBY_ROOMS_RES,
                             gson.toJson(
                                     roomManager.getAllRooms()
                             )
                     );
 
-            for (ClientHandler client :
-                    connectedClients) {
+            for (ClientHandler client
+                    : connectedClients) {
 
                 // Chỉ gửi cho Client đang ở Lobby
                 if (client.currentRoomId == -1) {
@@ -621,18 +716,17 @@ public class ClientHandler implements Runnable {
     // =========================================================
     // BROADCAST ROOM STATE
     // =========================================================
-
     private void broadcastRoomStateForRoom(int roomId) {
 
-        Room room =
-                roomManager.getRoom(roomId);
+        Room room
+                = roomManager.getRoom(roomId);
 
         if (room == null) {
             return;
         }
 
-        Packet packet =
-                new Packet(
+        Packet packet
+                = new Packet(
                         PacketType.ROOM_STATE_UPDATE,
                         gson.toJson(
                                 roomManager.getRoomDTO(
@@ -641,8 +735,8 @@ public class ClientHandler implements Runnable {
                         )
                 );
 
-        for (ClientHandler client :
-                connectedClients) {
+        for (ClientHandler client
+                : connectedClients) {
 
             if (client.currentRoomId == roomId) {
 
@@ -670,8 +764,8 @@ public class ClientHandler implements Runnable {
             return;
         }
 
-        Room room =
-                roomManager.getRoom(
+        Room room
+                = roomManager.getRoom(
                         currentRoomId
                 );
 
@@ -679,8 +773,8 @@ public class ClientHandler implements Runnable {
             return;
         }
 
-        Packet packet =
-                new Packet(
+        Packet packet
+                = new Packet(
                         PacketType.ROOM_STATE_UPDATE,
                         gson.toJson(
                                 roomManager.getRoomDTO(
@@ -689,11 +783,11 @@ public class ClientHandler implements Runnable {
                         )
                 );
 
-        for (ClientHandler client :
-                connectedClients) {
+        for (ClientHandler client
+                : connectedClients) {
 
-            if (client.currentRoomId ==
-                    currentRoomId) {
+            if (client.currentRoomId
+                    == currentRoomId) {
 
                 try {
 
@@ -720,33 +814,34 @@ public class ClientHandler implements Runnable {
     // =========================================================
     // GAME START NOTIFY
     // =========================================================
-
     private void broadcastGameStart() {
 
         if (currentRoomId == -1) {
             return;
         }
 
-        // JSON dạng: {"roomId": 1}
-        Map<String, Object> dataMap =
-                new HashMap<>();
+        Room room = roomManager.getRoom(currentRoomId);
 
-        dataMap.put(
-                "roomId",
-                currentRoomId
+        if (room == null) {
+            System.out.println("[Game] Không tìm thấy phòng khi broadcast Start.");
+            return;
+        }
+
+        int matchDuration = room.getDuration();
+
+        Map<String, Object> dataMap = new HashMap<>();
+
+        dataMap.put("roomId", currentRoomId);
+        dataMap.put("duration", matchDuration);
+
+        Packet packet = new Packet(
+                PacketType.GAME_START_NOTIFY,
+                gson.toJson(dataMap)
         );
 
-        Packet packet =
-                new Packet(
-                        PacketType.GAME_START_NOTIFY,
-                        gson.toJson(dataMap)
-                );
+        for (ClientHandler client : connectedClients) {
 
-        for (ClientHandler client :
-                connectedClients) {
-
-            if (client.currentRoomId ==
-                    currentRoomId) {
+            if (client.currentRoomId == currentRoomId) {
 
                 try {
 
@@ -756,7 +851,13 @@ public class ClientHandler implements Runnable {
                     );
 
                     System.out.println(
-                            "[Game] Đã gửi GAME_START_NOTIFY tới Client"
+                            "[Game] GAME_START_NOTIFY -> "
+                            + client.currentUser.getUsername()
+                            + " | Room: "
+                            + currentRoomId
+                            + " | Duration: "
+                            + matchDuration
+                            + "s"
                     );
 
                 } catch (IOException e) {
@@ -773,11 +874,13 @@ public class ClientHandler implements Runnable {
     // =========================================================
     // START GAME
     // =========================================================
-
     private void handleStartGame() {
 
         try {
 
+            // =========================================================
+            // 1. Kiểm tra đăng nhập
+            // =========================================================
             if (currentUser == null) {
 
                 System.out.println(
@@ -787,6 +890,9 @@ public class ClientHandler implements Runnable {
                 return;
             }
 
+            // =========================================================
+            // 2. Kiểm tra đang ở trong phòng
+            // =========================================================
             if (currentRoomId == -1) {
 
                 System.out.println(
@@ -796,10 +902,10 @@ public class ClientHandler implements Runnable {
                 return;
             }
 
-            Room room =
-                    roomManager.getRoom(
-                            currentRoomId
-                    );
+            // =========================================================
+            // 3. Lấy Room
+            // =========================================================
+            Room room = roomManager.getRoom(currentRoomId);
 
             if (room == null) {
 
@@ -810,9 +916,10 @@ public class ClientHandler implements Runnable {
                 return;
             }
 
-            // Chỉ Host mới được bắt đầu
-            if (!room.isHost(
-                    currentUser.getId())) {
+            // =========================================================
+            // 4. Chỉ Host mới được Start
+            // =========================================================
+            if (!room.isHost(currentUser.getId())) {
 
                 System.out.println(
                         "[Game] User "
@@ -823,19 +930,34 @@ public class ClientHandler implements Runnable {
                 return;
             }
 
-            // Hiện tại giữ nguyên logic cũ:
-            // phải đủ số người tối đa mới Start.
-            if (room.getCurrentPlayers()
-                    < room.getMaxPlayers()) {
+            // =========================================================
+            // 5. Kiểm tra số lượng người chơi
+            //    Task 7: tối thiểu 2, tối đa 4
+            // =========================================================
+            int currentPlayers = room.getCurrentPlayers();
+            int maxPlayers = room.getMaxPlayers();
+
+            if (currentPlayers < 2) {
 
                 System.out.println(
-                        "[Game] Chưa đủ người chơi."
+                        "[Game] Cần ít nhất 2 người chơi để bắt đầu."
                 );
 
                 return;
             }
 
-            // Tất cả người chơi phải Ready
+            if (currentPlayers > maxPlayers) {
+
+                System.out.println(
+                        "[Game] Số người chơi vượt quá giới hạn phòng."
+                );
+
+                return;
+            }
+
+            // =========================================================
+            // 6. Tất cả người chơi phải Ready
+            // =========================================================
             if (!room.areAllPlayersReady()) {
 
                 System.out.println(
@@ -845,63 +967,92 @@ public class ClientHandler implements Runnable {
                 return;
             }
 
+            // =========================================================
+            // 7. Lấy thời lượng trận đấu
+            //    45 / 60 / 90 giây
+            // =========================================================
+            int matchDuration = room.getDuration();
+
+            if (matchDuration != 45
+                    && matchDuration != 60
+                    && matchDuration != 90) {
+
+                System.out.println(
+                        "[Game] Duration không hợp lệ: "
+                        + matchDuration
+                );
+
+                return;
+            }
+
             System.out.println(
                     "[Game] Host "
                     + currentUser.getUsername()
                     + " bắt đầu trận!"
+                    + " | Players: "
+                    + currentPlayers
+                    + " | Duration: "
+                    + matchDuration
+                    + "s"
             );
 
-            // Thông báo cho Client chuyển sang Game
+            // =========================================================
+            // 8. Thông báo cho tất cả Client chuyển sang Game
+            //    Payload có roomId + duration
+            // =========================================================
             broadcastGameStart();
 
-            // =================================================
-            // TẠO GAME LOOP
-            // =================================================
+            // =========================================================
+            // 9. Tạo GameLoop
+            // =========================================================
+            com.tank2d.server.game.GameLoop gameLoop
+                    = new com.tank2d.server.game.GameLoop(60);
 
-            com.tank2d.server.game.GameLoop gameLoop =
-                    new com.tank2d.server.game.GameLoop(60);
-
-            com.tank2d.server.game.GameStateManager stateManager =
-                    new com.tank2d.server.game.GameStateManager(
+            // =========================================================
+            // 10. Tạo GameStateManager với duration của Room
+            // =========================================================
+            GameStateManager stateManager
+                    = new GameStateManager(
                             gameLoop,
                             userDAO,
-                            180.0
+                            matchDuration
                     );
 
             gameLoop.setStateManager(
                     stateManager
             );
 
+            // =========================================================
+            // 11. Tạo Tank cho từng Client trong Room
+            // =========================================================
             int tankIndex = 1;
 
-            // Tạo Tank cho từng Client trong Room
-            for (ClientHandler client :
-                    connectedClients) {
+            for (ClientHandler client : connectedClients) {
 
-                if (client.currentRoomId ==
-                        currentRoomId) {
+                if (client.currentRoomId == currentRoomId) {
 
-                    double startX =
-                            (tankIndex == 1)
-                            ? 100.0
-                            : 650.0;
+                    double startX;
+                    double startY;
+                    double startAngle;
 
-                    double startY =
-                            (tankIndex == 1)
-                            ? 100.0
-                            : 450.0;
+                    if (tankIndex == 1) {
 
-                    double startAngle =
-                            (tankIndex == 1)
-                            ? 0.0
-                            : 180.0;
+                        startX = 100.0;
+                        startY = 100.0;
+                        startAngle = 0.0;
+
+                    } else {
+
+                        startX = 650.0;
+                        startY = 450.0;
+                        startAngle = 180.0;
+                    }
 
                     double speed = 150.0;
-
                     double rotationSpeed = 120.0;
 
-                    TankEntity tank =
-                            new TankEntity(
+                    TankEntity tank
+                            = new TankEntity(
                                     tankIndex,
                                     startX,
                                     startY,
@@ -912,9 +1063,7 @@ public class ClientHandler implements Runnable {
 
                     tank.setHp(3);
 
-                    gameLoop.addTank(
-                            tank
-                    );
+                    gameLoop.addTank(tank);
 
                     stateManager.registerPlayer(
                             tankIndex,
@@ -922,54 +1071,52 @@ public class ClientHandler implements Runnable {
                             client.dos
                     );
 
-                    client.myTankId =
-                            tankIndex;
+                    client.myTankId = tankIndex;
+                    client.currentGameLoop = gameLoop;
 
-                    client.currentGameLoop =
-                            gameLoop;
+                    System.out.println(
+                            "[Game] Tank "
+                            + tankIndex
+                            + " -> User "
+                            + client.currentUser.getUsername()
+                    );
 
                     tankIndex++;
                 }
             }
 
-            // =================================================
-            // SNAPSHOT → CLIENT
-            // =================================================
-
-            java.util.concurrent.ExecutorService
-                    networkBroadcastPool =
-                    java.util.concurrent.Executors
+            // =========================================================
+            // 12. Snapshot -> Client
+            // =========================================================
+            java.util.concurrent.ExecutorService networkBroadcastPool
+                    = java.util.concurrent.Executors
                             .newSingleThreadExecutor();
 
-            int finalRoomId =
-                    currentRoomId;
+            int finalRoomId = currentRoomId;
 
             gameLoop.setSnapshotListener(
                     snapshot -> {
 
-                        // Đẩy việc gửi Snapshot sang thread riêng
                         networkBroadcastPool.submit(
                                 () -> {
 
                                     try {
 
-                                        String json =
-                                                gson.toJson(
-                                                        snapshot
-                                                );
+                                        String json
+                                        = gson.toJson(snapshot);
 
-                                        Packet snapshotPacket =
-                                                new Packet(
-                                                        PacketType.GAME_SNAPSHOT,
-                                                        json
-                                                );
+                                        Packet snapshotPacket
+                                        = new Packet(
+                                                PacketType.GAME_SNAPSHOT,
+                                                json
+                                        );
 
-                                        for (ClientHandler client :
-                                                connectedClients) {
+                                        for (ClientHandler client
+                                        : connectedClients) {
 
-                                            if (client.currentRoomId ==
-                                                    finalRoomId
-                                                    && client.dos != null) {
+                                            if (client.currentRoomId
+                                            == finalRoomId
+                                            && client.dos != null) {
 
                                                 NetworkUtil.sendPacket(
                                                         client.dos,
@@ -985,14 +1132,11 @@ public class ClientHandler implements Runnable {
                     }
             );
 
-            // =================================================
-            // START GAME LOOP THREAD
-            // =================================================
-
-            Thread loopThread =
-                    new Thread(
-                            gameLoop
-                    );
+            // =========================================================
+            // 13. Start GameLoop Thread
+            // =========================================================
+            Thread loopThread
+                    = new Thread(gameLoop);
 
             loopThread.setName(
                     "GameLoop-Room-"
@@ -1001,27 +1145,37 @@ public class ClientHandler implements Runnable {
 
             loopThread.start();
 
+            System.out.println(
+                    "[Game] GameLoop started!"
+                    + " | Room: "
+                    + finalRoomId
+                    + " | Duration: "
+                    + matchDuration
+                    + "s"
+            );
+
         } catch (Exception e) {
 
             System.err.println(
                     "[Game] Lỗi xử lý ROOM_START_REQ: "
                     + e.getMessage()
             );
+
+            e.printStackTrace();
         }
     }
 
     // =========================================================
     // REGISTER
     // =========================================================
-
     private void handleRegister(String rawJson) {
 
         RegisterResponse res;
 
         try {
 
-            LoginRequest req =
-                    gson.fromJson(
+            LoginRequest req
+                    = gson.fromJson(
                             rawJson,
                             LoginRequest.class
                     );
@@ -1031,16 +1185,16 @@ public class ClientHandler implements Runnable {
                     + req.getUsername()
             );
 
-            boolean isSuccess =
-                    userDAO.register(
+            boolean isSuccess
+                    = userDAO.register(
                             req.getUsername(),
                             req.getPassword()
                     );
 
             if (isSuccess) {
 
-                res =
-                        new RegisterResponse(
+                res
+                        = new RegisterResponse(
                                 true,
                                 "Đăng ký tài khoản thành công!"
                         );
@@ -1052,8 +1206,8 @@ public class ClientHandler implements Runnable {
 
             } else {
 
-                res =
-                        new RegisterResponse(
+                res
+                        = new RegisterResponse(
                                 false,
                                 "Đăng ký thất bại! "
                                 + "Tên tài khoản có thể đã tồn tại."
@@ -1072,8 +1226,8 @@ public class ClientHandler implements Runnable {
                     + e.getMessage()
             );
 
-            res =
-                    new RegisterResponse(
+            res
+                    = new RegisterResponse(
                             false,
                             "Lỗi định dạng dữ liệu đăng ký!"
                     );
@@ -1081,8 +1235,8 @@ public class ClientHandler implements Runnable {
 
         try {
 
-            Packet resPacket =
-                    new Packet(
+            Packet resPacket
+                    = new Packet(
                             PacketType.AUTH_REGISTER_RES,
                             gson.toJson(res)
                     );
@@ -1104,18 +1258,17 @@ public class ClientHandler implements Runnable {
     // =========================================================
     // GET ROOMS
     // =========================================================
-
     private void handleGetRooms() {
 
         try {
 
-            String roomsJson =
-                    gson.toJson(
+            String roomsJson
+                    = gson.toJson(
                             roomManager.getAllRooms()
                     );
 
-            Packet response =
-                    new Packet(
+            Packet response
+                    = new Packet(
                             PacketType.LOBBY_ROOMS_RES,
                             roomsJson
                     );
@@ -1141,25 +1294,27 @@ public class ClientHandler implements Runnable {
     // =========================================================
     // LEAVE ROOM
     // =========================================================
-
     private void handleLeaveRoom() {
 
         try {
 
-            if (currentUser == null ||
-                    currentRoomId == -1) {
+            if (currentUser == null
+                    || currentRoomId == -1) {
 
                 return;
             }
 
-            int roomId =
-                    currentRoomId;
+            int roomId = currentRoomId;
+            int userId = currentUser.getId();
 
-            int userId =
-                    currentUser.getId();
+            Room room = roomManager.getRoom(roomId);
 
-            boolean success =
-                    roomManager.leaveRoom(
+            boolean wasHost
+                    = room != null
+                    && room.isHost(userId);
+
+            boolean success
+                    = roomManager.leaveRoom(
                             roomId,
                             userId
                     );
@@ -1169,16 +1324,18 @@ public class ClientHandler implements Runnable {
                 System.out.println(
                         "[Room] User "
                         + currentUser.getUsername()
-                        + " đã chủ động rời phòng "
+                        + " đã rời phòng "
                         + roomId
+                        + (wasHost
+                                ? " (HOST)"
+                                : "")
                 );
 
+                // Client này quay về Lobby
                 currentRoomId = -1;
 
-                // Cập nhật cho Client còn lại
-                broadcastRoomStateForRoom(
-                        roomId
-                );
+                // Thông báo cho những người còn lại
+                broadcastRoomStateForRoom(roomId);
             }
 
         } catch (Exception e) {
@@ -1187,13 +1344,14 @@ public class ClientHandler implements Runnable {
                     "[Room] Lỗi xử lý ROOM_LEAVE_REQ: "
                     + e.getMessage()
             );
+
+            e.printStackTrace();
         }
     }
 
     // =========================================================
     // CLOSE CONNECTION
     // =========================================================
-
     public void closeConnection() {
 
         isRunning = false;
@@ -1203,50 +1361,37 @@ public class ClientHandler implements Runnable {
         );
 
         // Nếu đang ở trong phòng thì xóa khỏi phòng
-        if (currentUser != null &&
-                currentRoomId != -1) {
+        if (currentUser != null
+                && currentRoomId != -1) {
+
+            int roomId = currentRoomId;
+            int userId = currentUser.getId();
+
+            boolean wasHost = false;
+
+            Room room = roomManager.getRoom(roomId);
+
+            if (room != null) {
+                wasHost = room.isHost(userId);
+            }
 
             roomManager.leaveRoom(
-                    currentRoomId,
-                    currentUser.getId()
+                    roomId,
+                    userId
             );
 
             System.out.println(
                     "[Lobby] User "
                     + currentUser.getUsername()
                     + " đã rời phòng ID: "
-                    + currentRoomId
+                    + roomId
+                    + (wasHost ? " (HOST)" : "")
             );
 
             currentRoomId = -1;
+
+            // Cập nhật cho những người còn lại
+            broadcastRoomStateForRoom(roomId);
         }
-
-        try {
-
-            if (dis != null) {
-                dis.close();
-            }
-
-            if (dos != null) {
-                dos.close();
-            }
-
-            if (socket != null &&
-                    !socket.isClosed()) {
-
-                socket.close();
-            }
-
-        } catch (IOException e) {
-
-            System.err.println(
-                    "[ClientHandler] Lỗi đóng kết nối: "
-                    + e.getMessage()
-            );
-        }
-
-        System.out.println(
-                "[ClientHandler] Đã đóng tài nguyên kết nối an toàn."
-        );
     }
 }
