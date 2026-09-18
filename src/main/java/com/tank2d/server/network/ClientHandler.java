@@ -346,17 +346,18 @@ public class ClientHandler implements Runnable {
 
             if (success) {
 
-                currentRoomId
-                        = roomId;
+                currentRoomId = roomId;
 
                 System.out.println(
                         "[Lobby] Client đã vào phòng ID: "
                         + roomId
                 );
 
-                // Đồng bộ trạng thái phòng
+                // Đồng bộ trạng thái phòng cho người trong phòng
                 broadcastRoomState();
 
+                // Cập nhật danh sách phòng cho các Client đang ở Lobby
+                broadcastLobbyRooms();
             } else {
 
                 System.out.println(
@@ -548,6 +549,7 @@ public class ClientHandler implements Runnable {
 
                 // Đồng bộ duration cho tất cả người trong phòng
                 broadcastRoomState();
+                broadcastLobbyRooms();
             }
 
         } catch (Exception e) {
@@ -1336,6 +1338,8 @@ public class ClientHandler implements Runnable {
 
                 // Thông báo cho những người còn lại
                 broadcastRoomStateForRoom(roomId);
+
+                broadcastLobbyRooms();
             }
 
         } catch (Exception e) {
@@ -1392,6 +1396,8 @@ public class ClientHandler implements Runnable {
 
             // Cập nhật cho những người còn lại
             broadcastRoomStateForRoom(roomId);
+
+            broadcastLobbyRooms();
         }
     }
 }

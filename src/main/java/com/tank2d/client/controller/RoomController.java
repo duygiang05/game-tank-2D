@@ -9,6 +9,7 @@ import com.tank2d.common.model.User;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
 
+
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -26,8 +27,8 @@ public class RoomController {
 
     @FXML
     private Label roomNameLabel;
-
-    @FXML
+    
+   @FXML
     private Label roomStatusLabel;
 
     @FXML
