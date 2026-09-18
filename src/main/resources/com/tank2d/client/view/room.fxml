@@ -2,8 +2,8 @@
 
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
-<?import javafx.scene.control.ListView?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
@@ -14,10 +14,19 @@
             prefWidth="800"
             prefHeight="600">
 
+    <!-- =========================
+    TOP
+    ========================= -->
+
     <top>
-        <VBox alignment="CENTER" spacing="10">
+        <VBox alignment="CENTER"
+              spacing="10">
+
             <padding>
-                <Insets top="25" right="20" bottom="20" left="20"/>
+                <Insets top="20"
+                        right="20"
+                        bottom="5"
+                        left="20"/>
             </padding>
 
             <Label fx:id="roomNameLabel"
@@ -25,42 +34,139 @@
                    style="-fx-font-size: 28px; -fx-font-weight: bold;"/>
 
             <Label fx:id="roomStatusLabel"
-                   text="Đang chờ người chơi..."/>
+                   text="Đang chờ người chơi..."
+                   style="-fx-font-size: 15px;"/>
+
+            <HBox alignment="CENTER"
+                  spacing="10">
+
+                <Label text="Thời lượng:"
+                       style="-fx-font-size: 16px;"/>
+
+                <ComboBox fx:id="durationComboBox"
+                          prefWidth="130"
+                          promptText="Chọn thời gian"/>
+
+            </HBox>
+
         </VBox>
     </top>
 
+
+    <!-- =========================
+    CENTER
+    ========================= -->
+
     <center>
-        <VBox alignment="CENTER" spacing="15">
+        <VBox alignment="TOP_CENTER"
+              spacing="22">
+
             <padding>
-                <Insets top="20" right="40" bottom="20" left="40"/>
+                <Insets top="20"
+                        right="30"
+                        bottom="10"
+                        left="30"/>
             </padding>
 
-            <Label text="Danh sách người chơi"
-                   style="-fx-font-size: 20px; -fx-font-weight: bold;"/>
+            <Label text="Góc xuất phát"
+                   style="-fx-font-size: 22px; -fx-font-weight: bold;"/>
 
-            <ListView fx:id="playerListView"
-                      prefHeight="300"/>
+            <HBox alignment="CENTER"
+                  spacing="40">
+
+                <!-- P1 -->
+                <VBox alignment="CENTER"
+                      spacing="8"
+                      prefWidth="120">
+
+                    <Label text="P1"
+                           style="-fx-font-size: 18px; -fx-font-weight: bold;"/>
+
+                    <Label fx:id="p1Label"
+                           text="Trống"
+                           style="-fx-font-size: 15px;"/>
+
+                </VBox>
+
+
+                <!-- P2 -->
+                <VBox alignment="CENTER"
+                      spacing="8"
+                      prefWidth="120">
+
+                    <Label text="P2"
+                           style="-fx-font-size: 18px; -fx-font-weight: bold;"/>
+
+                    <Label fx:id="p2Label"
+                           text="Trống"
+                           style="-fx-font-size: 15px;"/>
+
+                </VBox>
+
+
+                <!-- P3 -->
+                <VBox alignment="CENTER"
+                      spacing="8"
+                      prefWidth="120">
+
+                    <Label text="P3"
+                           style="-fx-font-size: 18px; -fx-font-weight: bold;"/>
+
+                    <Label fx:id="p3Label"
+                           text="Trống"
+                           style="-fx-font-size: 15px;"/>
+
+                </VBox>
+
+
+                <!-- P4 -->
+                <VBox alignment="CENTER"
+                      spacing="8"
+                      prefWidth="120">
+
+                    <Label text="P4"
+                           style="-fx-font-size: 18px; -fx-font-weight: bold;"/>
+
+                    <Label fx:id="p4Label"
+                           text="Trống"
+                           style="-fx-font-size: 15px;"/>
+
+                </VBox>
+
+            </HBox>
+
         </VBox>
     </center>
 
+
+    <!-- =========================
+    BOTTOM
+    ========================= -->
+
     <bottom>
-    <HBox alignment="CENTER" spacing="20">
-        <padding>
-            <Insets top="20" right="20" bottom="30" left="20"/>
-        </padding>
+        <HBox alignment="CENTER"
+              spacing="25">
 
-        <Button fx:id="readyButton"
-                text="SẴN SÀNG"
-                prefWidth="150"
-                prefHeight="40"
-                onAction="#handleReady"/>
+            <padding>
+                <Insets top="10"
+                        right="20"
+                        bottom="25"
+                        left="20"/>
+            </padding>
 
-        <Button fx:id="leaveButton"
-                text="RỜI PHÒNG"
-                prefWidth="150"
-                prefHeight="40"
-                onAction="#handleLeave"/>
-    </HBox>
-</bottom>
+            <Button fx:id="readyButton"
+                    text="SẴN SÀNG"
+                    prefWidth="170"
+                    prefHeight="45"
+                    onAction="#handleReady"/>
+
+            <Button fx:id="leaveButton"
+                    text="RỜI PHÒNG"
+                    prefWidth="170"
+                    prefHeight="45"
+                    onAction="#handleLeave"/>
+
+        </HBox>
+    </bottom>
 
 </BorderPane>

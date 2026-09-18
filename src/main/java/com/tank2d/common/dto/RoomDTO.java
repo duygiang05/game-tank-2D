@@ -21,6 +21,10 @@ public class RoomDTO {
     // userId -> true/false
     private Map<Integer, Boolean> readyStates;
 
+    // Thời lượng trận đấu (đơn vị: giây)
+    // Giá trị hợp lệ: 45, 60, 90
+    private int duration;
+
     public RoomDTO() {
     }
 
@@ -32,7 +36,8 @@ public class RoomDTO {
             String status,
             List<String> playerNames,
             int hostId,
-            Map<Integer, Boolean> readyStates) {
+            Map<Integer, Boolean> readyStates,
+            int duration) {
 
         this.roomId = roomId;
         this.roomName = roomName;
@@ -42,6 +47,7 @@ public class RoomDTO {
         this.playerNames = playerNames;
         this.hostId = hostId;
         this.readyStates = readyStates;
+        this.duration = duration;
     }
 
     // =========================
@@ -142,5 +148,17 @@ public class RoomDTO {
             Map<Integer, Boolean> readyStates) {
 
         this.readyStates = readyStates;
+    }
+
+    // =========================
+    // MATCH DURATION
+    // =========================
+
+    public int getDuration() {
+        return duration;
+    }
+
+    public void setDuration(int duration) {
+        this.duration = duration;
     }
 }

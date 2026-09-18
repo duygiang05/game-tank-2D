@@ -6,15 +6,23 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
+// Thời lượng trận đấu, đơn vị: giây
+// Mặc định: 60 giây
 
 public class Room {
 
     private final int roomId;
     private final String roomName;
+
+    // Phòng tối đa 4 người
     private final int maxPlayers;
 
     // ID của người tạo phòng
-    private final int hostId;
+    private int hostId;
+    // Thời lượng trận đấu, đơn vị: giây
+// Mặc định: 60 giây
+    private int duration = 60;
 
     private final List<User> players;
     private final Map<Integer, Boolean> readyStates;
@@ -27,7 +35,8 @@ public class Room {
         this.roomName = roomName;
         this.hostId = hostId;
 
-        this.maxPlayers = 2;
+        // Task 7: mỗi phòng tối đa 4 người
+        this.maxPlayers = 4;
 
         this.players = new ArrayList<>();
         this.readyStates = new LinkedHashMap<>();
@@ -35,6 +44,9 @@ public class Room {
         this.status = "Waiting";
     }
 
+    // =========================
+    // ROOM INFORMATION
+    // =========================
     public int getRoomId() {
         return roomId;
     }
@@ -47,10 +59,17 @@ public class Room {
         return maxPlayers;
     }
 
+    public synchronized int getCurrentPlayers() {
+        return players.size();
+    }
+
+    public synchronized String getStatus() {
+        return status;
+    }
+
     // =========================
     // HOST
     // =========================
-
     public int getHostId() {
         return hostId;
     }
@@ -62,7 +81,6 @@ public class Room {
     // =========================
     // PLAYERS
     // =========================
-
     public synchronized List<User> getPlayers() {
         return new ArrayList<>(players);
     }
@@ -70,19 +88,13 @@ public class Room {
     // =========================
     // READY STATES
     // =========================
-
     public synchronized Map<Integer, Boolean> getReadyStates() {
         return new LinkedHashMap<>(readyStates);
-    }
-
-    public synchronized String getStatus() {
-        return status;
     }
 
     // =========================
     // ADD PLAYER
     // =========================
-
     public synchronized boolean addPlayer(User user) {
 
         if (user == null) {
@@ -97,6 +109,7 @@ public class Room {
             }
         }
 
+        // Phòng đã đủ 4 người
         if (players.size() >= maxPlayers) {
             return false;
         }
@@ -108,9 +121,18 @@ public class Room {
          * Người chơi thường ban đầu chưa Ready.
          */
         if (user.getId() == hostId) {
-            readyStates.put(user.getId(), true);
+
+            readyStates.put(
+                    user.getId(),
+                    true
+            );
+
         } else {
-            readyStates.put(user.getId(), false);
+
+            readyStates.put(
+                    user.getId(),
+                    false
+            );
         }
 
         updateStatus();
@@ -121,12 +143,12 @@ public class Room {
     // =========================
     // REMOVE PLAYER
     // =========================
-
     public synchronized boolean removePlayer(int userId) {
 
-        boolean removed = players.removeIf(
-                user -> user.getId() == userId
-        );
+        boolean removed
+                = players.removeIf(
+                        user -> user.getId() == userId
+                );
 
         if (removed) {
 
@@ -141,11 +163,11 @@ public class Room {
     // =========================
     // SET READY
     // =========================
-
     public synchronized boolean setReady(
             int userId,
             boolean ready) {
 
+        // User không ở trong phòng
         if (!readyStates.containsKey(userId)) {
             return false;
         }
@@ -155,9 +177,18 @@ public class Room {
          * Không cho Host chuyển về Not Ready.
          */
         if (userId == hostId) {
-            readyStates.put(userId, true);
+
+            readyStates.put(
+                    userId,
+                    true
+            );
+
         } else {
-            readyStates.put(userId, ready);
+
+            readyStates.put(
+                    userId,
+                    ready
+            );
         }
 
         return true;
@@ -166,7 +197,6 @@ public class Room {
     // =========================
     // CHECK READY
     // =========================
-
     public synchronized boolean isReady(int userId) {
 
         return readyStates.getOrDefault(
@@ -175,6 +205,9 @@ public class Room {
         );
     }
 
+    /**
+     * Kiểm tra tất cả người chơi trong phòng đã Ready hay chưa.
+     */
     public synchronized boolean areAllPlayersReady() {
 
         if (players.isEmpty()) {
@@ -187,18 +220,8 @@ public class Room {
     }
 
     // =========================
-    // PLAYERS COUNT
-    // =========================
-
-    public synchronized int getCurrentPlayers() {
-
-        return players.size();
-    }
-
-    // =========================
     // ROOM STATUS
     // =========================
-
     private void updateStatus() {
 
         if (players.size() >= maxPlayers) {
@@ -209,5 +232,52 @@ public class Room {
 
             status = "Waiting";
         }
+    }
+
+    public synchronized void transferHostRandom() {
+
+        if (players.isEmpty()) {
+            return;
+        }
+
+        int randomIndex
+                = ThreadLocalRandom.current()
+                        .nextInt(players.size());
+
+        User newHost = players.get(randomIndex);
+
+        hostId = newHost.getId();
+
+        // Host mới tự động Ready
+        readyStates.put(newHost.getId(), true);
+
+        System.out.println(
+                "[Room] Host mới được chọn ngẫu nhiên: "
+                + newHost.getUsername()
+                + " (ID: "
+                + newHost.getId()
+                + ")"
+        );
+    }
+    // =========================
+// MATCH DURATION
+// =========================
+
+    public synchronized int getDuration() {
+        return duration;
+    }
+
+    public synchronized boolean setDuration(int duration) {
+
+        if (duration != 45
+                && duration != 60
+                && duration != 90) {
+
+            return false;
+        }
+
+        this.duration = duration;
+
+        return true;
     }
 }
