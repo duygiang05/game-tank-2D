@@ -10,12 +10,9 @@ import com.tank2d.common.protocol.NetworkUtil;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
 import com.tank2d.server.dao.UserDAO;
-<<<<<<< HEAD
-=======
 import com.tank2d.server.game.GameLoop;
 import com.tank2d.server.game.GameStateManager;
 import com.tank2d.server.map.MapLoader;
->>>>>>> origin/dev
 import com.tank2d.server.model.TankEntity;
 import com.tank2d.server.room.Room;
 import com.tank2d.server.room.RoomManager;
@@ -26,13 +23,10 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
-<<<<<<< HEAD
-=======
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
->>>>>>> origin/dev
 
 public class ClientHandler implements Runnable {
 
@@ -49,12 +43,8 @@ public class ClientHandler implements Runnable {
     private volatile boolean isRunning;
     private User currentUser;
     private int currentRoomId = -1;
-<<<<<<< HEAD
-    private com.tank2d.server.game.GameLoop currentGameLoop;
-=======
     private GameLoop currentGameLoop;
     private GameStateManager currentGameStateManager;
->>>>>>> origin/dev
     private int myTankId = -1;
 
     public ClientHandler(Socket socket, UserDAO userDAO, RoomManager roomManager) {
@@ -142,11 +132,6 @@ public class ClientHandler implements Runnable {
             case ROOM_READY_REQ:
                 handleReady(packet.getData());
                 break;
-<<<<<<< HEAD
-            case ROOM_START_REQ:
-                handleStartGame();
-                break;
-=======
 
             case ROOM_DURATION_REQ:
                 handleRoomDuration(packet.getData());
@@ -156,16 +141,8 @@ public class ClientHandler implements Runnable {
                 handleStartGame();
                 break;
 
->>>>>>> origin/dev
             case ROOM_LEAVE_REQ:
                 handleLeaveRoom();
-                break;
-            case PLAYER_INPUT:
-                handlePlayerInput(packet.getData());
-                break;
-
-            case PLAYER_SHOOT_REQ:
-                handlePlayerShoot();
                 break;
 
             case PLAYER_INPUT:
@@ -255,50 +232,6 @@ public class ClientHandler implements Runnable {
                 broadcastRoomState();
             }
         } catch (Exception ignored) {}
-    }
-    
-    private void handlePlayerInput(String rawJson) {
-        if (currentGameLoop == null || myTankId == -1) return;
-        com.tank2d.server.model.TankEntity tank = currentGameLoop.getTank(myTankId);
-        if (tank == null || !tank.isAlive()) return;
-
-        try {
-            // Json dạng: {"up":true,"down":false,"left":false,"right":false}
-            java.lang.reflect.Type type = new com.google.gson.reflect.TypeToken<Map<String, Boolean>>(){}.getType();
-            Map<String, Boolean> input = gson.fromJson(rawJson, type);
-            if (input != null) {
-                boolean up = input.getOrDefault("up", false);
-                boolean down = input.getOrDefault("down", false);
-                boolean left = input.getOrDefault("left", false);
-                boolean right = input.getOrDefault("right", false);
-
-                // 1. Ánh xạ trạng thái di chuyển (Tiến / Lùi / Đứng yên)
-                if (up && !down) {
-                    tank.setMoveState(TankEntity.MoveState.FORWARD);
-                } else if (down && !up) {
-                    tank.setMoveState(TankEntity.MoveState.BACKWARD);
-                } else {
-                    tank.setMoveState(TankEntity.MoveState.NONE);
-                }
-
-                // 2. Ánh xạ trạng thái quay xe (Trái / Phải / Đứng yên)
-                if (left && !right) {
-                    tank.setRotateState(TankEntity.RotateState.LEFT);
-                } else if (right && !left) {
-                    tank.setRotateState(TankEntity.RotateState.RIGHT);
-                } else {
-                    tank.setRotateState(TankEntity.RotateState.NONE);
-                }
-            }
-        } catch (Exception ignored) {}
-    }
-
-    private void handlePlayerShoot() {
-        if (currentGameLoop == null || myTankId == -1) return;
-        com.tank2d.server.model.TankEntity tank = currentGameLoop.getTank(myTankId);
-        if (tank != null && tank.isAlive()) {
-            currentGameLoop.handleShootRequest(tank);
-        }
     }
 
     private void handlePlayerInput(String rawJson) {
@@ -397,168 +330,10 @@ public class ClientHandler implements Runnable {
         currentGameLoop.handleShootRequest(tank, requestedType);
     }
 
-<<<<<<< HEAD
-    private void broadcastGameStart() {
-        if (currentRoomId == -1) {
-            return;
-        }
-
-        // Tạo JSON object chuẩn: {"roomId": 1}
-        Map<String, Object> dataMap = new HashMap<>();
-        dataMap.put("roomId", currentRoomId);
-        Packet packet = new Packet(
-                PacketType.GAME_START_NOTIFY,
-                gson.toJson(dataMap)
-        );
-
-        for (ClientHandler client : connectedClients) {
-            if (client.currentRoomId == currentRoomId) {
-                try {
-                    NetworkUtil.sendPacket(client.dos, packet);
-                    System.out.println("[Game] Đã gửi GAME_START_NOTIFY tới Client");
-                } catch (IOException e) {
-                    System.err.println("[Game] Không thể gửi GAME_START_NOTIFY: " + e.getMessage());
-                }
-            }
-        }
-    }  
-    private void handleStartGame() {
-
-    try {
-
-        if (currentUser == null) {
-            System.out.println(
-                    "[Game] Client chưa đăng nhập."
-            );
-            return;
-        }
-
-        if (currentRoomId == -1) {
-            System.out.println(
-                    "[Game] Client chưa ở trong phòng."
-            );
-            return;
-        }
-
-        Room room =
-                roomManager.getRoom(currentRoomId);
-
-        if (room == null) {
-            System.out.println(
-                    "[Game] Không tìm thấy phòng."
-            );
-            return;
-        }
-
-        // Chỉ Host mới được bắt đầu
-        if (!room.isHost(currentUser.getId())) {
-
-            System.out.println(
-                    "[Game] User "
-                    + currentUser.getUsername()
-                    + " không phải Host, không được Start."
-            );
-
-            return;
-        }
-
-        // Phải đủ người
-        if (room.getCurrentPlayers()
-                < room.getMaxPlayers()) {
-
-            System.out.println(
-                    "[Game] Chưa đủ người chơi."
-            );
-
-            return;
-        }
-
-        // Tất cả người chơi phải Ready
-        if (!room.areAllPlayersReady()) {
-
-            System.out.println(
-                    "[Game] Chưa phải tất cả người chơi Ready."
-            );
-
-            return;
-        }
-
-        System.out.println(
-                "[Game] Host "
-                + currentUser.getUsername()
-                + " bắt đầu trận!"
-        );
-
-        broadcastGameStart();
-        
-        com.tank2d.server.game.GameLoop gameLoop = new com.tank2d.server.game.GameLoop(60);
-        com.tank2d.server.game.GameStateManager stateManager = 
-                new com.tank2d.server.game.GameStateManager(gameLoop, userDAO, 180.0);
-        gameLoop.setStateManager(stateManager);
-
-        int tankIndex = 1;
-        for (ClientHandler client : connectedClients) {
-            if (client.currentRoomId == currentRoomId) {
-                // Đặt vị trí xuất phát cho xe 1 và xe 2
-                double startX = (tankIndex == 1) ? 100.0 : 650.0;
-                double startY = (tankIndex == 1) ? 100.0 : 450.0;
-                double startAngle = (tankIndex == 1) ? 0.0 : 180.0;
-                double speed = 150.0;          // Tốc độ di chuyển (pixel/giây)
-                double rotationSpeed = 120.0;  // Tốc độ quay (độ/giây)
-
-               com.tank2d.server.model.TankEntity tank = 
-                        new com.tank2d.server.model.TankEntity(tankIndex, startX, startY, startAngle, speed, rotationSpeed);
-                tank.setHp(3); // Khởi tạo máu ban đầu
-                gameLoop.addTank(tank);
-                stateManager.registerPlayer(tankIndex, client.currentUser.getId(), client.dos);
-
-                client.myTankId = tankIndex; // Lưu tankId cho client đó
-                client.currentGameLoop = gameLoop; // Gán gameLoop để nhận input
-                tankIndex++;
-            }
-        }
-
-        // Đăng ký gửi Snapshot xuống toàn bộ Client trong phòng
-        java.util.concurrent.ExecutorService networkBroadcastPool = 
-                java.util.concurrent.Executors.newSingleThreadExecutor();
-        int finalRoomId = currentRoomId;
-        gameLoop.setSnapshotListener(snapshot -> {
-            // Đẩy sang thread riêng, không làm nghẽn vòng lặp 60 tick/s của GameLoop
-            networkBroadcastPool.submit(() -> {
-                try {
-                    String json = gson.toJson(snapshot);
-                    Packet snapshotPacket = new Packet(PacketType.GAME_SNAPSHOT, json);
-                    for (ClientHandler client : connectedClients) {
-                        if (client.currentRoomId == finalRoomId && client.dos != null) {
-                            NetworkUtil.sendPacket(client.dos, snapshotPacket);
-                        }
-                    }
-                } catch (Exception ignored) {}
-            });
-        });
-
-        // KÍCH HOẠT CHẠY THREAD
-        Thread loopThread = new Thread(gameLoop);
-        loopThread.setName("GameLoop-Room-" + finalRoomId);
-        loopThread.start();
-
-    } catch (Exception e) {
-
-        System.err.println(
-                "[Game] Lỗi xử lý ROOM_START_REQ: "
-                + e.getMessage()
-        );
-    }
-}
-
-    private void handleRegister(String rawJson) {
-        RegisterResponse res;
-=======
     // =========================================================================
     // TASK 1 (GIANG) & FIX THEO PHẢN HỒI CỦA HOÀNG (PHYSICS & MAP)
     // =========================================================================
     private void handleStartGame() {
->>>>>>> origin/dev
         try {
             if (currentUser == null || currentRoomId == -1) return;
             Room room = roomManager.getRoom(currentRoomId);
