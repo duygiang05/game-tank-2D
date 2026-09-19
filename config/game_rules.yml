@@ -12,6 +12,7 @@ game:
     max_hp: 3                  # Lượng máu tối đa của mỗi xe tăng (3 HP)
     fire_cooldown_ms: 1000     # Thời gian giãn cách giữa 2 lần bắn (1000ms = 1 giây/viên, chống spam đạn)
     ghost_duration_s: 5        # Thời gian làm mờ/bảo hộ miễn nhiễm sau hồi sinh (5 giây an toàn)
+    reveal_duration_s: 2.0      # BỔ SUNG: Thời gian lộ hình sau khi bắn trong bụi (2 giây)
 
   # Danh sách các mốc thời gian trận đấu Chủ phòng có thể chọn (giây)
   match_durations:
