@@ -53,6 +53,6 @@ public enum PacketType {
     GAME_SNAPSHOT,
 
     GAME_EVENT_EFFECT,
-
-    GAME_OVER_NOTIFY
+    GAME_OVER_NOTIFY,
+    MAP_UPDATE
 }

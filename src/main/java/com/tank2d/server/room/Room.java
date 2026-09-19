@@ -17,30 +17,24 @@ public class Room {
 
     // Phòng tối đa 4 người
     private final int maxPlayers;
-
-    // ID của người tạo phòng
     private int hostId;
     // Thời lượng trận đấu, đơn vị: giây
-// Mặc định: 60 giây
+    // Mặc định: 60 giây
     private int duration = 60;
 
     private final List<User> players;
     private final Map<Integer, Boolean> readyStates;
 
     private String status;
+    private double matchDuration = 60.0; // Mặc định trận 60s
 
     public Room(int roomId, String roomName, int hostId) {
-
         this.roomId = roomId;
         this.roomName = roomName;
         this.hostId = hostId;
-
-        // Task 7: mỗi phòng tối đa 4 người
-        this.maxPlayers = 4;
-
+        this.maxPlayers = 4; // Cấu hình phòng tối đa 4 slot cho Sprint 3
         this.players = new ArrayList<>();
         this.readyStates = new LinkedHashMap<>();
-
         this.status = "Waiting";
     }
 
@@ -59,17 +53,6 @@ public class Room {
         return maxPlayers;
     }
 
-    public synchronized int getCurrentPlayers() {
-        return players.size();
-    }
-
-    public synchronized String getStatus() {
-        return status;
-    }
-
-    // =========================
-    // HOST
-    // =========================
     public int getHostId() {
         return hostId;
     }
@@ -92,34 +75,29 @@ public class Room {
         return new LinkedHashMap<>(readyStates);
     }
 
-    // =========================
-    // ADD PLAYER
-    // =========================
+    public synchronized String getStatus() {
+        return status;
+    }
+
+    public synchronized double getMatchDuration() {
+        return matchDuration;
+    }
+
+    public synchronized void setMatchDuration(double matchDuration) {
+        this.matchDuration = matchDuration;
+    }
+
     public synchronized boolean addPlayer(User user) {
+        if (user == null) return false;
 
-        if (user == null) {
-            return false;
-        }
-
-        // Không cho một user vào cùng một phòng 2 lần
         for (User player : players) {
-
-            if (player.getId() == user.getId()) {
-                return false;
-            }
+            if (player.getId() == user.getId()) return false;
         }
 
-        // Phòng đã đủ 4 người
-        if (players.size() >= maxPlayers) {
-            return false;
-        }
+        if (players.size() >= maxPlayers) return false;
 
         players.add(user);
 
-        /*
-         * Host luôn được xem là Ready.
-         * Người chơi thường ban đầu chưa Ready.
-         */
         if (user.getId() == hostId) {
 
             readyStates.put(
@@ -136,46 +114,21 @@ public class Room {
         }
 
         updateStatus();
-
         return true;
     }
 
-    // =========================
-    // REMOVE PLAYER
-    // =========================
     public synchronized boolean removePlayer(int userId) {
-
-        boolean removed
-                = players.removeIf(
-                        user -> user.getId() == userId
-                );
-
+        boolean removed = players.removeIf(user -> user.getId() == userId);
         if (removed) {
-
             readyStates.remove(userId);
-
             updateStatus();
         }
-
         return removed;
     }
 
-    // =========================
-    // SET READY
-    // =========================
-    public synchronized boolean setReady(
-            int userId,
-            boolean ready) {
+    public synchronized boolean setReady(int userId, boolean ready) {
+        if (!readyStates.containsKey(userId)) return false;
 
-        // User không ở trong phòng
-        if (!readyStates.containsKey(userId)) {
-            return false;
-        }
-
-        /*
-         * Host luôn Ready.
-         * Không cho Host chuyển về Not Ready.
-         */
         if (userId == hostId) {
 
             readyStates.put(
@@ -190,7 +143,6 @@ public class Room {
                     ready
             );
         }
-
         return true;
     }
 
@@ -198,38 +150,25 @@ public class Room {
     // CHECK READY
     // =========================
     public synchronized boolean isReady(int userId) {
-
-        return readyStates.getOrDefault(
-                userId,
-                false
-        );
+        return readyStates.getOrDefault(userId, false);
     }
 
     /**
      * Kiểm tra tất cả người chơi trong phòng đã Ready hay chưa.
      */
     public synchronized boolean areAllPlayersReady() {
-
-        if (players.isEmpty()) {
-            return false;
-        }
-
-        return readyStates.values()
-                .stream()
-                .allMatch(Boolean::booleanValue);
+        if (players.isEmpty()) return false;
+        return readyStates.values().stream().allMatch(Boolean::booleanValue);
     }
 
-    // =========================
-    // ROOM STATUS
-    // =========================
+    public synchronized int getCurrentPlayers() {
+        return players.size();
+    }
+
     private void updateStatus() {
-
         if (players.size() >= maxPlayers) {
-
             status = "Full";
-
         } else {
-
             status = "Waiting";
         }
     }
