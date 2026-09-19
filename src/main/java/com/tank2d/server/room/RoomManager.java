@@ -62,35 +62,38 @@ public class RoomManager {
     // JOIN ROOM
     // =========================
     public synchronized boolean joinRoom(
-            int roomId,
-            User user) {
+        int roomId,
+        User user) {
 
-        Room room = rooms.get(roomId);
+    Room room = rooms.get(roomId);
 
-        if (room == null || user == null) {
-            return false;
-        }
-
-        boolean success
-                = room.addPlayer(user);
-
-        if (success) {
-
-            System.out.println(
-                    "[RoomManager] "
-                    + user.getUsername()
-                    + " vào "
-                    + room.getRoomName()
-                    + " ("
-                    + room.getCurrentPlayers()
-                    + "/"
-                    + room.getMaxPlayers()
-                    + ")"
-            );
-        }
-
-        return success;
+    if (room == null || user == null) {
+        return false;
     }
+
+    // Không cho vào phòng đang chơi
+
+
+    boolean success
+            = room.addPlayer(user);
+
+    if (success) {
+
+        System.out.println(
+                "[RoomManager] "
+                + user.getUsername()
+                + " vào "
+                + room.getRoomName()
+                + " ("
+                + room.getCurrentPlayers()
+                + "/"
+                + room.getMaxPlayers()
+                + ")"
+        );
+    }
+
+    return success;
+}
 
     // =========================
     // LEAVE ROOM

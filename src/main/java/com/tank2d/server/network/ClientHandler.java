@@ -16,7 +16,9 @@ import com.tank2d.server.map.MapLoader;
 import com.tank2d.server.model.TankEntity;
 import com.tank2d.server.room.Room;
 import com.tank2d.server.room.RoomManager;
-
+import com.tank2d.common.dto.game.TankPlayerDTO;
+import java.util.ArrayList;
+import java.util.List;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -145,6 +147,10 @@ public class ClientHandler implements Runnable {
                 handleLeaveRoom();
                 break;
 
+            case TANK_PLAYER_INFO_REQ:
+                handleTankPlayerInfo();
+                break;
+
             case PLAYER_INPUT:
                 handlePlayerInput(packet.getData());
                 break;
@@ -154,6 +160,55 @@ public class ClientHandler implements Runnable {
             default:
                 System.out.println("[ClientHandler] Nhận packet chưa hỗ trợ: " + packet.getType());
                 break;
+        }
+    }
+
+    private void handleTankPlayerInfo() {
+
+        if (currentUser == null || currentRoomId == -1) {
+            return;
+        }
+
+        List<TankPlayerDTO> tankPlayers = new ArrayList<>();
+
+        for (ClientHandler client : connectedClients) {
+
+            if (client.currentRoomId == currentRoomId
+                    && client.currentUser != null
+                    && client.myTankId > 0) {
+
+                tankPlayers.add(
+                        new TankPlayerDTO(
+                                client.myTankId,
+                                client.currentUser.getUsername()
+                        )
+                );
+            }
+        }
+
+        String json = gson.toJson(tankPlayers);
+
+        Packet response = new Packet(
+                PacketType.TANK_PLAYER_INFO,
+                json
+        );
+
+        try {
+            if (dos != null) {
+                NetworkUtil.sendPacket(dos, response);
+            }
+
+            System.out.println(
+                    "[Game] Gửi Tank Player Info cho User "
+                    + currentUser.getUsername()
+                    + ": " + json
+            );
+
+        } catch (Exception e) {
+            System.err.println(
+                    "[Game] Lỗi gửi Tank Player Info: "
+                    + e.getMessage()
+            );
         }
     }
 
@@ -213,6 +268,7 @@ public class ClientHandler implements Runnable {
 
                 currentRoomId = roomId;
                 broadcastRoomState();
+                broadcastLobbyRooms();
             } else {
                 Packet response = new Packet(PacketType.ROOM_STATE_UPDATE, gson.toJson(roomManager.getRoomDTO(roomId)));
                 NetworkUtil.sendPacket(dos, response);
@@ -232,85 +288,6 @@ public class ClientHandler implements Runnable {
                 broadcastRoomState();
             }
         } catch (Exception ignored) {}
-    }
-
-    private void handlePlayerInput(String rawJson) {
-        if (currentGameLoop == null || myTankId == -1) return;
-        TankEntity tank = currentGameLoop.getTank(myTankId);
-        if (tank == null || !tank.isAlive()) return;
-
-        try {
-            java.lang.reflect.Type type = new com.google.gson.reflect.TypeToken<Map<String, Boolean>>(){}.getType();
-            Map<String, Boolean> input = gson.fromJson(rawJson, type);
-            if (input != null) {
-
-                boolean up
-                        = input.getOrDefault(
-                                "up",
-                                false
-                        );
-
-                boolean down
-                        = input.getOrDefault(
-                                "down",
-                                false
-                        );
-
-                boolean left
-                        = input.getOrDefault(
-                                "left",
-                                false
-                        );
-
-                boolean right
-                        = input.getOrDefault(
-                                "right",
-                                false
-                        );
-
-                // Di chuyển
-                if (up && !down) {
-
-                    tank.setMoveState(
-                            TankEntity.MoveState.FORWARD
-                    );
-
-                } else if (down && !up) {
-
-                    tank.setMoveState(
-                            TankEntity.MoveState.BACKWARD
-                    );
-
-                } else {
-
-                    tank.setMoveState(
-                            TankEntity.MoveState.NONE
-                    );
-                }
-
-                // Xoay
-                if (left && !right) {
-
-                    tank.setRotateState(
-                            TankEntity.RotateState.LEFT
-                    );
-
-                } else if (right && !left) {
-
-                    tank.setRotateState(
-                            TankEntity.RotateState.RIGHT
-                    );
-
-                } else {
-
-                    tank.setRotateState(
-                            TankEntity.RotateState.NONE
-                    );
-                }
-            }
-
-        } catch (Exception ignored) {
-        }
     }
 
     private void handlePlayerShoot(String rawJson) {
@@ -394,6 +371,35 @@ private void handleStartGame() {
                     client.currentGameLoop = gameLoop;
                     client.currentGameStateManager = stateManager;
                     tankIndex++;
+                }
+            }
+
+            // Gửi mapping Tank -> Username cho tất cả client trong phòng.
+            List<TankPlayerDTO> tankPlayers = new ArrayList<>();
+            for (ClientHandler client : connectedClients) {
+                if (client.currentRoomId == currentRoomId
+                        && client.currentUser != null
+                        && client.myTankId > 0) {
+                    tankPlayers.add(new TankPlayerDTO(
+                            client.myTankId,
+                            client.currentUser.getUsername()
+                    ));
+                }
+            }
+
+            String tankPlayersJson = gson.toJson(tankPlayers);
+            Packet tankPlayerPacket = new Packet(
+                    PacketType.TANK_PLAYER_INFO,
+                    tankPlayersJson
+            );
+
+            for (ClientHandler client : connectedClients) {
+                if (client.currentRoomId == currentRoomId
+                        && client.dos != null) {
+                    try {
+                        NetworkUtil.sendPacket(client.dos, tankPlayerPacket);
+                    } catch (IOException ignored) {
+                    }
                 }
             }
 
@@ -632,4 +638,148 @@ private void handleStartGame() {
             );
         }
     }
+
+    private void handlePlayerInput(String rawJson) {
+
+        if (currentGameLoop == null || myTankId == -1) {
+            return;
+        }
+
+        TankEntity tank
+                = currentGameLoop.getTank(myTankId);
+
+        if (tank == null || !tank.isAlive()) {
+            return;
+        }
+
+        try {
+
+            java.lang.reflect.Type type
+                    = new com.google.gson.reflect.TypeToken<
+                            Map<String, Boolean>>() {
+                    }.getType();
+
+            Map<String, Boolean> input
+                    = gson.fromJson(
+                            rawJson,
+                            type
+                    );
+
+            if (input != null) {
+
+                boolean up
+                        = input.getOrDefault(
+                                "up",
+                                false
+                        );
+
+                boolean down
+                        = input.getOrDefault(
+                                "down",
+                                false
+                        );
+
+                boolean left
+                        = input.getOrDefault(
+                                "left",
+                                false
+                        );
+
+                boolean right
+                        = input.getOrDefault(
+                                "right",
+                                false
+                        );
+
+                // Di chuyển
+                if (up && !down) {
+
+                    tank.setMoveState(
+                            TankEntity.MoveState.FORWARD
+                    );
+
+                } else if (down && !up) {
+
+                    tank.setMoveState(
+                            TankEntity.MoveState.BACKWARD
+                    );
+
+                } else {
+
+                    tank.setMoveState(
+                            TankEntity.MoveState.NONE
+                    );
+                }
+
+                // Xoay
+                if (left && !right) {
+
+                    tank.setRotateState(
+                            TankEntity.RotateState.LEFT
+                    );
+
+                } else if (right && !left) {
+
+                    tank.setRotateState(
+                            TankEntity.RotateState.RIGHT
+                    );
+
+                } else {
+
+                    tank.setRotateState(
+                            TankEntity.RotateState.NONE
+                    );
+                }
+            }
+
+        } catch (Exception ignored) {
+        }
+    }
+
+    // =========================================================
+    // PLAYER SHOOT
+    // =========================================================
+    
+
+    // =========================================================
+    // BROADCAST LOBBY
+    // =========================================================
+    
+
+    // =========================================================
+    // BROADCAST ROOM STATE
+    // =========================================================
+    
+
+    
+
+    // =========================================================
+    // GAME START NOTIFY
+    // =========================================================
+    
+
+    // =========================================================
+    // START GAME
+    // =========================================================
+    
+
+    // =========================================================
+    // REGISTER
+    // =========================================================
+    
+
+    // =========================================================
+    // GET ROOMS
+    // =========================================================
+    
+
+    // =========================================================
+    // LEAVE ROOM
+    // =========================================================
+    
+
+    // =========================================================
+    // CLOSE CONNECTION
+    // =========================================================
+    
 }
