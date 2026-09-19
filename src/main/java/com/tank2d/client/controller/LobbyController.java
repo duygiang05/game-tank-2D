@@ -7,6 +7,7 @@ import com.tank2d.client.network.ClientSocket;
 import com.tank2d.common.dto.RoomDTO;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
+import javafx.scene.control.ComboBox;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -40,23 +41,42 @@ public class LobbyController {
     @FXML
     private Label usernameLabel;
 
+    @FXML
+    private ComboBox<String> durationFilterComboBox;
+
+    private List<RoomDTO> allRooms = new java.util.ArrayList<>();
+
     private final Gson gson = new Gson();
 
-    private final ClientSession session =
-            ClientSession.getInstance();
+    private final ClientSession session
+            = ClientSession.getInstance();
 
     /**
-     * Listener nhận packet từ ClientSession.
-     * ClientSession là nơi duy nhất đọc socket.
+     * Listener nhận packet từ ClientSession. ClientSession là nơi duy nhất đọc
+     * socket.
      */
-    private final Consumer<Packet> packetListener =
-            this::handleServerPacket;
+    private final Consumer<Packet> packetListener
+            = this::handleServerPacket;
 
     @FXML
     private void initialize() {
 
         // Đăng ký nhận packet từ Server
         session.addPacketListener(packetListener);
+
+        // Bộ lọc thời gian
+        durationFilterComboBox.getItems().addAll(
+                "Tất cả",
+                "45s",
+                "60s",
+                "90s"
+        );
+
+        durationFilterComboBox.setValue("Tất cả");
+
+        durationFilterComboBox.setOnAction(
+                event -> applyDurationFilter()
+        );
 
         // Hiển thị username
         if (session.getCurrentUser() != null) {
@@ -77,34 +97,37 @@ public class LobbyController {
 
         // Cấu hình hiển thị từng phòng
         roomListView.setCellFactory(
-                listView ->
-                        new javafx.scene.control.ListCell<RoomDTO>() {
+                listView
+                -> new javafx.scene.control.ListCell<RoomDTO>() {
 
-                    @Override
-                    protected void updateItem(
-                            RoomDTO room,
-                            boolean empty) {
+            @Override
+            protected void updateItem(
+                    RoomDTO room,
+                    boolean empty) {
 
-                        super.updateItem(room, empty);
+                super.updateItem(room, empty);
 
-                        if (empty || room == null) {
+                if (empty || room == null) {
 
-                            setText(null);
+                    setText(null);
 
-                        } else {
+                } else {
 
-                            setText(
-                                    room.getRoomName()
-                                    + "   |   "
-                                    + room.getCurrentPlayers()
-                                    + "/"
-                                    + room.getMaxPlayers()
-                                    + "   |   "
-                                    + room.getStatus()
-                            );
-                        }
-                    }
+                    setText(
+                            room.getRoomName()
+                            + "   |   "
+                            + room.getCurrentPlayers()
+                            + "/"
+                            + room.getMaxPlayers()
+                            + "   |   "
+                            + room.getStatus()
+                            + "   |   "
+                            + room.getDuration()
+                            + "s"
+                    );
                 }
+            }
+        }
         );
 
         // Yêu cầu danh sách phòng
@@ -114,15 +137,14 @@ public class LobbyController {
     /**
      * Yêu cầu Server gửi danh sách phòng hiện tại.
      *
-     * Chỉ gửi request.
-     * Không tự đọc socket.
+     * Chỉ gửi request. Không tự đọc socket.
      */
     private void loadRooms() {
 
         try {
 
-            ClientSocket clientSocket =
-                    session.getClientSocket();
+            ClientSocket clientSocket
+                    = session.getClientSocket();
 
             if (clientSocket == null
                     || !clientSocket.isConnected()) {
@@ -156,9 +178,8 @@ public class LobbyController {
     /**
      * Tạo phòng.
      *
-     * Chỉ gửi request.
-     * ROOM_STATE_UPDATE sẽ được ClientSession
-     * chuyển vào handleServerPacket().
+     * Chỉ gửi request. ROOM_STATE_UPDATE sẽ được ClientSession chuyển vào
+     * handleServerPacket().
      */
     @FXML
     private void handleCreateRoom() {
@@ -169,8 +190,8 @@ public class LobbyController {
 
         try {
 
-            ClientSocket clientSocket =
-                    session.getClientSocket();
+            ClientSocket clientSocket
+                    = session.getClientSocket();
 
             if (clientSocket == null
                     || !clientSocket.isConnected()) {
@@ -207,8 +228,8 @@ public class LobbyController {
     @FXML
     private void handleJoinRoom() {
 
-        RoomDTO selectedRoom =
-                roomListView
+        RoomDTO selectedRoom
+                = roomListView
                         .getSelectionModel()
                         .getSelectedItem();
 
@@ -220,8 +241,8 @@ public class LobbyController {
             return;
         }
 
-        int selectedRoomId =
-                selectedRoom.getRoomId();
+        int selectedRoomId
+                = selectedRoom.getRoomId();
 
         statusLabel.setText(
                 "Đang vào "
@@ -231,8 +252,8 @@ public class LobbyController {
 
         try {
 
-            ClientSocket clientSocket =
-                    session.getClientSocket();
+            ClientSocket clientSocket
+                    = session.getClientSocket();
 
             if (clientSocket == null
                     || !clientSocket.isConnected()) {
@@ -318,12 +339,12 @@ public class LobbyController {
 
         try {
 
-            Type roomListType =
-                    new TypeToken<List<RoomDTO>>() {
+            Type roomListType
+                    = new TypeToken<List<RoomDTO>>() {
                     }.getType();
 
-            List<RoomDTO> rooms =
-                    gson.fromJson(
+            List<RoomDTO> rooms
+                    = gson.fromJson(
                             rawJson,
                             roomListType
                     );
@@ -333,27 +354,8 @@ public class LobbyController {
             }
 
             Platform.runLater(() -> {
-
-                roomListView.getItems().clear();
-
-                roomListView.getItems().addAll(
-                        rooms
-                );
-
-                if (rooms.isEmpty()) {
-
-                    statusLabel.setText(
-                            "Hiện chưa có phòng nào."
-                    );
-
-                } else {
-
-                    statusLabel.setText(
-                            "Đã cập nhật "
-                            + rooms.size()
-                            + " phòng."
-                    );
-                }
+                allRooms = rooms;
+                applyDurationFilter();
             });
 
         } catch (Exception e) {
@@ -366,19 +368,67 @@ public class LobbyController {
     }
 
     /**
+     * Lọc phòng theo thời lượng trận đấu.
+     */
+    private void applyDurationFilter() {
+
+        String selectedFilter
+                = durationFilterComboBox.getValue();
+
+        if (selectedFilter == null) {
+            selectedFilter = "Tất cả";
+        }
+
+        roomListView.getItems().clear();
+
+        if (selectedFilter.equals("Tất cả")) {
+
+            roomListView.getItems().addAll(allRooms);
+
+        } else {
+
+            int duration = Integer.parseInt(
+                    selectedFilter.replace("s", "")
+            );
+
+            for (RoomDTO room : allRooms) {
+
+                if (room.getDuration() == duration) {
+                    roomListView.getItems().add(room);
+                }
+            }
+        }
+
+        int count = roomListView.getItems().size();
+
+        if (count == 0) {
+
+            statusLabel.setText(
+                    "Không có phòng phù hợp."
+            );
+
+        } else {
+
+            statusLabel.setText(
+                    "Đang hiển thị "
+                    + count
+                    + " phòng."
+            );
+        }
+    }
+
+    /**
      * Xử lý ROOM_STATE_UPDATE.
      *
-     * Được dùng cho cả:
-     * - Tạo phòng
-     * - Vào phòng
+     * Được dùng cho cả: - Tạo phòng - Vào phòng
      */
     private void handleRoomStateUpdate(
             String rawJson) {
 
         try {
 
-            RoomDTO room =
-                    gson.fromJson(
+            RoomDTO room
+                    = gson.fromJson(
                             rawJson,
                             RoomDTO.class
                     );
@@ -429,25 +479,25 @@ public class LobbyController {
 
             try {
 
-                FXMLLoader loader =
-                        new FXMLLoader(
+                FXMLLoader loader
+                        = new FXMLLoader(
                                 getClass().getResource(
                                         "/com/tank2d/client/view/room.fxml"
                                 )
                         );
 
-                Parent root =
-                        loader.load();
+                Parent root
+                        = loader.load();
 
-                RoomController controller =
-                        loader.getController();
-                
+                RoomController controller
+                        = loader.getController();
+
                 session.removePacketListener(packetListener);
 
                 controller.setRoom(room);
 
-                Stage stage =
-                        (Stage) roomListView
+                Stage stage
+                        = (Stage) roomListView
                                 .getScene()
                                 .getWindow();
 

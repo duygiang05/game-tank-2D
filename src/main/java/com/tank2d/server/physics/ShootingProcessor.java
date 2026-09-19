@@ -1,6 +1,7 @@
 package com.tank2d.server.physics;
 
 import com.tank2d.common.config.ConfigLoader;
+import com.tank2d.server.model.BulletEntity;
 import com.tank2d.server.model.TankEntity;
 
 public final class ShootingProcessor {
@@ -11,17 +12,24 @@ public final class ShootingProcessor {
         public final boolean success;
         public final double vx;
         public final double vy;
+        public final BulletEntity.BulletType type;
 
-        private ShotResult(boolean success, double vx, double vy) {
+        private ShotResult(boolean success, double vx, double vy, BulletEntity.BulletType type) {
             this.success = success;
             this.vx = vx;
             this.vy = vy;
+            this.type = type;
         }
 
-        static ShotResult fail() { return new ShotResult(false, 0, 0); }
-        static ShotResult ok(double vx, double vy) { return new ShotResult(true, vx, vy); }
+        static ShotResult fail() { return new ShotResult(false, 0, 0, BulletEntity.BulletType.NORMAL); }
+        static ShotResult ok(double vx, double vy, BulletEntity.BulletType type) { return new ShotResult(true, vx, vy, type); }
     }
-    public static ShotResult tryShoot(TankEntity tank, long nowMillis) {
+
+    /**
+     * @param requestedType loại đạn CLIENT muốn bắn — chỉ thật sự bắn ROCKET nếu tank đang có buff tên lửa còn hiệu lực,
+     *                       ngược lại server tự hạ về NORMAL (không tin tưởng client tự xưng có đạn tên lửa).
+     */
+    public static ShotResult tryShoot(TankEntity tank, BulletEntity.BulletType requestedType, long nowMillis) {
         if (tank == null || !tank.isAlive()) {
             return ShotResult.fail();
         }
@@ -31,12 +39,17 @@ public final class ShootingProcessor {
             return ShotResult.fail(); // đang khóa spam đạn
         }
 
+        BulletEntity.BulletType actualType = BulletEntity.BulletType.NORMAL;
+        if (requestedType == BulletEntity.BulletType.ROCKET && tank.getRocketBuffActiveUntilMillis() > nowMillis) {
+            actualType = BulletEntity.BulletType.ROCKET;
+        }
+
         double bulletSpeed = ConfigLoader.getBulletSpeedPerSecond();
         double radians = Math.toRadians(tank.getAngle());
         double vx = bulletSpeed * Math.cos(radians);
         double vy = bulletSpeed * Math.sin(radians);
 
-        tank.setLastShotTimeMillis(nowMillis); // ghi nhận thời điểm bắn ngay khi hợp lệ
-        return ShotResult.ok(vx, vy);
+        tank.setLastShotTimeMillis(nowMillis);
+        return ShotResult.ok(vx, vy, actualType);
     }
 }

@@ -1,6 +1,8 @@
 package com.tank2d.common.config;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.yaml.snakeyaml.Yaml;
@@ -16,32 +18,49 @@ public class ConfigLoader {
 
     private static Dotenv dotenv;
     private static JsonObject statsConfig;
-    private static Map<String, Object> gameRulesConfig; // MỚI
+    private static Map<String, Object> gameRulesConfig;
+    private static JsonObject currentMapConfig;
     private static final Gson gson = new Gson();
 
     static {
+        // 1. Nạp .env
         try {
             dotenv = Dotenv.configure().ignoreIfMissing().load();
         } catch (Exception e) {
-            System.err.println("[ConfigLoader] Không tìm thấy file .env, sử dụng cấu hình mặc định!");
+            System.err.println("[ConfigLoader] Không tìm thấy file .env, dùng fallback mặc định!");
         }
 
+        // 2. Nạp config/stats.json
         try (FileReader reader = new FileReader("config/stats.json", StandardCharsets.UTF_8)) {
             statsConfig = gson.fromJson(reader, JsonObject.class);
         } catch (IOException e) {
-            System.err.println("[ConfigLoader] Không thể đọc file config/stats.json: " + e.getMessage());
+            System.err.println("[ConfigLoader] Không thể đọc config/stats.json: " + e.getMessage());
         }
 
-        // MỚI: nạp config/game_rules.yml bằng SnakeYAML
+        // 3. Nạp config/game_rules.yml bằng SnakeYAML
         try (InputStream input = new FileInputStream("config/game_rules.yml")) {
             Yaml yaml = new Yaml();
             gameRulesConfig = yaml.load(input);
         } catch (IOException e) {
-            System.err.println("[ConfigLoader] Không thể đọc file config/game_rules.yml: " + e.getMessage());
+            System.err.println("[ConfigLoader] Không thể đọc config/game_rules.yml: " + e.getMessage());
+        }
+
+        // 4. Nạp map JSON mặc định (map_snow.json)
+        loadMapConfig("config/maps/map_snow.json");
+    }
+
+    public static void loadMapConfig(String mapPath) {
+        try (FileReader reader = new FileReader(mapPath, StandardCharsets.UTF_8)) {
+            currentMapConfig = gson.fromJson(reader, JsonObject.class);
+            System.out.println("[ConfigLoader] Đã tải cấu hình bản đồ từ: " + mapPath);
+        } catch (IOException e) {
+            System.err.println("[ConfigLoader] Không thể đọc file map: " + mapPath + " - " + e.getMessage());
         }
     }
 
-    // ========== CÁC HÀM CŨ — GIỮ NGUYÊN ==========
+    // =========================================================================
+    // ĐỌC BIẾN MÔI TRƯỜNG (.ENV)
+    // =========================================================================
     public static String getEnv(String key, String defaultValue) {
         if (dotenv == null) return defaultValue;
         String val = dotenv.get(key);
@@ -58,6 +77,9 @@ public class ConfigLoader {
         }
     }
 
+    // =========================================================================
+    // ĐỌC THÔNG SỐ VẬT LÝ & DAMAGE (stats.json)
+    // =========================================================================
     public static JsonObject getPhysicsStats() {
         if (statsConfig != null && statsConfig.has("physics")) {
             return statsConfig.getAsJsonObject("physics");
@@ -72,9 +94,23 @@ public class ConfigLoader {
         return new JsonObject();
     }
 
-    // ========== HÀM MỚI: ĐỌC game_rules.yml ==========
+    public static double getBulletSpeedPerSecond() {
+        JsonObject physics = getPhysicsStats();
+        double perTick = physics.has("bullet_speed") ? physics.get("bullet_speed").getAsDouble() : 9.0;
+        int tickRate = physics.has("server_tick_rate") ? physics.get("server_tick_rate").getAsInt() : 30;
+        return perTick * tickRate;
+    }
 
-    /** Truy cập thô toàn bộ cây cấu hình game_rules.yml, dùng khi cần đọc field ít phổ biến. */
+    public static double getTankSpeedPerSecond() {
+        JsonObject physics = getPhysicsStats();
+        double perTick = physics.has("tank_speed") ? physics.get("tank_speed").getAsDouble() : 4.0;
+        int tickRate = physics.has("server_tick_rate") ? physics.get("server_tick_rate").getAsInt() : 30;
+        return perTick * tickRate;
+    }
+
+    // =========================================================================
+    // ĐỌC LUẬT CHƠI (game_rules.yml)
+    // =========================================================================
     @SuppressWarnings("unchecked")
     public static Map<String, Object> getGameRules() {
         if (gameRulesConfig == null) return Map.of();
@@ -88,34 +124,128 @@ public class ConfigLoader {
         return tankNode instanceof Map ? (Map<String, Object>) tankNode : Map.of();
     }
 
-    /** fire_cooldown_ms trong game_rules.yml — thời gian giãn cách giữa 2 lần bắn. */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> getRespawnRules() {
+        Object node = getGameRules().get("respawn_times");
+        return node instanceof Map ? (Map<String, Object>) node : Map.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> getScoringRules() {
+        Object node = getGameRules().get("scoring");
+        return node instanceof Map ? (Map<String, Object>) node : Map.of();
+    }
+
     public static long getFireCooldownMs() {
         Object val = getTankRules().get("fire_cooldown_ms");
-        return val instanceof Number ? ((Number) val).longValue() : 1000L; // fallback an toàn
+        return val instanceof Number ? ((Number) val).longValue() : 1000L;
     }
 
-    /** max_hp trong game_rules.yml — máu tối đa của xe tăng. */
     public static int getMaxHp() {
         Object val = getTankRules().get("max_hp");
-        return val instanceof Number ? ((Number) val).intValue() : 3; // fallback an toàn
+        return val instanceof Number ? ((Number) val).intValue() : 3;
     }
 
-    /** ghost_duration_s — thời gian bất tử sau hồi sinh (dùng cho task combat sau). */
     public static double getGhostDurationSeconds() {
         Object val = getTankRules().get("ghost_duration_s");
         return val instanceof Number ? ((Number) val).doubleValue() : 5.0;
     }
-    public static double getBulletSpeedPerSecond() {
-        JsonObject physics = getPhysicsStats();
-        double perTick = physics.has("bullet_speed") ? physics.get("bullet_speed").getAsDouble() : 9.0;
-        int tickRate = physics.has("server_tick_rate") ? physics.get("server_tick_rate").getAsInt() : 30;
-        return perTick * tickRate; // quy đổi pixel/tick -> pixel/giây
+
+    public static double getRespawnTime45s() {
+        Object val = getRespawnRules().get("match_45s");
+        return val instanceof Number ? ((Number) val).doubleValue() : 3.0;
     }
 
-    public static double getTankSpeedPerSecond() {
+    public static double getRespawnTime60s() {
+        Object val = getRespawnRules().get("match_60s");
+        return val instanceof Number ? ((Number) val).doubleValue() : 5.0;
+    }
+
+    public static double getRespawnTime90s() {
+        Object val = getRespawnRules().get("match_90s");
+        return val instanceof Number ? ((Number) val).doubleValue() : 7.0;
+    }
+
+    public static int getPointsPerHit() {
+        Object val = getScoringRules().get("points_per_hit");
+        return val instanceof Number ? ((Number) val).intValue() : 10;
+    }
+
+    public static int getPointsPerKill() {
+        Object val = getScoringRules().get("points_per_kill");
+        return val instanceof Number ? ((Number) val).intValue() : 30;
+    }
+
+    public static int getPointsWinBonus() {
+        Object val = getScoringRules().get("points_win_bonus");
+        return val instanceof Number ? ((Number) val).intValue() : 50;
+    }
+
+    public static double getDefaultMatchDuration() {
+        return 60.0;
+    }
+
+    // =========================================================================
+    // ĐỌC TỌA ĐỘ VÀ GÓC XOAY ĐỘNG TỪ MẢNG spawn_points TRONG MAP JSON
+    // =========================================================================
+    private static JsonObject getSpawnPointJson(int tankId) {
+        if (currentMapConfig != null && currentMapConfig.has("spawn_points")) {
+            JsonArray spawns = currentMapConfig.getAsJsonArray("spawn_points");
+            for (JsonElement elem : spawns) {
+                if (elem.isJsonObject()) {
+                    JsonObject obj = elem.getAsJsonObject();
+                    if (obj.has("tank_id") && obj.get("tank_id").getAsInt() == tankId) {
+                        return obj;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    public static double getSpawnX(int tankId, double fallback) {
+        JsonObject sp = getSpawnPointJson(tankId);
+        return (sp != null && sp.has("x")) ? sp.get("x").getAsDouble() : fallback;
+    }
+
+    public static double getSpawnY(int tankId, double fallback) {
+        JsonObject sp = getSpawnPointJson(tankId);
+        return (sp != null && sp.has("y")) ? sp.get("y").getAsDouble() : fallback;
+    }
+
+    public static double getSpawnAngle(int tankId, double fallback) {
+        JsonObject sp = getSpawnPointJson(tankId);
+        return (sp != null && sp.has("angle")) ? sp.get("angle").getAsDouble() : fallback;
+    }
+    public static double getRevealDurationSeconds() {
+        Object val = getTankRules().get("reveal_duration_s");
+        return val instanceof Number ? ((Number) val).doubleValue() : 2.0;
+    }
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> getPowerUpRules() {
+        Object node = getGameRules().get("power_up");
+        return node instanceof Map ? (Map<String, Object>) node : Map.of();
+    }
+
+    private static double numOr(Map<String, Object> map, String key, double def) {
+        Object v = map.get(key);
+        return v instanceof Number ? ((Number) v).doubleValue() : def;
+    }
+
+    public static double getItemSpawnIntervalSeconds() { return numOr(getPowerUpRules(), "spawn_interval_s", 7.0); }
+    public static double getItemDespawnSeconds() { return numOr(getPowerUpRules(), "despawn_time_s", 7.0); }
+    public static int getHealAmount() { return (int) numOr(getPowerUpRules(), "heal_amount", 3.0); }
+    public static double getShieldDurationSeconds() { return numOr(getPowerUpRules(), "shield_duration_s", 5.0); }
+    public static double getNitroDurationSeconds() { return numOr(getPowerUpRules(), "nitro_duration_s", 5.0); }
+    public static double getMissileBuffDurationSeconds() { return numOr(getPowerUpRules(), "missile_buff_duration_s", 5.0); }
+
+    public static double getNitroSpeedMultiplier() {
         JsonObject physics = getPhysicsStats();
-        double perTick = physics.has("tank_speed") ? physics.get("tank_speed").getAsDouble() : 4.0;
-        int tickRate = physics.has("server_tick_rate") ? physics.get("server_tick_rate").getAsInt() : 30;
-        return perTick * tickRate;
+        return physics.has("nitro_speed_multiplier") ? physics.get("nitro_speed_multiplier").getAsDouble() : 2.0;
+    }
+
+    public static int getRocketBulletDamage() {
+        JsonObject damage = getDamageStats();
+        return damage.has("rocket_bullet") ? damage.get("rocket_bullet").getAsInt() : 3;
     }
 }

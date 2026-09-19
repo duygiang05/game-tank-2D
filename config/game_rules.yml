@@ -2,26 +2,41 @@
 # CẤU HÌNH LUẬT CHƠI VÀ VÒNG ĐỜI TRẬN ĐẤU (GAME RULES & LIFECYCLE)
 # ==============================================================================
 game:
+  # Thiết lập quy mô phòng chơi
+  room:
+    min_players: 2             # Số lượng người chơi tối thiểu để bắt đầu trận
+    max_players: 4             # Số lượng người chơi tối đa trong một phòng
+
   # Cấu hình chỉ số gốc của xe tăng
   tank:
-    max_hp: 3                  # Lượng máu tối đa của mỗi xe tăng (3 máu)
+    max_hp: 3                  # Lượng máu tối đa của mỗi xe tăng (3 HP)
     fire_cooldown_ms: 1000     # Thời gian giãn cách giữa 2 lần bắn (1000ms = 1 giây/viên, chống spam đạn)
-    ghost_duration_s: 5        # Thời gian làm mờ/bất tử ngay sau khi hồi sinh (5 giây an toàn)
+    ghost_duration_s: 5        # Thời gian làm mờ/bảo hộ miễn nhiễm sau hồi sinh (5 giây an toàn)
+    reveal_duration_s: 2.0      # BỔ SUNG: Thời gian lộ hình sau khi bắn trong bụi (2 giây)
 
-  # Danh sách các mốc thời gian trận đấu mà Chủ phòng có thể lựa chọn (tính bằng giây)
+  # Danh sách các mốc thời gian trận đấu Chủ phòng có thể chọn (giây)
   match_durations:
     - 45                       # Trận đấu nhanh: 45 giây
     - 60                       # Trận đấu tiêu chuẩn: 60 giây
     - 90                       # Trận đấu kéo dài: 90 giây
 
-  # Thời gian chờ hồi sinh tương ứng với từng mốc thời gian trận đấu (tính bằng giây)
+  # Thời gian chờ hồi sinh tương ứng với từng mốc thời gian trận đấu (giây)
   respawn_times:
-    match_45s: 3               # Trận 45s -> Chết phải chờ 3s mới hồi sinh
-    match_60s: 5               # Trận 60s -> Chết phải chờ 5s mới hồi sinh
-    match_90s: 7               # Trận 90s -> Chết phải chờ 7s mới hồi sinh
+    match_45s: 3               # Trận 45s -> Chết chờ 3s mới hồi sinh
+    match_60s: 5               # Trận 60s -> Chết chờ 5s mới hồi sinh
+    match_90s: 7               # Trận 90s -> Chết chờ 7s mới hồi sinh
 
   # Cấu hình hệ thống vật phẩm bổ trợ (Power-up Buffs)
   power_up:
     spawn_interval_s: 7        # Chu kỳ tự động sinh ngẫu nhiên 1 vật phẩm trên map (7 giây/lần)
+    despawn_time_s: 7          # Tự động biến mất nếu sau 7 giây không có xe nào nhặt
+    heal_amount: 3             # Lượng máu hồi phục ngay khi nhặt Túi máu (hồi đầy 3/3 HP)
     shield_duration_s: 5       # Thời gian duy trì lớp Khiên chắn đạn thường (5 giây)
-    nitro_duration_s: 5        # Thời gian duy trì hiệu ứng Bình tăng tốc chạy/xoay (5 giây)
+    nitro_duration_s: 5        # Thời gian duy trì hiệu ứng Bình tăng tốc (5 giây)
+    missile_buff_duration_s: 5 # Thời gian duy trì trạng thái nạp đạn Tên lửa (5 giây)
+
+  # Cấu hình ma trận tính điểm (Scoring Matrix)
+  scoring:
+    points_per_hit: 10         # Điểm thưởng cho mỗi viên đạn bắn trúng đích (+10 điểm)
+    points_per_kill: 30        # Điểm thưởng cho mỗi mạng tiêu diệt (+30 điểm)
+    points_win_bonus: 50       # Điểm thưởng cộng thêm cho người chiến thắng chung cuộc (+50 điểm)
