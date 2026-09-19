@@ -17,7 +17,10 @@ public class Room {
 
     // Phòng tối đa 4 người
     private final int maxPlayers;
-    private final int hostId;
+    private int hostId;
+    // Thời lượng trận đấu, đơn vị: giây
+    // Mặc định: 60 giây
+    private int duration = 60;
 
     private final List<User> players;
     private final Map<Integer, Boolean> readyStates;

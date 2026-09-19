@@ -438,6 +438,7 @@ public class ClientHandler implements Runnable {
         } catch (Exception e) {
             System.err.println("[Room] Lỗi xử lý ROOM_LEAVE_REQ: " + e.getMessage());
         }
+    }
 
     public void closeConnection() {
         isRunning = false;
@@ -518,5 +519,104 @@ public class ClientHandler implements Runnable {
             Packet response = new Packet(PacketType.LOBBY_ROOMS_RES, gson.toJson(roomManager.getAllRooms()));
             NetworkUtil.sendPacket(dos, response);
         } catch (IOException ignored) {}
+    }
+    // ROOM DURATION
+// =========================================================
+    private void handleRoomDuration(String rawJson) {
+
+        try {
+
+            if (currentUser == null) {
+
+                System.out.println(
+                        "[Room] Client chưa đăng nhập."
+                );
+
+                return;
+            }
+
+            if (currentRoomId == -1) {
+
+                System.out.println(
+                        "[Room] Client chưa ở trong phòng."
+                );
+
+                return;
+            }
+
+            Room room
+                    = roomManager.getRoom(
+                            currentRoomId
+                    );
+
+            if (room == null) {
+
+                System.out.println(
+                        "[Room] Không tìm thấy phòng."
+                );
+
+                return;
+            }
+
+            // Chỉ Host được thay đổi thời lượng
+            if (!room.isHost(
+                    currentUser.getId())) {
+
+                System.out.println(
+                        "[Room] User "
+                        + currentUser.getUsername()
+                        + " không phải Host."
+                );
+
+                return;
+            }
+
+            int duration
+                    = gson.fromJson(
+                            rawJson,
+                            Integer.class
+                    );
+
+            // Chỉ chấp nhận 45 / 60 / 90 giây
+            if (duration != 45
+                    && duration != 60
+                    && duration != 90) {
+
+                System.out.println(
+                        "[Room] Thời lượng không hợp lệ: "
+                        + duration
+                );
+
+                return;
+            }
+
+            boolean success
+                    = roomManager.setRoomDuration(
+                            currentRoomId,
+                            duration
+                    );
+
+            if (success) {
+
+                System.out.println(
+                        "[Room] Host "
+                        + currentUser.getUsername()
+                        + " chọn "
+                        + duration
+                        + " giây."
+                );
+
+                // Đồng bộ duration cho tất cả người trong phòng
+                broadcastRoomState();
+                broadcastLobbyRooms();
+            }
+
+        } catch (Exception e) {
+
+            System.err.println(
+                    "[Room] Lỗi xử lý ROOM_DURATION_REQ: "
+                    + e.getMessage()
+            );
+        }
     }
 }
