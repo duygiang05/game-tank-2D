@@ -51,6 +51,7 @@ public class GameCanvasApp extends Application {
 
     // Lớp quản lý hiệu ứng nổ
     private static class ExplosionEffect {
+
         double x, y;
         int radius = 6;
         int maxRadius = 24;
@@ -63,17 +64,34 @@ public class GameCanvasApp extends Application {
 
         void update() {
             radius += 3;
-            if (radius > maxRadius) finished = true;
+            if (radius > maxRadius) {
+                finished = true;
+            }
         }
 
         void render(GraphicsContext gc) {
-            if (finished) return;
+            if (finished) {
+                return;
+            }
+
             gc.setFill(Color.ORANGE);
             gc.fillOval(x - radius, y - radius, radius * 2, radius * 2);
+
             gc.setFill(Color.RED);
-            gc.fillOval(x - (radius / 2.0), y - (radius / 2.0), radius, radius);
+            gc.fillOval(
+                    x - (radius / 2.0),
+                    y - (radius / 2.0),
+                    radius,
+                    radius
+            );
+
             gc.setFill(Color.YELLOW);
-            gc.fillOval(x - (radius / 4.0), y - (radius / 4.0), radius / 2.0, radius / 2.0);
+            gc.fillOval(
+                    x - (radius / 4.0),
+                    y - (radius / 4.0),
+                    radius / 2.0,
+                    radius / 2.0
+            );
         }
     }
 
@@ -86,6 +104,7 @@ public class GameCanvasApp extends Application {
 
         scene.setOnKeyPressed(e -> {
             activeKeys.add(e.getCode());
+
             if (e.getCode() == KeyCode.SPACE && !spacePressed) {
                 spacePressed = true;
                 sendShootRequestToServer();
@@ -94,6 +113,7 @@ public class GameCanvasApp extends Application {
 
         scene.setOnKeyReleased(e -> {
             activeKeys.remove(e.getCode());
+
             if (e.getCode() == KeyCode.SPACE) {
                 spacePressed = false;
             }
@@ -113,7 +133,7 @@ public class GameCanvasApp extends Application {
     // =========================================================================
     private void initNetworkReceiver() {
         this.clientSocket = ClientSession.getInstance().getClientSocket();
-        
+
         // Đăng ký trực tiếp bộ xử lý vào luồng duy nhất của ClientSession
         ClientSession.getInstance().addPacketListener(this::processIncomingPacket);
     }
@@ -130,9 +150,9 @@ public class GameCanvasApp extends Application {
                 if (snapshot.getTanks() != null) {
                     for (TankSnapshotDTO incoming : snapshot.getTanks()) {
                         targetTanks.put(incoming.getId(), incoming);
-                        displayTanks.putIfAbsent(incoming.getId(), 
-                            new TankSnapshotDTO(incoming.getId(), incoming.getX(), incoming.getY(), 
-                                                incoming.getAngle(), incoming.getHp(), incoming.isAlive()));
+                        displayTanks.putIfAbsent(incoming.getId(),
+                                new TankSnapshotDTO(incoming.getId(), incoming.getX(), incoming.getY(),
+                                        incoming.getAngle(), incoming.getHp(), incoming.isAlive()));
                     }
                 }
             }
@@ -145,7 +165,9 @@ public class GameCanvasApp extends Application {
     }
 
     private void sendInputToServer() {
-        if (clientSocket == null || !clientSocket.isConnected()) return;
+        if (clientSocket == null || !clientSocket.isConnected()) {
+            return;
+        }
         boolean up = activeKeys.contains(KeyCode.W) || activeKeys.contains(KeyCode.UP);
         boolean down = activeKeys.contains(KeyCode.S) || activeKeys.contains(KeyCode.DOWN);
         boolean left = activeKeys.contains(KeyCode.A) || activeKeys.contains(KeyCode.LEFT);
@@ -159,14 +181,18 @@ public class GameCanvasApp extends Application {
 
         try {
             clientSocket.sendPacket(new Packet(PacketType.PLAYER_INPUT, gson.toJson(inputMap)));
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
     }
 
     private void sendShootRequestToServer() {
-        if (clientSocket == null || !clientSocket.isConnected()) return;
+        if (clientSocket == null || !clientSocket.isConnected()) {
+            return;
+        }
         try {
             clientSocket.sendPacket(new Packet(PacketType.PLAYER_SHOOT_REQ, "{}"));
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
     }
 
     // =========================================================================
@@ -198,7 +224,7 @@ public class GameCanvasApp extends Application {
             if (target != null) {
                 double newX = current.getX() + (target.getX() - current.getX()) * LERP_FACTOR;
                 double newY = current.getY() + (target.getY() - current.getY()) * LERP_FACTOR;
-                
+
                 double diffAngle = (target.getAngle() - current.getAngle() + 540) % 360 - 180;
                 double newAngle = (current.getAngle() + diffAngle * LERP_FACTOR + 360) % 360;
 
@@ -225,7 +251,8 @@ public class GameCanvasApp extends Application {
             java.lang.reflect.Field aliveField = TankSnapshotDTO.class.getDeclaredField("isAlive");
             aliveField.setAccessible(true);
             aliveField.setBoolean(dto, isAlive);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
     }
 
     private void renderBullets() {
@@ -237,7 +264,9 @@ public class GameCanvasApp extends Application {
 
     private void renderTanks() {
         for (TankSnapshotDTO tank : displayTanks.values()) {
-            if (!tank.isAlive()) continue;
+            if (!tank.isAlive()) {
+                continue;
+            }
 
             gc.save();
             gc.translate(tank.getX(), tank.getY());

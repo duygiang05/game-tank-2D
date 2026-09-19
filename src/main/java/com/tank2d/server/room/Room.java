@@ -6,11 +6,16 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
+// Thời lượng trận đấu, đơn vị: giây
+// Mặc định: 60 giây
 
 public class Room {
 
     private final int roomId;
     private final String roomName;
+
+    // Phòng tối đa 4 người
     private final int maxPlayers;
     private final int hostId;
 
@@ -30,6 +35,9 @@ public class Room {
         this.status = "Waiting";
     }
 
+    // =========================
+    // ROOM INFORMATION
+    // =========================
     public int getRoomId() {
         return roomId;
     }
@@ -50,10 +58,16 @@ public class Room {
         return hostId == userId;
     }
 
+    // =========================
+    // PLAYERS
+    // =========================
     public synchronized List<User> getPlayers() {
         return new ArrayList<>(players);
     }
 
+    // =========================
+    // READY STATES
+    // =========================
     public synchronized Map<Integer, Boolean> getReadyStates() {
         return new LinkedHashMap<>(readyStates);
     }
@@ -82,9 +96,18 @@ public class Room {
         players.add(user);
 
         if (user.getId() == hostId) {
-            readyStates.put(user.getId(), true);
+
+            readyStates.put(
+                    user.getId(),
+                    true
+            );
+
         } else {
-            readyStates.put(user.getId(), false);
+
+            readyStates.put(
+                    user.getId(),
+                    false
+            );
         }
 
         updateStatus();
@@ -104,17 +127,32 @@ public class Room {
         if (!readyStates.containsKey(userId)) return false;
 
         if (userId == hostId) {
-            readyStates.put(userId, true);
+
+            readyStates.put(
+                    userId,
+                    true
+            );
+
         } else {
-            readyStates.put(userId, ready);
+
+            readyStates.put(
+                    userId,
+                    ready
+            );
         }
         return true;
     }
 
+    // =========================
+    // CHECK READY
+    // =========================
     public synchronized boolean isReady(int userId) {
         return readyStates.getOrDefault(userId, false);
     }
 
+    /**
+     * Kiểm tra tất cả người chơi trong phòng đã Ready hay chưa.
+     */
     public synchronized boolean areAllPlayersReady() {
         if (players.isEmpty()) return false;
         return readyStates.values().stream().allMatch(Boolean::booleanValue);
@@ -130,5 +168,52 @@ public class Room {
         } else {
             status = "Waiting";
         }
+    }
+
+    public synchronized void transferHostRandom() {
+
+        if (players.isEmpty()) {
+            return;
+        }
+
+        int randomIndex
+                = ThreadLocalRandom.current()
+                        .nextInt(players.size());
+
+        User newHost = players.get(randomIndex);
+
+        hostId = newHost.getId();
+
+        // Host mới tự động Ready
+        readyStates.put(newHost.getId(), true);
+
+        System.out.println(
+                "[Room] Host mới được chọn ngẫu nhiên: "
+                + newHost.getUsername()
+                + " (ID: "
+                + newHost.getId()
+                + ")"
+        );
+    }
+    // =========================
+// MATCH DURATION
+// =========================
+
+    public synchronized int getDuration() {
+        return duration;
+    }
+
+    public synchronized boolean setDuration(int duration) {
+
+        if (duration != 45
+                && duration != 60
+                && duration != 90) {
+
+            return false;
+        }
+
+        this.duration = duration;
+
+        return true;
     }
 }

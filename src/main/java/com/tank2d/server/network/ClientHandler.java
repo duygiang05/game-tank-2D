@@ -37,6 +37,7 @@ public class ClientHandler implements Runnable {
     private final UserDAO userDAO;
     private final RoomManager roomManager;
     private final Gson gson;
+
     private DataInputStream dis;
     private DataOutputStream dos;
     private volatile boolean isRunning;
@@ -56,35 +57,63 @@ public class ClientHandler implements Runnable {
 
     @Override
     public void run() {
-        String clientAddress = socket.getRemoteSocketAddress().toString();
-        System.out.println("[ClientHandler] Khởi tạo phiên làm việc với Client: " + clientAddress);
+
+        String clientAddress
+                = socket.getRemoteSocketAddress().toString();
+
+        System.out.println(
+                "[ClientHandler] Khởi tạo phiên làm việc với Client: "
+                + clientAddress
+        );
 
         try {
+
             dis = new DataInputStream(socket.getInputStream());
             dos = new DataOutputStream(socket.getOutputStream());
 
             connectedClients.add(this);
 
+            // Vòng lặp đọc Packet từ Client
             while (isRunning && !socket.isClosed()) {
+
                 Packet packet = NetworkUtil.readPacket(dis);
+
                 if (packet == null) {
-                    System.out.println("[ClientHandler] Client ngắt kết nối: " + clientAddress);
+
+                    System.out.println(
+                            "[ClientHandler] Client ngắt kết nối: "
+                            + clientAddress
+                    );
+
                     break;
                 }
+
                 dispatchPacket(packet);
             }
 
         } catch (IOException e) {
-            System.err.println("[ClientHandler] Lỗi kết nối (" + clientAddress + "): " + e.getMessage());
+
+            System.err.println(
+                    "[ClientHandler] Lỗi kết nối ("
+                    + clientAddress
+                    + "): "
+                    + e.getMessage()
+            );
+
         } finally {
+
             closeConnection();
         }
     }
 
+    // =========================================================
+    // DISPATCH PACKET
+    // =========================================================
     private void dispatchPacket(Packet packet) {
         if (packet.getType() == null) return;
 
         switch (packet.getType()) {
+
             case AUTH_LOGIN_REQ:
                 handleLogin(packet.getData());
                 break;
@@ -103,12 +132,19 @@ public class ClientHandler implements Runnable {
             case ROOM_READY_REQ:
                 handleReady(packet.getData());
                 break;
+
+            case ROOM_DURATION_REQ:
+                handleRoomDuration(packet.getData());
+                break;
+
             case ROOM_START_REQ:
                 handleStartGame();
                 break;
+
             case ROOM_LEAVE_REQ:
                 handleLeaveRoom();
                 break;
+
             case PLAYER_INPUT:
                 handlePlayerInput(packet.getData());
                 break;
@@ -121,13 +157,19 @@ public class ClientHandler implements Runnable {
         }
     }
 
+    // =========================================================
+    // LOGIN
+    // =========================================================
     private void handleLogin(String rawJson) {
+
         LoginResponse res;
+
         try {
             LoginRequest req = gson.fromJson(rawJson, LoginRequest.class);
             User user = userDAO.login(req.getUsername(), req.getPassword());
 
             if (user != null) {
+
                 this.currentUser = user;
                 res = new LoginResponse(true, user.getId(), user.getUsername(), "Đăng nhập thành công!");
             } else {
@@ -142,7 +184,11 @@ public class ClientHandler implements Runnable {
         } catch (IOException ignored) {}
     }
 
+    // =========================================================
+    // CREATE ROOM
+    // =========================================================
     private void handleCreateRoom() {
+
         try {
             if (currentUser == null) return;
             Room room = roomManager.createRoom(currentUser);
@@ -154,12 +200,17 @@ public class ClientHandler implements Runnable {
         } catch (IOException ignored) {}
     }
 
+    // =========================================================
+    // JOIN ROOM
+    // =========================================================
     private void handleJoinRoom(String rawJson) {
+
         try {
             int roomId = gson.fromJson(rawJson, Integer.class);
             boolean success = roomManager.joinRoom(roomId, currentUser);
 
             if (success) {
+
                 currentRoomId = roomId;
                 broadcastRoomState();
             } else {
@@ -169,7 +220,11 @@ public class ClientHandler implements Runnable {
         } catch (Exception ignored) {}
     }
 
+    // =========================================================
+    // READY
+    // =========================================================
     private void handleReady(String rawJson) {
+
         try {
             if (currentUser == null || currentRoomId == -1) return;
             boolean ready = gson.fromJson(rawJson, Boolean.class);
@@ -188,20 +243,74 @@ public class ClientHandler implements Runnable {
             java.lang.reflect.Type type = new com.google.gson.reflect.TypeToken<Map<String, Boolean>>(){}.getType();
             Map<String, Boolean> input = gson.fromJson(rawJson, type);
             if (input != null) {
-                boolean up = input.getOrDefault("up", false);
-                boolean down = input.getOrDefault("down", false);
-                boolean left = input.getOrDefault("left", false);
-                boolean right = input.getOrDefault("right", false);
 
-                if (up && !down) tank.setMoveState(TankEntity.MoveState.FORWARD);
-                else if (down && !up) tank.setMoveState(TankEntity.MoveState.BACKWARD);
-                else tank.setMoveState(TankEntity.MoveState.NONE);
+                boolean up
+                        = input.getOrDefault(
+                                "up",
+                                false
+                        );
 
-                if (left && !right) tank.setRotateState(TankEntity.RotateState.LEFT);
-                else if (right && !left) tank.setRotateState(TankEntity.RotateState.RIGHT);
-                else tank.setRotateState(TankEntity.RotateState.NONE);
+                boolean down
+                        = input.getOrDefault(
+                                "down",
+                                false
+                        );
+
+                boolean left
+                        = input.getOrDefault(
+                                "left",
+                                false
+                        );
+
+                boolean right
+                        = input.getOrDefault(
+                                "right",
+                                false
+                        );
+
+                // Di chuyển
+                if (up && !down) {
+
+                    tank.setMoveState(
+                            TankEntity.MoveState.FORWARD
+                    );
+
+                } else if (down && !up) {
+
+                    tank.setMoveState(
+                            TankEntity.MoveState.BACKWARD
+                    );
+
+                } else {
+
+                    tank.setMoveState(
+                            TankEntity.MoveState.NONE
+                    );
+                }
+
+                // Xoay
+                if (left && !right) {
+
+                    tank.setRotateState(
+                            TankEntity.RotateState.LEFT
+                    );
+
+                } else if (right && !left) {
+
+                    tank.setRotateState(
+                            TankEntity.RotateState.RIGHT
+                    );
+
+                } else {
+
+                    tank.setRotateState(
+                            TankEntity.RotateState.NONE
+                    );
+                }
             }
-        } catch (Exception ignored) {}
+
+        } catch (Exception ignored) {
+        }
     }
 
     private void handlePlayerShoot(String rawJson) {
@@ -329,7 +438,6 @@ public class ClientHandler implements Runnable {
         } catch (Exception e) {
             System.err.println("[Room] Lỗi xử lý ROOM_LEAVE_REQ: " + e.getMessage());
         }
-    }
 
     public void closeConnection() {
         isRunning = false;
