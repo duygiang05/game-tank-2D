@@ -11,7 +11,7 @@
     "tank_speed": 4.0,
     "bullet_speed": 9.0,
     "nitro_speed_multiplier": 2.0,
-    "tank_size": 36,
+    "tank_size": 30,
     "bullet_size": 8,
     "tile_size": 40
   },
