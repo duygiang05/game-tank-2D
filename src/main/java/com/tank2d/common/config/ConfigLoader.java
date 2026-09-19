@@ -221,4 +221,31 @@ public class ConfigLoader {
         Object val = getTankRules().get("reveal_duration_s");
         return val instanceof Number ? ((Number) val).doubleValue() : 2.0;
     }
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> getPowerUpRules() {
+        Object node = getGameRules().get("power_up");
+        return node instanceof Map ? (Map<String, Object>) node : Map.of();
+    }
+
+    private static double numOr(Map<String, Object> map, String key, double def) {
+        Object v = map.get(key);
+        return v instanceof Number ? ((Number) v).doubleValue() : def;
+    }
+
+    public static double getItemSpawnIntervalSeconds() { return numOr(getPowerUpRules(), "spawn_interval_s", 7.0); }
+    public static double getItemDespawnSeconds() { return numOr(getPowerUpRules(), "despawn_time_s", 7.0); }
+    public static int getHealAmount() { return (int) numOr(getPowerUpRules(), "heal_amount", 3.0); }
+    public static double getShieldDurationSeconds() { return numOr(getPowerUpRules(), "shield_duration_s", 5.0); }
+    public static double getNitroDurationSeconds() { return numOr(getPowerUpRules(), "nitro_duration_s", 5.0); }
+    public static double getMissileBuffDurationSeconds() { return numOr(getPowerUpRules(), "missile_buff_duration_s", 5.0); }
+
+    public static double getNitroSpeedMultiplier() {
+        JsonObject physics = getPhysicsStats();
+        return physics.has("nitro_speed_multiplier") ? physics.get("nitro_speed_multiplier").getAsDouble() : 2.0;
+    }
+
+    public static int getRocketBulletDamage() {
+        JsonObject damage = getDamageStats();
+        return damage.has("rocket_bullet") ? damage.get("rocket_bullet").getAsInt() : 3;
+    }
 }

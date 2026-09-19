@@ -66,16 +66,15 @@ public class TankEntity {
         this.isProtected = (this.protectionTimer > 0.0);
     }
 
-    /**
-     * Tự động giảm thời gian bảo hộ theo delta-time và tắt cờ khi hết giờ.
-     */
-    public void updateProtection(double deltaTime) {
-        if (!isProtected) return;
+    private long shieldActiveUntilMillis = 0L;
+    private long nitroActiveUntilMillis = 0L;
+    private long rocketBuffActiveUntilMillis = 0L;
 
-        protectionTimer -= deltaTime;
-        if (protectionTimer <= 0.0) {
-            protectionTimer = 0.0;
-            isProtected = false;
-        }
-    }
+    public long getShieldActiveUntilMillis() { return shieldActiveUntilMillis; }
+    public long getNitroActiveUntilMillis() { return nitroActiveUntilMillis; }
+    public long getRocketBuffActiveUntilMillis() { return rocketBuffActiveUntilMillis; }
+
+    public void setShieldActiveUntilMillis(long t) { this.shieldActiveUntilMillis = t; }
+    public void setNitroActiveUntilMillis(long t) { this.nitroActiveUntilMillis = t; }
+    public void setRocketBuffActiveUntilMillis(long t) { this.rocketBuffActiveUntilMillis = t; }
 }

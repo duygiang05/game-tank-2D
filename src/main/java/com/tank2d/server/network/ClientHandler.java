@@ -113,7 +113,7 @@ public class ClientHandler implements Runnable {
                 handlePlayerInput(packet.getData());
                 break;
             case PLAYER_SHOOT_REQ:
-                handlePlayerShoot();
+                handlePlayerShoot(packet.getData());
                 break;
             default:
                 System.out.println("[ClientHandler] Nhận packet chưa hỗ trợ: " + packet.getType());
@@ -204,12 +204,21 @@ public class ClientHandler implements Runnable {
         } catch (Exception ignored) {}
     }
 
-    private void handlePlayerShoot() {
+    private void handlePlayerShoot(String rawJson) {
         if (currentGameLoop == null || myTankId == -1) return;
         TankEntity tank = currentGameLoop.getTank(myTankId);
-        if (tank != null && tank.isAlive()) {
-            currentGameLoop.handleShootRequest(tank);
-        }
+        if (tank == null || !tank.isAlive()) return;
+
+        com.tank2d.server.model.BulletEntity.BulletType requestedType = com.tank2d.server.model.BulletEntity.BulletType.NORMAL;
+        try {
+            com.tank2d.common.dto.game.PlayerShootRequestDTO req =
+                    gson.fromJson(rawJson, com.tank2d.common.dto.game.PlayerShootRequestDTO.class);
+            if (req != null && "ROCKET".equalsIgnoreCase(req.getBulletType())) {
+                requestedType = com.tank2d.server.model.BulletEntity.BulletType.ROCKET;
+            }
+        } catch (Exception ignored) {} // payload rỗng "{}" hoặc lỗi -> mặc định NORMAL
+
+        currentGameLoop.handleShootRequest(tank, requestedType);
     }
 
     // =========================================================================
@@ -240,7 +249,8 @@ public class ClientHandler implements Runnable {
             double matchDuration = room.getMatchDuration() > 0 ? room.getMatchDuration() : 60.0;
             GameStateManager stateManager = new GameStateManager(gameLoop, userDAO, matchDuration);
             gameLoop.setStateManager(stateManager);
-
+            gameLoop.setMapChangeListener(stateManager); // GameStateManager cần implement MapChangeListener
+            gameLoop.setItemEventListener(stateManager);  // và ItemEventListener
             // 4. Lấy tốc độ chuẩn hóa pixel/giây từ ConfigLoader
             double speed = ConfigLoader.getTankSpeedPerSecond();
             double rotationSpeed = 120.0; // độ/giây
@@ -267,21 +277,15 @@ public class ClientHandler implements Runnable {
 
             // 6. SNAPSHOT LISTENER ĐỒNG BỘ: Hỗ trợ Bụi Cỏ / Tàng hình cá nhân hóa
             int finalRoomId = currentRoomId;
-            gameLoop.setSnapshotListener(snapshot -> {
+            gameLoop.setSnapshotListener(perViewerSnapshots -> {
                 networkBroadcastPool.submit(() -> {
                     try {
                         for (ClientHandler client : connectedClients) {
                             if (client.currentRoomId == finalRoomId && client.dos != null) {
-                                // Nếu GameLoop có hàm getSnapshotForPlayer(client.myTankId) thì dùng snapshot cá nhân,
-                                // còn không thì gửi snapshot chung mặc định
-                                Object clientSnapshot = snapshot;
-                                try {
-                                    java.lang.reflect.Method m = gameLoop.getClass().getMethod("getSnapshotForPlayer", int.class);
-                                    clientSnapshot = m.invoke(gameLoop, client.myTankId);
-                                } catch (NoSuchMethodException ignored) {}
-
-                                Packet snapshotPacket = new Packet(PacketType.GAME_SNAPSHOT, gson.toJson(clientSnapshot));
-                                NetworkUtil.sendPacket(client.dos, snapshotPacket);
+                                var snap = perViewerSnapshots.get(client.myTankId);
+                                if (snap == null) continue;
+                                String json = gson.toJson(snap);
+                                NetworkUtil.sendPacket(client.dos, new Packet(PacketType.GAME_SNAPSHOT, json));
                             }
                         }
                     } catch (Exception ignored) {}

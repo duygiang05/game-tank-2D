@@ -18,5 +18,6 @@ public enum PacketType {
     PLAYER_SHOOT_REQ,
     GAME_SNAPSHOT,
     GAME_EVENT_EFFECT,
-    GAME_OVER_NOTIFY
+    GAME_OVER_NOTIFY,
+    MAP_UPDATE
 }
