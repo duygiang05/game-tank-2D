@@ -13,7 +13,9 @@ import com.tank2d.server.game.GameStateManager;
 import com.tank2d.server.model.TankEntity;
 import com.tank2d.server.room.Room;
 import com.tank2d.server.room.RoomManager;
-
+import com.tank2d.common.dto.game.TankPlayerDTO;
+import java.util.ArrayList;
+import java.util.List;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -158,6 +160,10 @@ public class ClientHandler implements Runnable {
                 handleLeaveRoom();
                 break;
 
+            case TANK_PLAYER_INFO_REQ:
+                handleTankPlayerInfo();
+                break;
+
             case PLAYER_INPUT:
                 handlePlayerInput(packet.getData());
                 break;
@@ -172,6 +178,55 @@ public class ClientHandler implements Runnable {
                         + packet.getType()
                 );
                 break;
+        }
+    }
+
+    private void handleTankPlayerInfo() {
+
+        if (currentUser == null || currentRoomId == -1) {
+            return;
+        }
+
+        List<TankPlayerDTO> tankPlayers = new ArrayList<>();
+
+        for (ClientHandler client : connectedClients) {
+
+            if (client.currentRoomId == currentRoomId
+                    && client.currentUser != null
+                    && client.myTankId > 0) {
+
+                tankPlayers.add(
+                        new TankPlayerDTO(
+                                client.myTankId,
+                                client.currentUser.getUsername()
+                        )
+                );
+            }
+        }
+
+        String json = gson.toJson(tankPlayers);
+
+        Packet response = new Packet(
+                PacketType.TANK_PLAYER_INFO,
+                json
+        );
+
+        try {
+            if (dos != null) {
+                NetworkUtil.sendPacket(dos, response);
+            }
+
+            System.out.println(
+                    "[Game] Gửi Tank Player Info cho User "
+                    + currentUser.getUsername()
+                    + ": " + json
+            );
+
+        } catch (Exception e) {
+            System.err.println(
+                    "[Game] Lỗi gửi Tank Player Info: "
+                    + e.getMessage()
+            );
         }
     }
 
@@ -1027,6 +1082,7 @@ public class ClientHandler implements Runnable {
             // =========================================================
             // 11. Tạo Tank cho từng Client trong Room
             // =========================================================
+            List<TankPlayerDTO> tankPlayers = new ArrayList<>();
             int tankIndex = 1;
 
             for (ClientHandler client : connectedClients) {
@@ -1074,6 +1130,13 @@ public class ClientHandler implements Runnable {
                     );
 
                     client.myTankId = tankIndex;
+
+                    tankPlayers.add(
+                            new TankPlayerDTO(
+                                    tankIndex,
+                                    client.currentUser.getUsername()
+                            )
+                    );
                     client.currentGameLoop = gameLoop;
 
                     System.out.println(
@@ -1084,6 +1147,19 @@ public class ClientHandler implements Runnable {
                     );
 
                     tankIndex++;
+                }
+            }
+
+            String tankPlayersJson = gson.toJson(tankPlayers);
+
+            Packet tankPlayerPacket = new Packet(
+                    PacketType.TANK_PLAYER_INFO,
+                    tankPlayersJson
+            );
+
+            for (ClientHandler client : connectedClients) {
+                if (client.currentRoomId == currentRoomId && client.dos != null) {
+                    NetworkUtil.sendPacket(client.dos, tankPlayerPacket);
                 }
             }
 
