@@ -333,33 +333,46 @@ public class ClientHandler implements Runnable {
     // =========================================================================
     // TASK 1 (GIANG) & FIX THEO PHẢN HỒI CỦA HOÀNG (PHYSICS & MAP)
     // =========================================================================
-    private void handleStartGame() {
+private void handleStartGame() {
         try {
             if (currentUser == null || currentRoomId == -1) return;
             Room room = roomManager.getRoom(currentRoomId);
             if (room == null || !room.isHost(currentUser.getId())) return;
-            if (room.getCurrentPlayers() < room.getMaxPlayers() || !room.areAllPlayersReady()) return;
+
+            // FIX 1: Chỉ cần tối thiểu 2 người (hoặc >= 1 khi test solo) và tất cả đã Ready
+            if (room.getCurrentPlayers() < 2 || !room.areAllPlayersReady()) {
+                System.out.println("[Game] Chưa đủ điều kiện bắt đầu: Số người = " 
+                    + room.getCurrentPlayers() + ", Ready = " + room.areAllPlayersReady());
+                return;
+            }
 
             broadcastGameStart();
 
-            // 1. Khởi tạo GameLoop với Tick-rate chuẩn từ Config (thay vì hardcode 60)
+            // 1. Khởi tạo GameLoop với Tick-rate chuẩn từ Config
             int serverTickRate = ConfigLoader.getPhysicsStats().has("server_tick_rate") 
                     ? ConfigLoader.getPhysicsStats().get("server_tick_rate").getAsInt() : 30;
             GameLoop gameLoop = new GameLoop(serverTickRate);
 
-            // 2. KHẮC PHỤC LỖI HOÀNG NÊU: Nạp GameMap để kích hoạt vật lý chặn tường
+            // FIX 2: Nạp đúng map tuyết của dự án
             try {
                 gameLoop.setGameMap(MapLoader.loadFromFile("config/maps/map_default.json"));
             } catch (Exception e) {
-                System.err.println("[Game] Cảnh báo: Không thể nạp map_default.json: " + e.getMessage());
+                System.err.println("[Game] Cảnh báo: Không thể nạp map_snow.json: " + e.getMessage());
             }
 
-            // 3. Khởi tạo GameStateManager với thời lượng phòng chọn từ Saimay (hoặc mặc định 60s)
-            double matchDuration = room.getMatchDuration() > 0 ? room.getMatchDuration() : 60.0;
+            // FIX 3: Lấy duration linh hoạt theo cả 2 cách đặt tên của Room
+            double matchDuration = 60.0;
+            try {
+                matchDuration = room.getDuration();
+            } catch (NoSuchMethodError | Exception e) {
+                matchDuration = room.getMatchDuration();
+            }
+
             GameStateManager stateManager = new GameStateManager(gameLoop, userDAO, matchDuration);
             gameLoop.setStateManager(stateManager);
-            gameLoop.setMapChangeListener(stateManager); // GameStateManager cần implement MapChangeListener
-            gameLoop.setItemEventListener(stateManager);  // và ItemEventListener
+            gameLoop.setMapChangeListener(stateManager);
+            gameLoop.setItemEventListener(stateManager);
+
             // 4. Lấy tốc độ chuẩn hóa pixel/giây từ ConfigLoader
             double speed = ConfigLoader.getTankSpeedPerSecond();
             double rotationSpeed = 120.0; // độ/giây
@@ -384,7 +397,7 @@ public class ClientHandler implements Runnable {
                 }
             }
 
-            // 6. SNAPSHOT LISTENER ĐỒNG BỘ: Hỗ trợ Bụi Cỏ / Tàng hình cá nhân hóa
+            // 6. Snapshot Listener hỗ trợ Bụi Cỏ / Tàng hình cá nhân hóa
             int finalRoomId = currentRoomId;
             gameLoop.setSnapshotListener(perViewerSnapshots -> {
                 networkBroadcastPool.submit(() -> {
