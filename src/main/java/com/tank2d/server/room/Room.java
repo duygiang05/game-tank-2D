@@ -165,6 +165,30 @@ public class Room {
         return players.size();
     }
 
+    // =========================
+// RESET READY FOR NEW GAME
+// =========================
+    public synchronized void resetReadyStatesForNewGame() {
+
+        for (User player : players) {
+
+            if (player.getId() == hostId) {
+                readyStates.put(player.getId(), true);
+            } else {
+                readyStates.put(player.getId(), false);
+            }
+        }
+
+        status = "Waiting";
+
+        System.out.println(
+                "[Room] Đã reset Ready cho ván mới."
+        );
+    }
+
+    // =========================
+    // ROOM STATUS
+    // =========================
     private void updateStatus() {
         if (players.size() >= maxPlayers) {
             status = "Full";

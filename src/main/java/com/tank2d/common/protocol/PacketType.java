@@ -45,6 +45,10 @@ public enum PacketType {
     // =========================
 
     GAME_START_NOTIFY,
+    
+    TANK_PLAYER_INFO_REQ,
+    
+    TANK_PLAYER_INFO,
 
     PLAYER_INPUT,
 
