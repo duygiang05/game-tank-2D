@@ -1,6 +1,7 @@
 package com.tank2d.server.network;
 
 import com.tank2d.common.config.ConfigLoader;
+import com.tank2d.server.dao.MatchDAO;
 import com.tank2d.server.dao.UserDAO;
 import com.tank2d.server.db.DatabaseConnection;
 import com.tank2d.server.room.RoomManager;
@@ -18,6 +19,7 @@ public class TankServer {
     private final int port;
     private final ExecutorService threadPool;
     private final UserDAO userDAO;
+    private final MatchDAO matchDAO;
     private final RoomManager roomManager;
     private ServerSocket serverSocket;
     private volatile boolean isRunning;
@@ -26,6 +28,7 @@ public class TankServer {
         this.port = port;
         this.threadPool = Executors.newCachedThreadPool();
         this.userDAO = new UserDAO();
+        this.matchDAO = new MatchDAO();
         this.roomManager = new RoomManager();
         this.isRunning = false;
     }
@@ -58,7 +61,7 @@ public class TankServer {
                     ClientHandler handler
                             = new ClientHandler(
                                     clientSocket,
-                                    userDAO,
+                                    userDAO,matchDAO,
                                     roomManager
                             );
 
