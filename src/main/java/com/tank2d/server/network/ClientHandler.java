@@ -17,6 +17,7 @@ import com.tank2d.server.model.TankEntity;
 import com.tank2d.server.room.Room;
 import com.tank2d.server.room.RoomManager;
 import com.tank2d.common.dto.game.TankPlayerDTO;
+import com.tank2d.server.dao.MatchDAO;
 import java.util.ArrayList;
 import java.util.List;
 import java.io.DataInputStream;
@@ -37,6 +38,7 @@ public class ClientHandler implements Runnable {
 
     private final Socket socket;
     private final UserDAO userDAO;
+    private final MatchDAO matchDAO;
     private final RoomManager roomManager;
     private final Gson gson;
 
@@ -49,9 +51,10 @@ public class ClientHandler implements Runnable {
     private GameStateManager currentGameStateManager;
     private int myTankId = -1;
 
-    public ClientHandler(Socket socket, UserDAO userDAO, RoomManager roomManager) {
+    public ClientHandler(Socket socket, UserDAO userDAO,MatchDAO matchDAO, RoomManager roomManager) {
         this.socket = socket;
         this.userDAO = userDAO;
+        this.matchDAO = matchDAO;
         this.roomManager = roomManager;
         this.gson = new Gson();
         this.isRunning = true;
@@ -310,7 +313,7 @@ public class ClientHandler implements Runnable {
     // =========================================================================
     // TASK 1 (GIANG) & FIX THEO PHẢN HỒI CỦA HOÀNG (PHYSICS & MAP)
     // =========================================================================
-private void handleStartGame() {
+    private void handleStartGame() {
         try {
             if (currentUser == null || currentRoomId == -1) return;
             Room room = roomManager.getRoom(currentRoomId);
@@ -345,7 +348,7 @@ private void handleStartGame() {
                 matchDuration = room.getMatchDuration();
             }
 
-            GameStateManager stateManager = new GameStateManager(gameLoop, userDAO, matchDuration);
+            GameStateManager stateManager = new GameStateManager(gameLoop, userDAO,matchDAO, matchDuration);
             gameLoop.setStateManager(stateManager);
             gameLoop.setMapChangeListener(stateManager);
             gameLoop.setItemEventListener(stateManager);
@@ -436,9 +439,16 @@ private void handleStartGame() {
         try {
             if (currentUser == null || currentRoomId == -1) return;
 
-            // 1. Nếu đang trong trận đấu, báo GameStateManager hủy xe an toàn
+            // 1. Nếu đang trong trận đấu:
             if (currentGameStateManager != null && myTankId != -1) {
+                // Báo GameStateManager lưu điểm vào DB, ngắt socket, kết thúc trận nếu chỉ còn 1 người
                 currentGameStateManager.handlePlayerLeave(myTankId);
+
+                //Xóa xe khỏi GameLoop để client không còn vẽ xác xe hoặc bóng ma
+                if (currentGameLoop != null) {
+                    currentGameLoop.getTanks().remove(myTankId);
+                }
+
                 this.currentGameLoop = null;
                 this.currentGameStateManager = null;
                 this.myTankId = -1;
@@ -447,7 +457,7 @@ private void handleStartGame() {
             int roomId = currentRoomId;
             int userId = currentUser.getId();
 
-            // 2. Xóa khỏi RoomManager
+            // 2. Xóa khỏi RoomManager & thông báo cho các người chơi còn lại trong phòng
             if (roomManager.leaveRoom(roomId, userId)) {
                 System.out.println("[Room] User " + currentUser.getUsername() + " đã thoát phòng " + roomId);
                 currentRoomId = -1;
