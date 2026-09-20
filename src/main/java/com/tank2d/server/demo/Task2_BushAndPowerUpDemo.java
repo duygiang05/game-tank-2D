@@ -42,7 +42,7 @@ public class Task2_BushAndPowerUpDemo {
          * Demo không cần UserDAO nên truyền null.
          */
         GameStateManager stateManager =
-                new GameStateManager(loop, null, 90.0);
+                new GameStateManager(loop, null,null, 90.0);
 
         /*
          * CombatEvent

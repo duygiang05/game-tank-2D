@@ -141,7 +141,8 @@ public final class CollisionDetector {
         for (ItemEntity item : items) {
             if (!item.isActive()) continue;
             for (TankEntity tank : tanks) {
-                if (!tank.isAlive()) continue;
+                // CHẶN : Xe chết HOẶC xe đang bảo hộ 5s thì bỏ qua, không nhặt
+                if (!tank.isAlive() || tank.isProtected()) continue;
                 if (Math.abs(tank.getX() - item.getX()) < half && Math.abs(tank.getY() - item.getY()) < half) {
                     item.setActive(false);
                     events.add(new ItemPickupEvent(tank.getId(), item.getId(), item.getType()));

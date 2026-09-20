@@ -1,5 +1,6 @@
 package com.tank2d.server.demo;
 
+import com.tank2d.server.dao.MatchDAO;
 import com.tank2d.server.dao.UserDAO;
 import com.tank2d.server.game.GameLoop;
 import com.tank2d.server.game.GameStateManager;
@@ -12,11 +13,12 @@ public class ServerCoreIntegrationTest {
         System.out.println("========== BẮT ĐẦU KIỂM THỬ TÍCH HỢP TASK 1 & TASK 2 ==========\n");
 
         UserDAO userDAO = new UserDAO();
+        MatchDAO matchDAO = new MatchDAO();
         GameLoop gameLoop = new GameLoop(30);
 
         // Thiết lập thời gian trận đấu ngắn (5 giây) để test tự động kích hoạt Game Over
         double testMatchDurationSeconds = 5.0;
-        GameStateManager stateManager = new GameStateManager(gameLoop, userDAO, testMatchDurationSeconds);
+        GameStateManager stateManager = new GameStateManager(gameLoop, userDAO,matchDAO, testMatchDurationSeconds);
         gameLoop.setStateManager(stateManager);
 
         // 1. Tạo 2 xe đại diện cho User ID 1 và User ID 2 (có sẵn trong MySQL của bạn)
