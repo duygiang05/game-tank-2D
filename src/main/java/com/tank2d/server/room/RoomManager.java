@@ -20,14 +20,17 @@ public class RoomManager {
     // =========================
     // CREATE ROOM
     // =========================
-
     public synchronized Room createRoom(User creator) {
 
         if (creator == null) {
             return null;
         }
 
-        int roomId = nextRoomId++;
+        int roomId = 1;
+
+        while (rooms.containsKey(roomId)) {
+            roomId++;
+        }
 
         /*
          * Người tạo phòng chính là Host.
@@ -58,45 +61,44 @@ public class RoomManager {
     // =========================
     // JOIN ROOM
     // =========================
-
     public synchronized boolean joinRoom(
-            int roomId,
-            User user) {
+        int roomId,
+        User user) {
 
-        Room room = rooms.get(roomId);
+    Room room = rooms.get(roomId);
 
-        if (room == null || user == null) {
-            return false;
-        }
-
-        boolean success =
-                room.addPlayer(user);
-
-        if (success) {
-
-            System.out.println(
-                    "[RoomManager] "
-                    + user.getUsername()
-                    + " vào "
-                    + room.getRoomName()
-                    + " ("
-                    + room.getCurrentPlayers()
-                    + "/"
-                    + room.getMaxPlayers()
-                    + ")"
-            );
-        }
-
-        return success;
+    if (room == null || user == null) {
+        return false;
     }
+
+    // Không cho vào phòng đang chơi
+
+
+    boolean success
+            = room.addPlayer(user);
+
+    if (success) {
+
+        System.out.println(
+                "[RoomManager] "
+                + user.getUsername()
+                + " vào "
+                + room.getRoomName()
+                + " ("
+                + room.getCurrentPlayers()
+                + "/"
+                + room.getMaxPlayers()
+                + ")"
+        );
+    }
+
+    return success;
+}
 
     // =========================
     // LEAVE ROOM
     // =========================
-
-    public synchronized boolean leaveRoom(
-            int roomId,
-            int userId) {
+    public synchronized boolean leaveRoom(int roomId, int userId) {
 
         Room room = rooms.get(roomId);
 
@@ -104,32 +106,44 @@ public class RoomManager {
             return false;
         }
 
-        boolean success =
-                room.removePlayer(userId);
+        // Kiểm tra người rời có phải Host không
+        boolean wasHost = room.isHost(userId);
 
-        if (success) {
+        // Xóa player khỏi phòng
+        boolean success = room.removePlayer(userId);
 
-            System.out.println(
-                    "[RoomManager] User "
-                    + userId
-                    + " rời "
-                    + room.getRoomName()
-            );
-
-            if (room.getCurrentPlayers() == 0) {
-
-                rooms.remove(roomId);
-
-                System.out.println(
-                        "[RoomManager] Xóa phòng trống: "
-                        + room.getRoomName()
-                );
-            }
+        if (!success) {
+            return false;
         }
 
-        return success;
-    }
+        // Không còn ai -> xóa phòng
+        if (room.getCurrentPlayers() == 0) {
 
+            rooms.remove(roomId);
+
+            System.out.println(
+                    "[Room] Phòng "
+                    + roomId
+                    + " đã được xóa vì không còn người chơi."
+            );
+
+            return true;
+        }
+
+        // Nếu Host rời -> chọn Host mới
+        if (wasHost) {
+
+            room.transferHostRandom();
+
+            System.out.println(
+                    "[Room] Host cũ đã rời phòng "
+                    + roomId
+                    + ". Đã chuyển Host."
+            );
+        }
+
+        return true;
+    }
     // =========================
     // GET ROOM
     // =========================
@@ -143,11 +157,10 @@ public class RoomManager {
     // =========================
     // GET ALL ROOMS
     // =========================
-
     public synchronized List<RoomDTO> getAllRooms() {
 
-        List<RoomDTO> roomDTOs =
-                new ArrayList<>();
+        List<RoomDTO> roomDTOs
+                = new ArrayList<>();
 
         for (Room room : rooms.values()) {
 
@@ -162,12 +175,11 @@ public class RoomManager {
     // =========================
     // GET ROOM DTO
     // =========================
-
     public synchronized RoomDTO getRoomDTO(
             int roomId) {
 
-        Room room =
-                rooms.get(roomId);
+        Room room
+                = rooms.get(roomId);
 
         if (room == null) {
             return null;
@@ -179,14 +191,13 @@ public class RoomManager {
     // =========================
     // SET PLAYER READY
     // =========================
-
     public synchronized boolean setPlayerReady(
             int roomId,
             int userId,
             boolean ready) {
 
-        Room room =
-                rooms.get(roomId);
+        Room room
+                = rooms.get(roomId);
 
         if (room == null) {
             return false;
@@ -199,26 +210,85 @@ public class RoomManager {
     }
 
     // =========================
-    // CONVERT ROOM → DTO
+    // SET ROOM DURATION
     // =========================
+    /**
+     * Đổi thời lượng trận đấu của phòng.
+     *
+     * Chỉ cho phép: 45 giây 60 giây 90 giây
+     */
+    public synchronized boolean setRoomDuration(
+            int roomId,
+            int duration) {
 
-    private RoomDTO toRoomDTO(Room room) {
+        Room room
+                = rooms.get(roomId);
 
-    List<String> playerNames = new ArrayList<>();
+        if (room == null) {
+            return false;
+        }
 
-    for (User user : room.getPlayers()) {
-        playerNames.add(user.getUsername());
+        if (duration != 45
+                && duration != 60
+                && duration != 90) {
+
+            return false;
+        }
+
+        room.setDuration(duration);
+
+        System.out.println(
+                "[RoomManager] "
+                + room.getRoomName()
+                + " chọn thời lượng: "
+                + duration
+                + " giây"
+        );
+
+        return true;
     }
 
-    return new RoomDTO(
-            room.getRoomId(),
-            room.getRoomName(),
-            room.getCurrentPlayers(),
-            room.getMaxPlayers(),
-            room.getStatus(),
-            playerNames,
-            room.getHostId(),
-            room.getReadyStates()
-    );
-}
+    // =========================
+    // GET ROOM DURATION
+    // =========================
+    public synchronized int getRoomDuration(
+            int roomId) {
+
+        Room room
+                = rooms.get(roomId);
+
+        if (room == null) {
+            return 60;
+        }
+
+        return room.getDuration();
+    }
+
+    // =========================
+    // CONVERT ROOM → DTO
+    // =========================
+    private RoomDTO toRoomDTO(Room room) {
+
+        List<String> playerNames
+                = new ArrayList<>();
+
+        for (User user : room.getPlayers()) {
+
+            playerNames.add(
+                    user.getUsername()
+            );
+        }
+
+        return new RoomDTO(
+                room.getRoomId(),
+                room.getRoomName(),
+                room.getCurrentPlayers(),
+                room.getMaxPlayers(),
+                room.getStatus(),
+                playerNames,
+                room.getHostId(),
+                room.getReadyStates(),
+                room.getDuration()
+        );
+    }
 }

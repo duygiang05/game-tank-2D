@@ -4,12 +4,17 @@ import com.google.gson.Gson;
 import com.tank2d.common.config.ConfigLoader;
 import com.tank2d.common.dto.game.GameEventEffectDTO;
 import com.tank2d.common.dto.game.GameOverDTO;
+import com.tank2d.common.dto.game.MapUpdateDTO;
 import com.tank2d.common.protocol.NetworkUtil;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
 import com.tank2d.server.dao.UserDAO;
 import com.tank2d.server.game.event.CombatEvent;
 import com.tank2d.server.game.event.CombatEventListener;
+import com.tank2d.server.game.event.ItemEventListener;
+import com.tank2d.server.game.event.ItemPickupEvent;
+import com.tank2d.server.game.event.MapChangeEvent;
+import com.tank2d.server.game.event.MapChangeListener;
 import com.tank2d.server.model.TankEntity;
 
 import java.io.DataOutputStream;
@@ -18,7 +23,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
-public class GameStateManager implements CombatEventListener {
+public class GameStateManager implements CombatEventListener, MapChangeListener, ItemEventListener {
     private static final Logger LOGGER = Logger.getLogger(GameStateManager.class.getName());
     private static final Gson GSON = new Gson();
 
@@ -111,7 +116,7 @@ public class GameStateManager implements CombatEventListener {
             if (tank.isAlive()) {
                 // Xe đang sống: trừ dần thời gian bảo hộ 5s
                 if (tank.isProtected()) {
-                    tank.updateProtection(deltaTime);
+                    
                 }
             } else if (state.isWaitingRespawn()) {
                 // Xe đang chết: đếm ngược hồi sinh
@@ -126,14 +131,16 @@ public class GameStateManager implements CombatEventListener {
     @Override
     public void onCombatEvent(CombatEvent event) {
         if (isGameOver) return;
-
+        if (event.getType() == CombatEvent.EventType.SHIELD_BLOCKED) return;
         TankEntity targetTank = gameLoop.getTank(event.getTargetTankId());
         TankEntity shooterTank = gameLoop.getTank(event.getShooterId());
         PlayerCombatState targetState = playerStates.get(event.getTargetTankId());
         PlayerCombatState shooterState = playerStates.get(event.getShooterId());
 
         if (targetTank == null || targetState == null || !targetTank.isAlive()) return;
-
+        if (event.getType() == CombatEvent.EventType.SHIELD_BROKEN) {
+            targetTank.setShieldActiveUntilMillis(0); // tắt khiên
+        }
         // MIỄN NHIỄM KHI BẢO HỘ: Xe đang bảo hộ không bị nhận damage và không gây damage
         if (targetTank.isProtected() || (shooterTank != null && shooterTank.isProtected())) {
             return;
@@ -274,4 +281,24 @@ public class GameStateManager implements CombatEventListener {
     public boolean isGameOver() { return isGameOver; }
     public double getMatchRemainingTime() { return matchRemainingTime; }
     public double getRespawnDelay() { return respawnDelay; }
+    @Override
+    public void onMapChanged(MapChangeEvent event) {
+            MapUpdateDTO dto = new MapUpdateDTO(event.getRow(), event.getCol(), event.getNewTileCode());
+            broadcastPacket(new Packet(PacketType.MAP_UPDATE, GSON.toJson(dto)));
+        }
+
+    @Override
+    public void onItemPickup(ItemPickupEvent event) {
+            TankEntity tank = gameLoop.getTank(event.getTankId());
+            if (tank == null) return;
+            long now = System.currentTimeMillis();
+
+            switch (event.getItemType()) {
+                case SHIELD -> tank.setShieldActiveUntilMillis(now + (long) (ConfigLoader.getShieldDurationSeconds() * 1000));
+                case NITRO -> tank.setNitroActiveUntilMillis(now + (long) (ConfigLoader.getNitroDurationSeconds() * 1000));
+                case ROCKET_AMMO -> tank.setRocketBuffActiveUntilMillis(now + (long) (ConfigLoader.getMissileBuffDurationSeconds() * 1000));
+                case HEALTH_PACK -> tank.setHp(Math.min(maxHp, tank.getHp() + ConfigLoader.getHealAmount()));
+            }
+            broadcastEffect(new GameEventEffectDTO("ITEM_PICKUP_" + event.getItemType(), tank.getX(), tank.getY(), tank.getId()));
+    }
 }

@@ -1,27 +1,33 @@
 package com.tank2d.server.physics;
 
+import com.tank2d.common.config.ConfigLoader;
 import com.tank2d.server.model.TankEntity;
 
 public final class TankMovementProcessor {
 
-    private TankMovementProcessor() {} // utility class, không cần khởi tạo
-
     public static void update(TankEntity tank, double deltaTime) {
         if (!tank.isAlive()) return;
+
+        long now = System.currentTimeMillis();
+        boolean nitroActive = tank.getNitroActiveUntilMillis() > now;
+        double nitroMultiplier = nitroActive ? ConfigLoader.getNitroSpeedMultiplier() : 1.0;
+
         double angle = tank.getAngle();
+        double rotSpeed = tank.getRotationSpeed() * nitroMultiplier;
 
         if (tank.getRotateState() == TankEntity.RotateState.LEFT) {
-            angle -= tank.getRotationSpeed() * deltaTime;
+            angle -= rotSpeed * deltaTime;
         } else if (tank.getRotateState() == TankEntity.RotateState.RIGHT) {
-            angle += tank.getRotationSpeed() * deltaTime;
+            angle += rotSpeed * deltaTime;
         }
         angle = normalizeAngle(angle);
         tank.setAngle(angle);
 
         if (tank.getMoveState() != TankEntity.MoveState.NONE) {
+            double speed = tank.getSpeed() * nitroMultiplier;
             double radians = Math.toRadians(angle);
-            double vx = tank.getSpeed() * Math.cos(radians) * deltaTime;
-            double vy = tank.getSpeed() * Math.sin(radians) * deltaTime;
+            double vx = speed * Math.cos(radians) * deltaTime;
+            double vy = speed * Math.sin(radians) * deltaTime;
 
             if (tank.getMoveState() == TankEntity.MoveState.FORWARD) {
                 tank.setX(tank.getX() + vx);

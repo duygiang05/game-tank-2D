@@ -1,7 +1,7 @@
 package com.tank2d.server.game.event;
 
 public class CombatEvent {
-    public enum EventType { BULLET_HIT_TANK }
+    public enum EventType { BULLET_HIT_TANK, SHIELD_BLOCKED, SHIELD_BROKEN }
 
     private final int bulletId;
     private final int shooterId;
