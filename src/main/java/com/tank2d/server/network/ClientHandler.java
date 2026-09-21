@@ -16,7 +16,10 @@ import com.tank2d.server.map.MapLoader;
 import com.tank2d.server.model.TankEntity;
 import com.tank2d.server.room.Room;
 import com.tank2d.server.room.RoomManager;
-
+import com.tank2d.common.dto.game.TankPlayerDTO;
+import com.tank2d.server.dao.MatchDAO;
+import java.util.ArrayList;
+import java.util.List;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -35,6 +38,7 @@ public class ClientHandler implements Runnable {
 
     private final Socket socket;
     private final UserDAO userDAO;
+    private final MatchDAO matchDAO;
     private final RoomManager roomManager;
     private final Gson gson;
 
@@ -47,9 +51,10 @@ public class ClientHandler implements Runnable {
     private GameStateManager currentGameStateManager;
     private int myTankId = -1;
 
-    public ClientHandler(Socket socket, UserDAO userDAO, RoomManager roomManager) {
+    public ClientHandler(Socket socket, UserDAO userDAO,MatchDAO matchDAO, RoomManager roomManager) {
         this.socket = socket;
         this.userDAO = userDAO;
+        this.matchDAO = matchDAO;
         this.roomManager = roomManager;
         this.gson = new Gson();
         this.isRunning = true;
@@ -145,6 +150,10 @@ public class ClientHandler implements Runnable {
                 handleLeaveRoom();
                 break;
 
+            case TANK_PLAYER_INFO_REQ:
+                handleTankPlayerInfo();
+                break;
+
             case PLAYER_INPUT:
                 handlePlayerInput(packet.getData());
                 break;
@@ -154,6 +163,55 @@ public class ClientHandler implements Runnable {
             default:
                 System.out.println("[ClientHandler] Nhận packet chưa hỗ trợ: " + packet.getType());
                 break;
+        }
+    }
+
+    private void handleTankPlayerInfo() {
+
+        if (currentUser == null || currentRoomId == -1) {
+            return;
+        }
+
+        List<TankPlayerDTO> tankPlayers = new ArrayList<>();
+
+        for (ClientHandler client : connectedClients) {
+
+            if (client.currentRoomId == currentRoomId
+                    && client.currentUser != null
+                    && client.myTankId > 0) {
+
+                tankPlayers.add(
+                        new TankPlayerDTO(
+                                client.myTankId,
+                                client.currentUser.getUsername()
+                        )
+                );
+            }
+        }
+
+        String json = gson.toJson(tankPlayers);
+
+        Packet response = new Packet(
+                PacketType.TANK_PLAYER_INFO,
+                json
+        );
+
+        try {
+            if (dos != null) {
+                NetworkUtil.sendPacket(dos, response);
+            }
+
+            System.out.println(
+                    "[Game] Gửi Tank Player Info cho User "
+                    + currentUser.getUsername()
+                    + ": " + json
+            );
+
+        } catch (Exception e) {
+            System.err.println(
+                    "[Game] Lỗi gửi Tank Player Info: "
+                    + e.getMessage()
+            );
         }
     }
 
@@ -213,6 +271,7 @@ public class ClientHandler implements Runnable {
 
                 currentRoomId = roomId;
                 broadcastRoomState();
+                broadcastLobbyRooms();
             } else {
                 Packet response = new Packet(PacketType.ROOM_STATE_UPDATE, gson.toJson(roomManager.getRoomDTO(roomId)));
                 NetworkUtil.sendPacket(dos, response);
@@ -232,85 +291,6 @@ public class ClientHandler implements Runnable {
                 broadcastRoomState();
             }
         } catch (Exception ignored) {}
-    }
-
-    private void handlePlayerInput(String rawJson) {
-        if (currentGameLoop == null || myTankId == -1) return;
-        TankEntity tank = currentGameLoop.getTank(myTankId);
-        if (tank == null || !tank.isAlive()) return;
-
-        try {
-            java.lang.reflect.Type type = new com.google.gson.reflect.TypeToken<Map<String, Boolean>>(){}.getType();
-            Map<String, Boolean> input = gson.fromJson(rawJson, type);
-            if (input != null) {
-
-                boolean up
-                        = input.getOrDefault(
-                                "up",
-                                false
-                        );
-
-                boolean down
-                        = input.getOrDefault(
-                                "down",
-                                false
-                        );
-
-                boolean left
-                        = input.getOrDefault(
-                                "left",
-                                false
-                        );
-
-                boolean right
-                        = input.getOrDefault(
-                                "right",
-                                false
-                        );
-
-                // Di chuyển
-                if (up && !down) {
-
-                    tank.setMoveState(
-                            TankEntity.MoveState.FORWARD
-                    );
-
-                } else if (down && !up) {
-
-                    tank.setMoveState(
-                            TankEntity.MoveState.BACKWARD
-                    );
-
-                } else {
-
-                    tank.setMoveState(
-                            TankEntity.MoveState.NONE
-                    );
-                }
-
-                // Xoay
-                if (left && !right) {
-
-                    tank.setRotateState(
-                            TankEntity.RotateState.LEFT
-                    );
-
-                } else if (right && !left) {
-
-                    tank.setRotateState(
-                            TankEntity.RotateState.RIGHT
-                    );
-
-                } else {
-
-                    tank.setRotateState(
-                            TankEntity.RotateState.NONE
-                    );
-                }
-            }
-
-        } catch (Exception ignored) {
-        }
     }
 
     private void handlePlayerShoot(String rawJson) {
@@ -368,7 +348,7 @@ private void handleStartGame() {
                 matchDuration = room.getMatchDuration();
             }
 
-            GameStateManager stateManager = new GameStateManager(gameLoop, userDAO, matchDuration);
+            GameStateManager stateManager = new GameStateManager(gameLoop, userDAO,matchDAO, matchDuration);
             gameLoop.setStateManager(stateManager);
             gameLoop.setMapChangeListener(stateManager);
             gameLoop.setItemEventListener(stateManager);
@@ -396,6 +376,37 @@ private void handleStartGame() {
                     tankIndex++;
                 }
             }
+
+
+            // Gửi mapping Tank -> Username cho tất cả client trong phòng.
+            List<TankPlayerDTO> tankPlayers = new ArrayList<>();
+            for (ClientHandler client : connectedClients) {
+                if (client.currentRoomId == currentRoomId
+                        && client.currentUser != null
+                        && client.myTankId > 0) {
+                    tankPlayers.add(new TankPlayerDTO(
+                            client.myTankId,
+                            client.currentUser.getUsername()
+                    ));
+                }
+            }
+
+            String tankPlayersJson = gson.toJson(tankPlayers);
+            Packet tankPlayerPacket = new Packet(
+                    PacketType.TANK_PLAYER_INFO,
+                    tankPlayersJson
+            );
+
+            for (ClientHandler client : connectedClients) {
+                if (client.currentRoomId == currentRoomId
+                        && client.dos != null) {
+                    try {
+                        NetworkUtil.sendPacket(client.dos, tankPlayerPacket);
+                    } catch (IOException ignored) {
+                    }
+                }
+            }
+
 
             // 6. Snapshot Listener hỗ trợ Bụi Cỏ / Tàng hình cá nhân hóa
             int finalRoomId = currentRoomId;
@@ -430,9 +441,16 @@ private void handleStartGame() {
         try {
             if (currentUser == null || currentRoomId == -1) return;
 
-            // 1. Nếu đang trong trận đấu, báo GameStateManager hủy xe an toàn
+            // 1. Nếu đang trong trận đấu:
             if (currentGameStateManager != null && myTankId != -1) {
+                // Báo GameStateManager lưu điểm vào DB, ngắt socket, kết thúc trận nếu chỉ còn 1 người
                 currentGameStateManager.handlePlayerLeave(myTankId);
+
+                //Xóa xe khỏi GameLoop để client không còn vẽ xác xe hoặc bóng ma
+                if (currentGameLoop != null) {
+                    currentGameLoop.getTanks().remove(myTankId);
+                }
+
                 this.currentGameLoop = null;
                 this.currentGameStateManager = null;
                 this.myTankId = -1;
@@ -441,7 +459,7 @@ private void handleStartGame() {
             int roomId = currentRoomId;
             int userId = currentUser.getId();
 
-            // 2. Xóa khỏi RoomManager
+            // 2. Xóa khỏi RoomManager & thông báo cho các người chơi còn lại trong phòng
             if (roomManager.leaveRoom(roomId, userId)) {
                 System.out.println("[Room] User " + currentUser.getUsername() + " đã thoát phòng " + roomId);
                 currentRoomId = -1;
@@ -632,4 +650,148 @@ private void handleStartGame() {
             );
         }
     }
+
+    private void handlePlayerInput(String rawJson) {
+
+        if (currentGameLoop == null || myTankId == -1) {
+            return;
+        }
+
+        TankEntity tank
+                = currentGameLoop.getTank(myTankId);
+
+        if (tank == null || !tank.isAlive()) {
+            return;
+        }
+
+        try {
+
+            java.lang.reflect.Type type
+                    = new com.google.gson.reflect.TypeToken<
+                            Map<String, Boolean>>() {
+                    }.getType();
+
+            Map<String, Boolean> input
+                    = gson.fromJson(
+                            rawJson,
+                            type
+                    );
+
+            if (input != null) {
+
+                boolean up
+                        = input.getOrDefault(
+                                "up",
+                                false
+                        );
+
+                boolean down
+                        = input.getOrDefault(
+                                "down",
+                                false
+                        );
+
+                boolean left
+                        = input.getOrDefault(
+                                "left",
+                                false
+                        );
+
+                boolean right
+                        = input.getOrDefault(
+                                "right",
+                                false
+                        );
+
+                // Di chuyển
+                if (up && !down) {
+
+                    tank.setMoveState(
+                            TankEntity.MoveState.FORWARD
+                    );
+
+                } else if (down && !up) {
+
+                    tank.setMoveState(
+                            TankEntity.MoveState.BACKWARD
+                    );
+
+                } else {
+
+                    tank.setMoveState(
+                            TankEntity.MoveState.NONE
+                    );
+                }
+
+                // Xoay
+                if (left && !right) {
+
+                    tank.setRotateState(
+                            TankEntity.RotateState.LEFT
+                    );
+
+                } else if (right && !left) {
+
+                    tank.setRotateState(
+                            TankEntity.RotateState.RIGHT
+                    );
+
+                } else {
+
+                    tank.setRotateState(
+                            TankEntity.RotateState.NONE
+                    );
+                }
+            }
+
+        } catch (Exception ignored) {
+        }
+    }
+
+    // =========================================================
+    // PLAYER SHOOT
+    // =========================================================
+    
+
+    // =========================================================
+    // BROADCAST LOBBY
+    // =========================================================
+    
+
+    // =========================================================
+    // BROADCAST ROOM STATE
+    // =========================================================
+    
+
+    
+
+    // =========================================================
+    // GAME START NOTIFY
+    // =========================================================
+    
+
+    // =========================================================
+    // START GAME
+    // =========================================================
+    
+
+    // =========================================================
+    // REGISTER
+    // =========================================================
+    
+
+    // =========================================================
+    // GET ROOMS
+    // =========================================================
+    
+
+    // =========================================================
+    // LEAVE ROOM
+    // =========================================================
+    
+
+    // =========================================================
+    // CLOSE CONNECTION
+    // =========================================================
+    
 }

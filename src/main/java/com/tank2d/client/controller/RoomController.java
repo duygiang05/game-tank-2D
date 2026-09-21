@@ -9,7 +9,6 @@ import com.tank2d.common.model.User;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
 
-
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -27,8 +26,8 @@ public class RoomController {
 
     @FXML
     private Label roomNameLabel;
-    
-   @FXML
+
+    @FXML
     private Label roomStatusLabel;
 
     @FXML
@@ -138,8 +137,6 @@ public class RoomController {
                     + room.getDuration()
                     + " giây"
             );
-
-         
 
             updateSpawnSlots(room);
 
@@ -343,75 +340,76 @@ public class RoomController {
     // =========================
     private void updateButton(RoomDTO room) {
 
-        User currentUser
-                = session.getCurrentUser();
+    User currentUser
+            = session.getCurrentUser();
 
-        if (currentUser == null) {
-            return;
-        }
+    if (currentUser == null) {
+        return;
+    }
 
-        boolean isHost
-                = room.getHostId()
-                == currentUser.getId();
+    boolean isHost
+            = room.getHostId()
+            == currentUser.getId();
 
-        if (isHost) {
+    // Phòng đang chơi → không cho Ready / Start
+    if ("Playing".equalsIgnoreCase(room.getStatus())) {
 
-            /*
-             * Host không cần Ready.
-             * Host dùng nút này để Start.
-             */
+        readyButton.setText("ĐANG CHƠI");
+        readyButton.setDisable(true);
+
+        return;
+    }
+
+    if (isHost) {
+
+        /*
+         * Host không cần Ready.
+         * Host dùng nút này để Start.
+         */
+        readyButton.setText(
+                "BẮT ĐẦU"
+        );
+
+        boolean canStart
+                = room.getCurrentPlayers() >= 2
+                && room.getCurrentPlayers()
+                <= room.getMaxPlayers()
+                && areAllPlayersReady(room);
+
+        readyButton.setDisable(
+                !canStart
+        );
+
+    } else {
+
+        /*
+         * Player thường dùng nút này để Ready.
+         */
+        boolean isReady
+                = isCurrentUserReady(room);
+
+        if (isReady) {
+
             readyButton.setText(
-                    "BẮT ĐẦU"
+                    "ĐÃ SẴN SÀNG"
             );
 
-            /*
-             * Task 7:
-             *
-             * Có ít nhất 2 người
-             * và không vượt quá 4 người
-             * và tất cả người chơi Ready.
-             */
-            boolean canStart
-                    = room.getCurrentPlayers() >= 2
-                    && room.getCurrentPlayers()
-                    <= room.getMaxPlayers()
-                    && areAllPlayersReady(room);
-
             readyButton.setDisable(
-                    !canStart
+                    true
             );
 
         } else {
 
-            /*
-             * Player thường dùng nút này để Ready.
-             */
-            boolean isReady
-                    = isCurrentUserReady(room);
+            readyButton.setText(
+                    "SẴN SÀNG"
+            );
 
-            if (isReady) {
-
-                readyButton.setText(
-                        "ĐÃ SẴN SÀNG"
-                );
-
-                readyButton.setDisable(
-                        true
-                );
-
-            } else {
-
-                readyButton.setText(
-                        "SẴN SÀNG"
-                );
-
-                readyButton.setDisable(
-                        false
-                );
-            }
+            readyButton.setDisable(
+                    false
+            );
         }
     }
-
+}
     // =========================
     // CHECK CURRENT USER READY
     // =========================
@@ -570,13 +568,13 @@ public class RoomController {
         /*
          * Nếu là Player thường → Ready
          */
-        sendReady();
+        sendReady(true);
     }
 
     // =========================
     // SEND READY
     // =========================
-    private void sendReady() {
+    private void sendReady(boolean ready) {
 
         try {
 
@@ -593,26 +591,15 @@ public class RoomController {
                 return;
             }
 
-            Packet request
-                    = new Packet(
-                            PacketType.ROOM_READY_REQ,
-                            "true"
-                    );
-
-            clientSocket.sendPacket(
-                    request
+            Packet request = new Packet(
+                    PacketType.ROOM_READY_REQ,
+                    String.valueOf(ready)
             );
 
-            readyButton.setDisable(
-                    true
-            );
-
-            readyButton.setText(
-                    "ĐÃ SẴN SÀNG"
-            );
+            clientSocket.sendPacket(request);
 
             System.out.println(
-                    "[Room] Đã gửi READY."
+                    "[Room] Đã gửi READY: " + ready
             );
 
         } catch (IOException e) {
@@ -626,6 +613,13 @@ public class RoomController {
                     + e.getMessage()
             );
         }
+    }
+
+    // =========================
+    // RESET READY FOR REPLAY
+    // =========================
+    public void resetReadyForReplay() {
+        sendReady(false);
     }
 
     // =========================
@@ -647,7 +641,6 @@ public class RoomController {
 
                 return;
             }
-
             /*
              * Kiểm tra ở Client trước khi gửi.
              *
@@ -725,16 +718,13 @@ public class RoomController {
 
             try {
 
-                GameCanvasApp gameCanvasApp
-                        = new GameCanvasApp();
+                Stage stage = (Stage) roomNameLabel.getScene().getWindow();
 
-                Scene gameScene
-                        = gameCanvasApp.createGameScene();
+                GameCanvasApp gameCanvasApp = new GameCanvasApp();
+                gameCanvasApp.setStage(stage);
+                gameCanvasApp.setRoom(currentRoom);
 
-                Stage stage
-                        = (Stage) roomNameLabel
-                                .getScene()
-                                .getWindow();
+                Scene gameScene = gameCanvasApp.createGameScene();
 
                 stage.setScene(
                         gameScene
