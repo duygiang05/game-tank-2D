@@ -43,4 +43,8 @@ public class TankSnapshotDTO {
     public void setAngle(double angle) {
        this.angle = angle;
     }
+    
+    public void setHp(int hp){
+        this.hp = hp;
+    }
 }

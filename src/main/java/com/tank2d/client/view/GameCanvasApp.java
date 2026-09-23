@@ -60,6 +60,7 @@ public class GameCanvasApp extends Application {
     private static final double TANK_SIZE = 36.0;
     private static final double LERP_FACTOR = 0.3;
     private static final double MAX_HP = 3.0;
+    private int myTankId = -1; 
     
     private Timeline matchTimer;
     private Canvas canvas;
@@ -80,6 +81,8 @@ public class GameCanvasApp extends Application {
     private final List<BulletSnapshotDTO> bullets = new CopyOnWriteArrayList<>();
     private final List<ExplosionEffect> explosions = new CopyOnWriteArrayList<>();
     private final List<TankPlayerDTO> tankPlayers = new CopyOnWriteArrayList<>();
+    private final Set<String> processedBulletIds = new HashSet<>();
+    private final Map<Integer, TankSnapshotDTO> globalPlayerStates = new ConcurrentHashMap<>();
 
     // --- DỮ LIỆU ĐỊA HÌNH & THỜI GIAN ---
     private int[][] mapMatrix;
@@ -192,11 +195,22 @@ public class GameCanvasApp extends Application {
     }
 
     private void requestTankPlayerInfo() {
-        if (clientSocket == null || !clientSocket.isConnected()) return;
-        try {
-            clientSocket.sendPacket(new Packet(PacketType.TANK_PLAYER_INFO_REQ, ""));
-        } catch (IOException ignored) {}
+    if (clientSocket == null || !clientSocket.isConnected()) return;
+    try {
+        clientSocket.sendPacket(new Packet(PacketType.TANK_PLAYER_INFO_REQ, ""));
+    } catch (IOException ignored) {}
+}
+    
+    private boolean isTankInBush(double tankX, double tankY) {
+    if (mapMatrix == null) return false;
+    int c = (int) (tankX / tileSize);
+    int r = (int) (tankY / tileSize);
+
+    if (r >= 0 && r < mapMatrix.length && c >= 0 && c < mapMatrix[0].length) {
+        return mapMatrix[r][c] == 3; // 3 là ô bụi cỏ
     }
+    return false;
+}
 
     private void loadMapConfigFromFile(String mapName) {
         JsonObject mapJson = AssetLoader.loadMapConfig(mapName);
@@ -248,75 +262,67 @@ private void processIncomingPacket(Packet packet) {
                 for (TankSnapshotDTO incoming : snapshot.getTanks()) {
                     currentVisibleTankIds.add(incoming.getId());
                     targetTanks.put(incoming.getId(), incoming);
-                    displayTanks.putIfAbsent(incoming.getId(), 
-                        new TankSnapshotDTO(incoming.getId(), incoming.getX(), incoming.getY(), 
-                                            incoming.getAngle(), incoming.getHp(), incoming.isAlive()));
+                    
+                    // 1. Luôn cập nhật trạng thái HP/Sống chết vào Map toàn cục
+                    globalPlayerStates.put(incoming.getId(), incoming);
+
+                    // 2. Cập nhật cho displayTanks (Render trên bản đồ)
+                    if (displayTanks.containsKey(incoming.getId())) {
+                        updateTankHpAndStatus(displayTanks.get(incoming.getId()), incoming.getHp(), incoming.isAlive());
+                    } else {
+                        displayTanks.put(incoming.getId(), 
+                            new TankSnapshotDTO(incoming.getId(), incoming.getX(), incoming.getY(), 
+                                                incoming.getAngle(), incoming.getHp(), incoming.isAlive()));
+                    }
                 }
 
-                // FIX KẸT BÓNG XE: Xóa sạch các xe đã bị khuất khỏi tầm nhìn (vào bụi cỏ)
+                if (myTankId == -1) {
+                    updateMyTankIdFromSession();
+                }
+
+                // CHỈ xóa khỏi displayTanks để ẩn xe khỏi bản đồ khi chui vào cỏ
                 displayTanks.keySet().removeIf(id -> !currentVisibleTankIds.contains(id));
-                targetTanks.keySet().removeIf(id -> !currentVisibleTankIds.contains(id));
+                // KHÔNG xóa targetTanks hay globalPlayerStates!
             }
         }
     } 
-    else if (packet.getType() == PacketType.GAME_EVENT_EFFECT) {
-        GameEventEffectDTO effect = gson.fromJson(packet.getData(), GameEventEffectDTO.class);
-        if (effect != null) {
-            String eventType = effect.getEventType() != null ? effect.getEventType().toUpperCase() : "";
-            
-            if ("EXPLOSION".equalsIgnoreCase(eventType)) {
-                explosions.add(new ExplosionEffect(effect.getX(), effect.getY()));
-            } 
-            // Bổ sung thêm các từ khóa sự kiện nổ tường mà Server có thể gửi
-            else if (eventType.contains("BRICK") || eventType.contains("TILE") || eventType.contains("WALL")) {
-                
-                // Thử kiểm tra các điểm xung quanh điểm nổ (bán kính 6px) để tìm ô gạch
-                double hitX = effect.getX();
-                double hitY = effect.getY();
-                
-                int[][] offsets = {{0, 0}, {4, 0}, {-4, 0}, {0, 4}, {0, -4}};
-                boolean foundBrick = false;
-
-                for (int[] os : offsets) {
-                    int c = (int) Math.floor((hitX + os[0]) / tileSize);
-                    int r = (int) Math.floor((hitY + os[1]) / tileSize);
-
-                    if (mapMatrix != null && r >= 0 && r < mapMatrix.length && c >= 0 && c < mapMatrix[0].length) {
-                        if (mapMatrix[r][c] == 2) { // Tường gạch
-                            brickHitsLeft[r][c]--;
-                            if (brickHitsLeft[r][c] <= 0) {
-                                mapMatrix[r][c] = 0; // Vỡ hoàn toàn -> thành đường trống
-                            }
-                            foundBrick = true;
-                            break;
-                        }
-                    }
-                }
-                
-                // Thêm hiệu ứng nổ nhỏ ngay vị trí gạch bị bắn
-                explosions.add(new ExplosionEffect(hitX, hitY));
-            }
-        } // <--- ĐÃ BỔ SUNG NGOẶC ĐÓNG CỦA if (effect != null) Ở ĐÂY
-    } 
-    // BỔ SUNG: Xử lý danh sách người chơi trong trận đấu
     else if (packet.getType() == PacketType.TANK_PLAYER_INFO) {
         Type listType = new TypeToken<ArrayList<TankPlayerDTO>>(){}.getType();
         List<TankPlayerDTO> players = gson.fromJson(packet.getData(), listType);
         if (players != null) {
             tankPlayers.clear();
             tankPlayers.addAll(players);
+            updateMyTankIdFromSession();
+        }
+    }
+    else if (packet.getType() == PacketType.GAME_EVENT_EFFECT) {
+        GameEventEffectDTO effect = gson.fromJson(packet.getData(), GameEventEffectDTO.class);
+        if (effect != null) {
+            String eventType = effect.getEventType() != null ? effect.getEventType().toUpperCase() : "";
+            if ("EXPLOSION".equalsIgnoreCase(eventType)) {
+                explosions.add(new ExplosionEffect(effect.getX(), effect.getY()));
+            } else if (eventType.contains("BRICK") || eventType.contains("TILE") || eventType.contains("WALL")) {
+                int c = (int) Math.floor(effect.getX() / tileSize);
+                int r = (int) Math.floor(effect.getY() / tileSize);
+                if (mapMatrix != null && r >= 0 && r < mapMatrix.length && c >= 0 && c < mapMatrix[0].length) {
+                    if (mapMatrix[r][c] == 2) {
+                        brickHitsLeft[r][c]--;
+                        if (brickHitsLeft[r][c] <= 0) mapMatrix[r][c] = 0;
+                    }
+                }
+                explosions.add(new ExplosionEffect(effect.getX(), effect.getY()));
+            }
         }
     } 
-    // BỔ SUNG: Xử lý khi nhận được tín hiệu Kết thúc trận đấu từ Server
     else if (packet.getType() == PacketType.GAME_OVER_NOTIFY) {
         GameOverDTO gameOver = gson.fromJson(packet.getData(), GameOverDTO.class);
         Platform.runLater(() -> {
-            if (renderTimer != null) renderTimer.stop();
-            if (matchTimer != null) matchTimer.stop();
+            stopAllTimers();
             showGameOverPopup(gameOver);
         });
     }
 }
+
 
     private void sendInputToServer() {
         if (clientSocket == null || !clientSocket.isConnected()) return;
@@ -372,32 +378,93 @@ private void processIncomingPacket(Packet packet) {
         renderTimer.start();
     }
 
-    private void updateClientState() {
-        for (Map.Entry<Integer, TankSnapshotDTO> entry : displayTanks.entrySet()) {
-            int tankId = entry.getKey();
-            TankSnapshotDTO current = entry.getValue();
-            TankSnapshotDTO target = targetTanks.get(tankId);
+private void updateClientState() {
+    // Trong updateClientState():
+for (Map.Entry<Integer, TankSnapshotDTO> entry : displayTanks.entrySet()) {
+    int tankId = entry.getKey();
+    TankSnapshotDTO current = entry.getValue();
+    TankSnapshotDTO target = targetTanks.get(tankId);
 
-            if (target != null) {
-                double newX = current.getX() + (target.getX() - current.getX()) * LERP_FACTOR;
-                double newY = current.getY() + (target.getY() - current.getY()) * LERP_FACTOR;
-                
-                double diffAngle = (target.getAngle() - current.getAngle() + 540) % 360 - 180;
-                double newAngle = (current.getAngle() + diffAngle * LERP_FACTOR + 360) % 360;
+    if (target != null) {
+        double newX = current.getX() + (target.getX() - current.getX()) * LERP_FACTOR;
+        double newY = current.getY() + (target.getY() - current.getY()) * LERP_FACTOR;
+        double diffAngle = (target.getAngle() - current.getAngle() + 540) % 360 - 180;
+        double newAngle = (current.getAngle() + diffAngle * LERP_FACTOR + 360) % 360;
 
-                current.setX(newX);
-                current.setY(newY);
-                current.setAngle(newAngle);
+        current.setX(newX);
+        current.setY(newY);
+        current.setAngle(newAngle);
+        
+        updateTankHpAndStatus(current, target.getHp(), target.isAlive());
+        
+        // Đồng bộ HP vào Map toàn cục
+        if (globalPlayerStates.containsKey(tankId)) {
+            globalPlayerStates.get(tankId).setHp(target.getHp());
+        }
+    }
+}
 
-                updateTankHpAndStatus(current, target.getHp(), target.isAlive());
+    // 2. XỬ LÝ VA CHẠM ĐẠN VỚI TƯỜNG (Khắc phục triệt để va chạm lặp)
+    if (mapMatrix != null && !bullets.isEmpty()) {
+        List<BulletSnapshotDTO> bulletsToRemove = new ArrayList<>();
+
+        for (BulletSnapshotDTO bullet : bullets) {
+            // Tạo ID định danh duy nhất cho viên đạn dựa trên tọa độ/vận tốc
+            String bulletKey = bullet.getX() + "_" + bullet.getY() + "_" + bullet.getVx() + "_" + bullet.getVy();
+
+            // Nếu viên đạn này đã được xử lý va chạm trước đó rồi thì bỏ qua
+            if (processedBulletIds.contains(bulletKey)) {
+                continue;
+            }
+
+            int c = (int) Math.floor(bullet.getX() / tileSize);
+            int r = (int) Math.floor(bullet.getY() / tileSize);
+
+            if (r >= 0 && r < mapMatrix.length && c >= 0 && c < mapMatrix[0].length) {
+                int tileType = mapMatrix[r][c];
+
+                if (tileType == 2) { // Tường gạch
+                    // Đánh dấu đạn đã xử lý
+                    processedBulletIds.add(bulletKey);
+
+                    // Trừ HP gạch CHÍNH XÁC 1 ĐƠN VỊ
+                    brickHitsLeft[r][c]--;
+
+                    double centerX = c * tileSize + tileSize / 2.0;
+                    double centerY = r * tileSize + tileSize / 2.0;
+
+                    if (brickHitsLeft[r][c] <= 0) {
+                        // BẮN PHÁT THỨ 3 (HP <= 0): Ô gạch biến thành đường trống (0) và nổ lớn
+                        mapMatrix[r][c] = 0;
+                        explosions.add(new ExplosionEffect(centerX, centerY));
+                    } else {
+                        // BẮN PHÁT 1 & 2: Nổ tia lửa tại điểm va chạm
+                        explosions.add(new ExplosionEffect(bullet.getX(), bullet.getY()));
+                    }
+
+                    bulletsToRemove.add(bullet);
+                } else if (tileType == 1) { // Tường đá
+                    processedBulletIds.add(bulletKey);
+                    explosions.add(new ExplosionEffect(bullet.getX(), bullet.getY()));
+                    bulletsToRemove.add(bullet);
+                }
             }
         }
 
-        for (ExplosionEffect exp : explosions) {
-            exp.update();
+        if (!bulletsToRemove.isEmpty()) {
+            bullets.removeAll(bulletsToRemove);
         }
-        explosions.removeIf(exp -> exp.finished);
     }
+
+    // Dọn dẹp memory cho processedBulletIds nếu quá nhiều
+    if (processedBulletIds.size() > 500) {
+        processedBulletIds.clear();
+    }
+
+    // 3. Cập nhật hiệu ứng nổ
+    for (ExplosionEffect exp : explosions) exp.update();
+    explosions.removeIf(exp -> exp.finished);
+}
 
     private void updateTankHpAndStatus(TankSnapshotDTO dto, int hp, boolean isAlive) {
         try {
@@ -412,67 +479,91 @@ private void processIncomingPacket(Packet packet) {
     }
 
     private void renderTerrainAndWalls() {
-        if (mapMatrix == null) return;
+    if (mapMatrix == null) return;
 
-        Image stoneImg = AssetLoader.getImage("tiles/stone_wall.png");
-        Image brickImg = AssetLoader.getImage("tiles/brick_wall.png");
+    Image stoneImg = AssetLoader.getImage("tiles/stone_wall.png");
+    Image brickImg = AssetLoader.getImage("tiles/brick_wall.png");
 
-        for (int r = 0; r < mapMatrix.length; r++) {
-            for (int c = 0; c < mapMatrix[r].length; c++) {
-                int tileType = mapMatrix[r][c];
+    for (int r = 0; r < mapMatrix.length; r++) {
+        for (int c = 0; c < mapMatrix[r].length; c++) {
+            int tileType = mapMatrix[r][c];
+            double x = c * tileSize;
+            double y = r * tileSize;
+
+            // Đất trống (0) -> BỎ QUA KHÔNG VẼ
+            if (tileType == 0) continue;
+
+            if (tileType == 1) { // Tường đá
+                if (stoneImg != null) gc.drawImage(stoneImg, x, y, tileSize, tileSize);
+                else { gc.setFill(Color.GRAY); gc.fillRect(x, y, tileSize, tileSize); }
+            } else if (tileType == 2) { // Tường gạch
+                int hp = brickHitsLeft[r][c];
+
+                // Nếu HP <= 0: Ép về 0 và bỏ qua hoàn toàn
+                if (hp <= 0) {
+                    mapMatrix[r][c] = 0;
+                    continue;
+                }
+
+                // 1. Vẽ khối gạch
+                if (brickImg != null) gc.drawImage(brickImg, x, y, tileSize, tileSize);
+                else { gc.setFill(Color.CHOCOLATE); gc.fillRect(x, y, tileSize, tileSize); }
+
+                // 2. Vẽ nét nứt theo đúng số máu còn lại
+                gc.setStroke(Color.BLACK);
+                gc.setLineWidth(2);
+
+                if (hp == 2) {
+                    // Bắn phát 1 (Còn 2 HP) -> Vẽ 1 vết nứt chéo nhẹ
+                    gc.strokeLine(x + 8, y + 8, x + 24, y + 24);
+                } else if (hp == 1) {
+                    // Bắn phát 2 (Còn 1 HP) -> Vẽ 2 vết nứt chân chim đậm hơn
+                    gc.strokeLine(x + 8, y + 8, x + 24, y + 24);
+                    gc.strokeLine(x + 26, y + 8, x + 10, y + 30);
+                }
+            }
+        }
+    }
+}
+
+    private void renderBushes() {
+    if (mapMatrix == null) return;
+    Image bushImg = AssetLoader.getImage("tiles/grass.png");
+
+    // Lấy vị trí xe của bản thân
+    TankSnapshotDTO myTank = displayTanks.get(myTankId);
+
+    for (int r = 0; r < mapMatrix.length; r++) {
+        for (int c = 0; c < mapMatrix[r].length; c++) {
+            if (mapMatrix[r][c] == 3) { // Ô bụi cỏ
                 double x = c * tileSize;
                 double y = r * tileSize;
 
-                if (tileType == 1) { // Tường đá
-                    if (stoneImg != null) {
-                        gc.drawImage(stoneImg, x, y, tileSize, tileSize);
-                    } else {
-                        gc.setFill(Color.GRAY);
-                        gc.fillRect(x, y, tileSize, tileSize);
-                    }
-                } else if (tileType == 2) { // Tường gạch
-                    if (brickImg != null) {
-                        gc.drawImage(brickImg, x, y, tileSize, tileSize);
-                    } else {
-                        gc.setFill(Color.CHOCOLATE);
-                        gc.fillRect(x, y, tileSize, tileSize);
-                    }
+                gc.save();
 
-                    int hitsLeft = brickHitsLeft[r][c];
-                    if (hitsLeft < 3) {
-                        gc.setStroke(Color.BLACK);
-                        gc.setLineWidth(2);
-                        gc.strokeLine(x + 8, y + 8, x + 20, y + 22);
+                // Kiểm tra xem xe của bản thân có đang nằm trong ô cỏ này hay không
+                if (myTank != null && myTank.isAlive()) {
+                    double myC = Math.floor(myTank.getX() / tileSize);
+                    double myR = Math.floor(myTank.getY() / tileSize);
 
-                        if (hitsLeft <= 1) {
-                            gc.strokeLine(x + 24, y + 10, x + 32, y + 30);
-                            gc.strokeLine(x + 10, y + 26, x + 28, y + 34);
-                        }
+                    if ((int) myC == c && (int) myR == r) {
+                        // Làm mờ bụi cỏ tại đúng ô xe mình đứng để lộ xe bên dưới
+                        gc.setGlobalAlpha(0.55); 
                     }
                 }
+
+                if (bushImg != null) {
+                    gc.drawImage(bushImg, x, y, tileSize, tileSize);
+                } else {
+                    gc.setFill(Color.rgb(34, 139, 34, 0.75));
+                    gc.fillRect(x, y, tileSize, tileSize);
+                }
+
+                gc.restore();
             }
         }
     }
-
-    private void renderBushes() {
-        if (mapMatrix == null) return;
-        Image bushImg = AssetLoader.getImage("tiles/grass.png");
-
-        for (int r = 0; r < mapMatrix.length; r++) {
-            for (int c = 0; c < mapMatrix[r].length; c++) {
-                if (mapMatrix[r][c] == 3) {
-                    double x = c * tileSize;
-                    double y = r * tileSize;
-                    if (bushImg != null) {
-                        gc.drawImage(bushImg, x, y, tileSize, tileSize);
-                    } else {
-                        gc.setFill(Color.rgb(34, 139, 34, 0.75));
-                        gc.fillRect(x, y, tileSize, tileSize);
-                    }
-                }
-            }
-        }
-    }
+}
 
     private void renderBullets() {
         Image missileImg = AssetLoader.getImage("bullets/missile.png");
@@ -511,71 +602,98 @@ private void processIncomingPacket(Packet packet) {
     }
 
     private void renderTanks() {
-        for (TankSnapshotDTO tank : displayTanks.values()) {
-            if (!tank.isAlive()) continue;
+    String[] tankImageAssets = {
+        "tiles/green_tank.png",
+        "tiles/red_tank.png",
+        "tiles/purple_tank.png",
+        "tiles/yellow_tank.png"
+    };
 
-            String tankImageName;
-            switch (tank.getId()) {
-                case 1:  tankImageName = "tiles/green_tank.png"; break;
-                case 2:  tankImageName = "tiles/red_tank.png"; break;
-                case 3:  tankImageName = "tiles/purple_tank.png"; break;
-                case 4:  tankImageName = "tiles/yellow_tank.png"; break;
-                default: tankImageName = "tiles/green_tank.png"; break;
-            }
+    for (TankSnapshotDTO tank : displayTanks.values()) {
+        if (!tank.isAlive()) continue;
 
-            Image tankSprite = AssetLoader.getImage(tankImageName);
+        boolean isMyTank = (tank.getId() == myTankId);
+        boolean inBush = isTankInBush(tank.getX(), tank.getY());
 
-            gc.save();
-            gc.translate(tank.getX(), tank.getY());
-            gc.rotate(tank.getAngle() + 90.0); 
-
-            if (tankSprite != null) {
-                gc.drawImage(tankSprite, -TANK_SIZE / 2.0, -TANK_SIZE / 2.0, TANK_SIZE, TANK_SIZE);
-            } else {
-                Color bodyColor = (tank.getId() == 1) ? Color.web("#4CAF50") : Color.web("#F44336");
-                gc.setFill(Color.web("#333333"));
-                gc.fillRect(-TANK_SIZE / 2.0 - 2, -TANK_SIZE / 2.0, 5, TANK_SIZE);
-                gc.fillRect(TANK_SIZE / 2.0 - 3, -TANK_SIZE / 2.0, 5, TANK_SIZE);
-                gc.setFill(bodyColor);
-                gc.fillRect(-TANK_SIZE / 2.0 + 3, -TANK_SIZE / 2.0, TANK_SIZE - 6, TANK_SIZE);
-                gc.setFill(Color.BLACK);
-                gc.fillRect(-2.5, -TANK_SIZE / 2.0 - 10, 5, 12);
-                gc.setFill(Color.web("#212121"));
-                gc.fillOval(-7, -7, 14, 14);
-            }
-            gc.restore();
-
-            // Thanh máu & Tên người chơi
-            double barWidth = 36.0;
-            double barHeight = 6.0;
-            double barX = tank.getX() - barWidth / 2.0;
-            double barY = tank.getY() - TANK_SIZE / 2.0 - 12.0;
-
-            String username = getUsernameByTankId(tank.getId());
-            if (username != null) {
-                gc.setFill(Color.WHITE);
-                gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
-                double textWidth = username.length() * 6.5;
-                gc.fillText(username, tank.getX() - textWidth / 2.0, barY - 6);
-            }
-
-            gc.setFill(Color.DARKRED);
-            gc.fillRect(barX, barY, barWidth, barHeight);
-
-            int currentHp = (int) Math.max(0, Math.min(MAX_HP, tank.getHp()));
-            double hpWidth = (barWidth / MAX_HP) * currentHp;
-            gc.setFill(Color.LIME);
-            gc.fillRect(barX, barY, hpWidth, barHeight);
-
-            gc.setStroke(Color.BLACK);
-            gc.setLineWidth(1);
-            gc.strokeRect(barX, barY, barWidth, barHeight);
-            for (int i = 1; i < MAX_HP; i++) {
-                double lineX = barX + (barWidth / MAX_HP) * i;
-                gc.strokeLine(lineX, barY, lineX, barY + barHeight);
-            }
+        // QUY TẮC BỤI CỎ:
+        // - Xe địch trong bụi cỏ: Không vẽ (bỏ qua render)
+        // - Xe mình trong bụi cỏ: Vẫn vẽ nhưng làm mờ (GlobalAlpha = 0.45)
+        if (inBush && !isMyTank) {
+            continue; 
         }
+
+        // Chọn Sprite xe theo công thức mod 4 để đảm bảo xe thứ 3, 4, 5... đều có ảnh
+        int imageIndex = Math.abs(tank.getId() - 1) % tankImageAssets.length;
+        Image tankSprite = AssetLoader.getImage(tankImageAssets[imageIndex]);
+
+        gc.save(); // Lưu trạng thái Canvas
+        
+        // Thiết lập độ mờ nếu là xe mình đang ở trong bụi cỏ
+        if (inBush && isMyTank) {
+            gc.setGlobalAlpha(0.45); // Độ mờ 45%
+        }
+
+        // 1. Render Thân & Nòng pháo Xe Tank
+        gc.translate(tank.getX(), tank.getY());
+        gc.rotate(tank.getAngle() + 90.0); // Xoay nòng pháo theo góc Server trả về
+
+        if (tankSprite != null) {
+            gc.drawImage(tankSprite, -TANK_SIZE / 2.0, -TANK_SIZE / 2.0, TANK_SIZE, TANK_SIZE);
+        } else {
+            // Chế độ dự phòng khi không nạp được file ảnh
+            Color bodyColor = isMyTank ? Color.web("#4CAF50") : Color.web("#F44336");
+            gc.setFill(Color.web("#333333"));
+            gc.fillRect(-TANK_SIZE / 2.0 - 2, -TANK_SIZE / 2.0, 5, TANK_SIZE);
+            gc.fillRect(TANK_SIZE / 2.0 - 3, -TANK_SIZE / 2.0, 5, TANK_SIZE);
+            gc.setFill(bodyColor);
+            gc.fillRect(-TANK_SIZE / 2.0 + 3, -TANK_SIZE / 2.0, TANK_SIZE - 6, TANK_SIZE);
+            gc.setFill(Color.BLACK);
+            gc.fillRect(-2.5, -TANK_SIZE / 2.0 - 10, 5, 12);
+            gc.setFill(Color.web("#212121"));
+            gc.fillOval(-7, -7, 14, 14);
+        }
+        gc.restore(); // Khôi phục trạng thái Canvas (trả Alpha về 1.0)
+
+        // 2. Render Thanh Máu & Tên người chơi
+        gc.save();
+        if (inBush && isMyTank) {
+            gc.setGlobalAlpha(0.5); // Thanh máu cũng mờ nhẹ theo xe
+        }
+
+        double barWidth = 36.0;
+        double barHeight = 6.0;
+        double barX = tank.getX() - barWidth / 2.0;
+        double barY = tank.getY() - TANK_SIZE / 2.0 - 12.0;
+
+        String username = getUsernameByTankId(tank.getId());
+        if (username != null) {
+            gc.setFill(Color.WHITE);
+            gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
+            double textWidth = username.length() * 6.5;
+            gc.fillText(username, tank.getX() - textWidth / 2.0, barY - 6);
+        }
+
+        // Vẽ nền thanh máu (Đỏ)
+        gc.setFill(Color.DARKRED);
+        gc.fillRect(barX, barY, barWidth, barHeight);
+
+        // Vẽ phần máu hiện tại (Xanh lá)
+        int currentHp = (int) Math.max(0, Math.min(MAX_HP, tank.getHp()));
+        double hpWidth = (barWidth / MAX_HP) * currentHp;
+        gc.setFill(Color.LIME);
+        gc.fillRect(barX, barY, hpWidth, barHeight);
+
+        // Khung thanh máu
+        gc.setStroke(Color.BLACK);
+        gc.setLineWidth(1);
+        gc.strokeRect(barX, barY, barWidth, barHeight);
+        for (int i = 1; i < MAX_HP; i++) {
+            double lineX = barX + (barWidth / MAX_HP) * i;
+            gc.strokeLine(lineX, barY, lineX, barY + barHeight);
+        }
+        gc.restore();
     }
+}
 
     private void renderExplosions() {
         for (ExplosionEffect exp : explosions) {
@@ -584,52 +702,88 @@ private void processIncomingPacket(Packet packet) {
     }
 
     private void renderHUD() {
-        gc.save();
+    gc.save();
 
-        // Đồng hồ đếm ngược
-        gc.setFill(Color.rgb(0, 0, 0, 0.3));
-        gc.fillRoundRect(340, 10, 120, 35, 10, 10);
-        gc.setStroke(Color.rgb(255, 215, 0, 0.5));
-        gc.setLineWidth(1.5);
-        gc.strokeRoundRect(340, 10, 120, 35, 10, 10);
+    // 1. Đồng hồ đếm ngược
+    gc.setFill(Color.rgb(0, 0, 0, 0.3));
+    gc.fillRoundRect(340, 10, 120, 35, 10, 10);
+    gc.setStroke(Color.rgb(255, 215, 0, 0.5));
+    gc.setLineWidth(1.5);
+    gc.strokeRoundRect(340, 10, 120, 35, 10, 10);
 
-        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
-        gc.setFill(Color.rgb(255, 255, 0, 0.75));
-        String timeStr = String.format("%02d:%02d", matchRemainingTime / 60, matchRemainingTime % 60);
-        gc.fillText("⏱ " + timeStr, 365, 34);
+    gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
+    gc.setFill(Color.rgb(255, 255, 0, 0.75));
+    gc.fillText(String.format("⏱ %02d:%02d", matchRemainingTime / 60, matchRemainingTime % 60), 365, 34);
 
-        // Bảng xếp hạng mini
-        gc.setFill(Color.rgb(15, 18, 24, 0.25));
-        gc.fillRoundRect(10, 10, 210, 115, 8, 8);
-        gc.setStroke(Color.rgb(58, 63, 77, 0.4));
-        gc.strokeRoundRect(10, 10, 210, 115, 8, 8);
+    // 2. Bảng điểm mini
+    gc.setFill(Color.rgb(15, 18, 24, 0.4));
+    gc.fillRoundRect(10, 10, 220, 125, 8, 8);
+    gc.setStroke(Color.rgb(58, 63, 77, 0.5));
+    gc.strokeRoundRect(10, 10, 220, 125, 8, 8);
 
-        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
-        gc.setFill(Color.rgb(255, 255, 255, 0.7));
-        gc.fillText("BẢNG ĐIỂM TRẬN ĐẤU", 20, 28);
-        gc.setStroke(Color.rgb(128, 128, 128, 0.4));
-        gc.strokeLine(20, 34, 200, 34);
+    gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
+    gc.setFill(Color.rgb(255, 255, 255, 0.9));
+    gc.fillText("BẢNG ĐIỂM TRẬN ĐẤU", 20, 28);
+    gc.setStroke(Color.rgb(128, 128, 128, 0.4));
+    gc.strokeLine(20, 34, 210, 34);
 
-        gc.setFont(Font.font("Consolas", FontWeight.NORMAL, 12));
-        int startY = 52;
-        if (displayTanks.isEmpty()) {
-            gc.setFill(Color.rgb(211, 211, 211, 0.6));
-            gc.fillText("Đang chờ người chơi...", 20, startY);
-        } else {
-            for (TankSnapshotDTO tank : displayTanks.values()) {
-                String uName = getUsernameByTankId(tank.getId());
-                String displayName = (uName != null) ? uName : ("Tank #" + tank.getId());
-                if (displayName.length() > 8) displayName = displayName.substring(0, 8);
+    gc.setFont(Font.font("Consolas", FontWeight.BOLD, 12));
+    int startY = 52;
 
-                Color textColor = (tank.getId() == 1) ? Color.rgb(76, 175, 80, 0.75) : Color.rgb(244, 67, 54, 0.75);
-                gc.setFill(textColor);
-                gc.fillText(String.format("%-8s | HP:%d", displayName, tank.getHp()), 20, startY);
-                startY += 18;
+    Color[] tankColors = {
+        Color.rgb(76, 175, 80),  // Tank 1 - Green
+        Color.rgb(244, 67, 54),  // Tank 2 - Red
+        Color.rgb(156, 39, 176), // Tank 3 - Purple
+        Color.rgb(255, 193, 7)   // Tank 4 - Yellow
+    };
+
+    if (tankPlayers.isEmpty()) {
+        gc.setFill(Color.rgb(211, 211, 211, 0.6));
+        gc.fillText("Đang chờ dữ liệu...", 20, startY);
+    } else {
+        // Duyệt danh sách cố định tất cả người chơi trong phòng
+        for (TankPlayerDTO player : tankPlayers) {
+            int tId = player.getTankId();
+            String displayName = player.getUsername();
+
+            if (tId == myTankId) {
+                displayName += " (Tôi)";
+            }
+            if (displayName.length() > 10) displayName = displayName.substring(0, 10);
+
+            // LẤY HP CHÍNH XÁC TỪ GLOBAL PLAYER STATES
+            int currentHp = 3;
+            if (globalPlayerStates.containsKey(tId)) {
+                currentHp = globalPlayerStates.get(tId).getHp();
+            } else if (displayTanks.containsKey(tId)) {
+                currentHp = displayTanks.get(tId).getHp();
+            }
+
+            int colorIdx = Math.abs(tId - 1) % tankColors.length;
+            gc.setFill(tankColors[colorIdx]);
+
+            gc.fillText(String.format("%-10s | HP:%d", displayName, currentHp), 20, startY);
+            startY += 18;
+        }
+    }
+
+    gc.restore();
+}
+    
+    private void updateMyTankIdFromSession() {
+    com.tank2d.common.model.User currentUser = ClientSession.getInstance().getCurrentUser();
+    
+    if (currentUser != null && currentUser.getUsername() != null && !tankPlayers.isEmpty()) {
+        String myUsername = currentUser.getUsername();
+        
+        for (TankPlayerDTO player : tankPlayers) {
+            if (myUsername.equalsIgnoreCase(player.getUsername())) {
+                this.myTankId = player.getTankId(); // Gán đúng Tank ID của tài khoản đang đăng nhập
+                return;
             }
         }
-
-        gc.restore();
     }
+}
 
     private void stopAllTimers() {
         if (renderTimer != null) renderTimer.stop();
