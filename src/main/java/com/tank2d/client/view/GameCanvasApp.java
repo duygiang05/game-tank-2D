@@ -350,33 +350,44 @@ private void processIncomingPacket(Packet packet) {
     }
 
     private void startRenderLoop() {
-        renderTimer = new AnimationTimer() {
-            @Override
-            public void handle(long now) {
-                sendInputToServer();
-                updateClientState();
+    renderTimer = new AnimationTimer() {
+        @Override
+        public void handle(long now) {
+            sendInputToServer();
+            updateClientState();
 
-                // 1. Clear nền tối
+            // 1. RENDER NỀN TỪ ASSETLOADER
+            Image bgImg = AssetLoader.getImage("tiles/background.png");
+            if (bgImg != null && !bgImg.isError()) {
+                // Co giãn ảnh phủ kín diện tích Canvas (800x600)
+                gc.drawImage(bgImg, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            } else {
+                // Nền dự phòng nếu chưa tìm thấy file background.png
                 gc.setFill(Color.rgb(22, 24, 29));
                 gc.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-                // 2. Render ma trận tường
-                renderTerrainAndWalls();
-
-                // 3. Render đạn, xe & hiệu ứng nổ
-                renderBullets();
-                renderTanks();
-                renderExplosions();
-
-                // 4. Render bụi cỏ đè lên xe
-                renderBushes();
-
-                // 5. Render bảng HUD & đồng hồ
-                renderHUD();
             }
-        };
-        renderTimer.start();
-    }
+
+            // (Tùy chọn) Phủ 1 lớp màu tối nhẹ 20% giúp đường đạn & tank nổi bật hơn
+            gc.setFill(Color.rgb(0, 0, 0, 0.2));
+            gc.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            // 2. Render ma trận tường
+            renderTerrainAndWalls();
+
+            // 3. Render đạn, xe & hiệu ứng nổ
+            renderBullets();
+            renderTanks();
+            renderExplosions();
+
+            // 4. Render bụi cỏ đè lên xe
+            renderBushes();
+
+            // 5. Render bảng HUD & đồng hồ
+            renderHUD();
+        }
+    };
+    renderTimer.start();
+}
 
 private void updateClientState() {
     // Trong updateClientState():
