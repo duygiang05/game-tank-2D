@@ -7,14 +7,14 @@
   "_comment_sizes": "tank_size: Kích thước xe (36x36), bullet_size: Đường kính đạn (8px), tile_size: Kích thước ô bản đồ (40x40)",
   
   "physics": {
-    "server_tick_rate": 30,
-    "tank_speed": 4.0,
-    "bullet_speed": 9.0,
-    "nitro_speed_multiplier": 2.0,
-    "tank_size": 30,
-    "bullet_size": 8,
-    "tile_size": 40
-  },
+  "server_tick_rate": 30,
+  "tank_speed": 3.0,          
+  "bullet_speed": 7.0,        
+  "nitro_speed_multiplier": 2.0,
+  "tank_size": 24,            
+  "bullet_size": 6,
+  "tile_size": 30
+},
 
   "_comment_damage": "Cấu hình sát thương của từng loại đạn và độ bền của tường",
   "_comment_normal_bullet": "normal_bullet: Sát thương đạn thường (trừ 1 máu)",

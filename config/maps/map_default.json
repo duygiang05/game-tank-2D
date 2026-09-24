@@ -5,12 +5,12 @@
   "theme": "default",
   "width": 20,
   "height": 20,
-  "tile_size": 40,
+  "tile_size": 30,
   "spawn_points": [
-    { "tank_id": 1, "row": 0,  "col": 0,  "x": 20,  "y": 20,  "angle": 135.0 },
-    { "tank_id": 2, "row": 0,  "col": 19, "x": 780, "y": 20,  "angle": 225.0 },
-    { "tank_id": 3, "row": 19, "col": 0,  "x": 20,  "y": 780, "angle": 45.0  },
-    { "tank_id": 4, "row": 19, "col": 19, "x": 780, "y": 780, "angle": 315.0 }
+    { "tank_id": 1, "row": 0,  "col": 0,  "x": 15,  "y": 15,  "angle": 135.0 },
+    { "tank_id": 2, "row": 0,  "col": 19, "x": 585, "y": 15,  "angle": 225.0 },
+    { "tank_id": 3, "row": 19, "col": 0,  "x": 15,  "y": 585, "angle": 45.0  },
+    { "tank_id": 4, "row": 19, "col": 19, "x": 585, "y": 585, "angle": 315.0 }
   ],
   "matrix": [
     [0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0,0,0,0],
