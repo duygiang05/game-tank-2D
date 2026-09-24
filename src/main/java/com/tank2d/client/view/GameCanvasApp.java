@@ -205,6 +205,7 @@ public class GameCanvasApp extends Application {
      */
     private void loadGameStatsConfig() {
         JsonObject statsJson = AssetLoader.loadMapConfig("stats"); // Hoặc AssetLoader tương ứng
+        System.out.println("[DEBUG] statsJson = " + statsJson);
         if (statsJson == null) return;
 
         if (statsJson.has("physics")) {
@@ -276,7 +277,7 @@ public class GameCanvasApp extends Application {
         }
 
         // 3. Đọc Spawn Points từ JSON (Khởi tạo vị trí ban đầu cho Tank)
-        if (mapJson.has("spawn_points")) {
+        /*if (mapJson.has("spawn_points")) {
             JsonArray spawns = mapJson.getAsJsonArray("spawn_points");
             for (int i = 0; i < spawns.size(); i++) {
                 JsonObject spawn = spawns.get(i).getAsJsonObject();
@@ -290,7 +291,7 @@ public class GameCanvasApp extends Application {
                 targetTanks.putIfAbsent(tId, defaultTank);
                 globalPlayerStates.putIfAbsent(tId, defaultTank);
             }
-        }
+        }*/
     }
 
     private void initNetworkReceiver() {
@@ -308,33 +309,41 @@ public class GameCanvasApp extends Application {
 
     private void processIncomingPacket(Packet packet) {
         if (packet.getType() == PacketType.GAME_SNAPSHOT) {
-            GameSnapshotDTO snapshot = gson.fromJson(packet.getData(), GameSnapshotDTO.class);
-            if (snapshot != null) {
-                if (snapshot.getBullets() != null) {
-                    this.bullets.clear();
-                    this.bullets.addAll(snapshot.getBullets());
-                }
+    GameSnapshotDTO snapshot = gson.fromJson(packet.getData(), GameSnapshotDTO.class);
+    if (snapshot != null) {
+        if (snapshot.getBullets() != null) {
+            this.bullets.clear();
+            this.bullets.addAll(snapshot.getBullets());
+        }
 
-                if (snapshot.getTanks() != null) {
-                    for (TankSnapshotDTO incoming : snapshot.getTanks()) {
-                        targetTanks.put(incoming.getId(), incoming);
-                        globalPlayerStates.put(incoming.getId(), incoming);
+        if (snapshot.getTanks() != null) {
+            Set<Integer> activeTankIds = new HashSet<>();
 
-                        if (displayTanks.containsKey(incoming.getId())) {
-                            updateTankHpAndStatus(displayTanks.get(incoming.getId()), incoming.getHp(), incoming.isAlive());
-                        } else {
-                            displayTanks.put(incoming.getId(), 
-                                new TankSnapshotDTO(incoming.getId(), incoming.getX(), incoming.getY(), 
-                                                    incoming.getAngle(), incoming.getHp(), incoming.isAlive()));
-                        }
-                    }
+            for (TankSnapshotDTO incoming : snapshot.getTanks()) {
+                activeTankIds.add(incoming.getId());
+                targetTanks.put(incoming.getId(), incoming);
+                globalPlayerStates.put(incoming.getId(), incoming);
 
-                    if (myTankId == -1) {
-                        updateMyTankIdFromSession();
-                    }
+                if (displayTanks.containsKey(incoming.getId())) {
+                    updateTankHpAndStatus(displayTanks.get(incoming.getId()), incoming.getHp(), incoming.isAlive());
+                } else {
+                    displayTanks.put(incoming.getId(), 
+                        new TankSnapshotDTO(incoming.getId(), incoming.getX(), incoming.getY(), 
+                                            incoming.getAngle(), incoming.getHp(), incoming.isAlive()));
                 }
             }
+
+            // Xóa toàn bộ tank dư thừa không nằm trong danh sách Server gửi
+            displayTanks.keySet().removeIf(id -> !activeTankIds.contains(id));
+            targetTanks.keySet().removeIf(id -> !activeTankIds.contains(id));
+            globalPlayerStates.keySet().removeIf(id -> !activeTankIds.contains(id));
+
+            if (myTankId == -1) {
+                updateMyTankIdFromSession();
+            }
         }
+    }
+}
         else if (packet.getType() == PacketType.TANK_PLAYER_INFO) {
             Type listType = new TypeToken<ArrayList<TankPlayerDTO>>(){}.getType();
             List<TankPlayerDTO> players = gson.fromJson(packet.getData(), listType);
@@ -710,72 +719,77 @@ public class GameCanvasApp extends Application {
     }
 
     private void renderHUD() {
-        gc.save();
+    gc.save();
 
-        // 1. Đồng hồ đếm ngược căn giữa Canvas động
-        double clockX = (canvasWidth / 2.0) - 60;
-        gc.setFill(Color.rgb(0, 0, 0, 0.4));
-        gc.fillRoundRect(clockX, 10, 120, 35, 10, 10);
-        gc.setStroke(Color.rgb(255, 215, 0, 0.6));
-        gc.setLineWidth(1.5);
-        gc.strokeRoundRect(clockX, 10, 120, 35, 10, 10);
+    // 1. Đồng hồ đếm ngược căn giữa Canvas động
+    double clockX = (canvasWidth / 2.0) - 50;
+    gc.setFill(Color.rgb(0, 0, 0, 0.35)); // Giảm độ đậm nền
+    gc.fillRoundRect(clockX, 8, 100, 30, 8, 8);
+    gc.setStroke(Color.rgb(255, 215, 0, 0.5));
+    gc.setLineWidth(1.2);
+    gc.strokeRoundRect(clockX, 8, 100, 30, 8, 8);
 
-        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
-        gc.setFill(Color.rgb(255, 255, 0, 0.9));
-        gc.fillText(String.format("⏱ %02d:%02d", matchRemainingTime / 60, matchRemainingTime % 60), clockX + 25, 34);
+    gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 15));
+    gc.setFill(Color.rgb(255, 255, 0, 0.9));
+    gc.fillText(String.format("⏱ %02d:%02d", matchRemainingTime / 60, matchRemainingTime % 60), clockX + 18, 28);
 
-        // 2. Bảng điểm mini
-        gc.setFill(Color.rgb(15, 18, 24, 0.6));
-        gc.fillRoundRect(10, 10, 230, 150, 8, 8);
-        gc.setStroke(Color.rgb(58, 63, 77, 0.6));
-        gc.strokeRoundRect(10, 10, 230, 150, 8, 8);
+    // 2. Bảng điểm mini (Thu nhỏ & Mờ hơn)
+    int boardWidth = 170;  // Giảm độ rộng từ 230 -> 170
+    int boardHeight = 25 + (Math.max(1, tankPlayers.size()) * 16) + 10; // Tự điều chỉnh chiều cao theo số lượng player
 
-        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
-        gc.setFill(Color.rgb(255, 255, 255, 0.9));
-        gc.fillText("BẢNG ĐIỂM TRẬN ĐẤU", 20, 28);
-        gc.setStroke(Color.rgb(128, 128, 128, 0.4));
-        gc.strokeLine(20, 34, 220, 34);
+    gc.setFill(Color.rgb(15, 18, 24, 0.35)); // Độ mờ nền giảm xuống 0.35 (trong suốt hơn)
+    gc.fillRoundRect(8, 8, boardWidth, boardHeight, 6, 6);
+    gc.setStroke(Color.rgb(58, 63, 77, 0.4));
+    gc.strokeRoundRect(8, 8, boardWidth, boardHeight, 6, 6);
 
-        gc.setFont(Font.font("Consolas", FontWeight.BOLD, 12));
-        int startY = 52;
+    // Tiêu đề bảng điểm
+    gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10));
+    gc.setFill(Color.rgb(255, 255, 255, 0.75));
+    gc.fillText("BẢNG ĐIỂM", 14, 21);
+    gc.setStroke(Color.rgb(128, 128, 128, 0.25));
+    gc.strokeLine(14, 25, boardWidth - 6, 25);
 
-        Color[] tankColors = {
-            Color.rgb(76, 175, 80),  // Tank 1 - Green
-            Color.rgb(244, 67, 54),  // Tank 2 - Red
-            Color.rgb(156, 39, 176), // Tank 3 - Purple
-            Color.rgb(255, 193, 7)   // Tank 4 - Yellow
-        };
+    // Danh sách người chơi
+    gc.setFont(Font.font("Consolas", FontWeight.BOLD, 10.5)); // Chữ nhỏ lại
+    int startY = 38;
 
-        if (tankPlayers.isEmpty()) {
-            gc.setFill(Color.rgb(211, 211, 211, 0.6));
-            gc.fillText("Đang chờ dữ liệu...", 20, startY);
-        } else {
-            for (TankPlayerDTO player : tankPlayers) {
-                int tId = player.getTankId();
-                String displayName = player.getUsername();
+    Color[] tankColors = {
+        Color.rgb(76, 175, 80, 0.9),  // Tank 1 - Green
+        Color.rgb(244, 67, 54, 0.9),  // Tank 2 - Red
+        Color.rgb(156, 39, 176, 0.9), // Tank 3 - Purple
+        Color.rgb(255, 193, 7, 0.9)   // Tank 4 - Yellow
+    };
 
-                if (tId == myTankId) {
-                    displayName += " (Tôi)";
-                }
-                if (displayName.length() > 10) displayName = displayName.substring(0, 10);
+    if (tankPlayers.isEmpty()) {
+        gc.setFill(Color.rgb(211, 211, 211, 0.5));
+        gc.fillText("Đang chờ...", 14, startY);
+    } else {
+        for (TankPlayerDTO player : tankPlayers) {
+            int tId = player.getTankId();
+            String displayName = player.getUsername();
 
-                int currentHp = (int) maxHp;
-                if (globalPlayerStates.containsKey(tId)) {
-                    currentHp = globalPlayerStates.get(tId).getHp();
-                } else if (displayTanks.containsKey(tId)) {
-                    currentHp = displayTanks.get(tId).getHp();
-                }
-
-                int colorIdx = Math.abs(tId - 1) % tankColors.length;
-                gc.setFill(tankColors[colorIdx]);
-
-                gc.fillText(String.format("%-10s | HP:%d", displayName, currentHp), 20, startY);
-                startY += 18;
+            if (tId == myTankId) {
+                displayName += "*"; // Đổi (Tôi) thành dấu * để đỡ tốn diện tích
             }
-        }
+            if (displayName.length() > 8) displayName = displayName.substring(0, 8);
 
-        gc.restore();
+            int currentHp = (int) maxHp;
+            if (globalPlayerStates.containsKey(tId)) {
+                currentHp = globalPlayerStates.get(tId).getHp();
+            } else if (displayTanks.containsKey(tId)) {
+                currentHp = displayTanks.get(tId).getHp();
+            }
+
+            int colorIdx = Math.abs(tId - 1) % tankColors.length;
+            gc.setFill(tankColors[colorIdx]);
+
+            gc.fillText(String.format("%-8s | HP:%d", displayName, currentHp), 14, startY);
+            startY += 15; // Thu hẹp khoảng cách dòng
+        }
     }
+
+    gc.restore();
+}
     
     private void updateMyTankIdFromSession() {
         com.tank2d.common.model.User currentUser = ClientSession.getInstance().getCurrentUser();
