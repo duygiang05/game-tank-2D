@@ -258,15 +258,7 @@ public class GameLoop implements Runnable {
 
     List<BulletSnapshotDTO> bulletDTOs = new ArrayList<>();
     for (BulletEntity bullet : bullets.values()) {
-        bulletDTOs.add(new BulletSnapshotDTO(
-        bullet.getId(), 
-        bullet.getOwnerId(), 
-        bullet.getX(), 
-        bullet.getY(), 
-        bullet.getVx(), 
-        bullet.getVy(),
-        bullet.getType() != null ? bullet.getType().name() : "NORMAL" // <--- ĐÓNG GÓI LOẠI ĐẠN
-    ));
+        bulletDTOs.add(new BulletSnapshotDTO(bullet.getId(), bullet.getOwnerId(), bullet.getX(), bullet.getY(), bullet.getVx(), bullet.getVy()));
     }
 
     List<ItemSnapshotDTO> itemDTOs = new ArrayList<>();
