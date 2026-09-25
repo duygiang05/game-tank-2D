@@ -1,0 +1,152 @@
+/* ================================
+   TANK 2D ONLINE - LIGHT THEME
+   ================================ */
+
+.root {
+    -fx-background-color: #f5f7fb;
+    -fx-font-family: "Arial";
+}
+
+/* ---------- Label ---------- */
+
+.label {
+    -fx-text-fill: #1f2937;
+}
+
+/* ---------- Button ---------- */
+
+.button {
+    -fx-background-color: #2563eb;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-padding: 10px 20px;
+    -fx-cursor: hand;
+}
+
+.button:hover {
+    -fx-background-color: #1d4ed8;
+}
+
+.button:pressed {
+    -fx-background-color: #1e40af;
+}
+
+/* ---------- ListView ---------- */
+
+.list-view {
+    -fx-background-color: white;
+    -fx-border-color: #dbe2ea;
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+}
+
+/* ---------- List Cell ---------- */
+
+.list-cell {
+    -fx-background-color: white;
+    -fx-text-fill: #1f2937;
+    -fx-font-size: 15px;
+    -fx-padding: 12px;
+}
+
+.list-cell:hover {
+    -fx-background-color: #eff6ff;
+}
+
+.list-cell:selected {
+    -fx-background-color: #2563eb;
+    -fx-text-fill: white;
+}
+
+/* ---------- TextField ---------- */
+
+.text-field,
+.password-field {
+    -fx-background-color: white;
+    -fx-text-fill: #1f2937;
+    -fx-prompt-text-fill: #9ca3af;
+    -fx-border-color: #d1d5db;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 9px 12px;
+}
+
+.text-field:focused,
+.password-field:focused {
+    -fx-border-color: #2563eb;
+    -fx-border-width: 2px;
+}
+
+/* ---------- ComboBox ---------- */
+
+.combo-box {
+    -fx-background-color: white;
+    -fx-border-color: #d1d5db;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+}
+
+.combo-box .list-cell {
+    -fx-background-color: white;
+    -fx-text-fill: #1f2937;
+}
+
+/* ---------- Status ---------- */
+
+#statusLabel {
+    -fx-text-fill: #6b7280;
+    -fx-font-size: 14px;
+}
+
+/* ---------- Title ---------- */
+
+#titleLabel {
+    -fx-text-fill: #111827;
+    -fx-font-weight: bold;
+}
+
+/* ---------- Secondary Button ---------- */
+
+.secondary-button {
+    -fx-background-color: #2563eb;
+    -fx-text-fill: white;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 10px;
+    -fx-border-radius: 10px;
+}
+
+.secondary-button:hover {
+    -fx-background-color: #1d4ed8;
+}
+.secondary-button:hover {
+    -fx-background-color: #d1d5db;
+}
+
+/* ---------- Logout Button ---------- */
+
+.logout-button {
+    -fx-background-color: #ef4444;
+}
+
+.logout-button:hover {
+    -fx-background-color: #dc2626;
+}
+
+/* ---------- Start Button ---------- */
+
+.start-button {
+    -fx-background-color: #2563eb;
+    -fx-text-fill: white;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 10px;
+    -fx-padding: 12px 30px;
+}
+
+.start-button:hover {
+    -fx-background-color: #1d4ed8;
+}

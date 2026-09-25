@@ -3,109 +3,145 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.text.Font?>
 
-<VBox alignment="CENTER"
-      spacing="15.0"
-      prefHeight="400.0"
-      prefWidth="600.0"
-      xmlns="http://javafx.com/javafx/21"
-      xmlns:fx="http://javafx.com/fxml/1"
-      fx:controller="com.tank2d.client.controller.LoginController">
+<BorderPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.tank2d.client.controller.LoginController"
+            stylesheets="@theme.css"
+            prefWidth="800.0"
+            prefHeight="600.0">
 
-    <children>
+    <center>
 
-        <!-- Login Form -->
-        <VBox fx:id="loginForm"
-              alignment="CENTER"
-              spacing="15.0">
+        <StackPane alignment="CENTER">
 
             <children>
 
-                <Label text="Tank 2D">
-                    <font>
-                        <Font size="24.0"/>
-                    </font>
-                </Label>
+                <!-- Login Form -->
+                <VBox fx:id="loginForm"
+                      alignment="CENTER"
+                      spacing="15.0"
+                      maxWidth="380.0"
+                      maxHeight="400.0"
+                      style="-fx-background-color: white;
+                             -fx-background-radius: 18;
+                             -fx-padding: 35;
+                             -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.12), 15, 0, 0, 5);">
 
-                <Label text="Login">
-                    <font>
-                        <Font size="18.0"/>
-                    </font>
-                </Label>
+                    <children>
 
-                <TextField fx:id="usernameField"
-                           prefWidth="300.0"
-                           promptText="Username"/>
+                       <ImageView fitWidth="220.0"
+           fitHeight="140.0"
+           preserveRatio="true">
+    <image>
+        <Image url="@tank-logo_1.png"/>
+    </image>
+</ImageView>
 
-                <PasswordField fx:id="passwordField"
-                               prefWidth="300.0"
-                               promptText="Password"/>
+<Label text="TANK 2D ONLINE"
+       style="-fx-text-fill: #2563eb;
+              -fx-font-size: 24px;
+              -fx-font-weight: bold;"/>
 
-                <Button fx:id="loginButton"
-                        text="Login"
-                        prefWidth="120.0"
-                        prefHeight="35.0"
-                        onAction="#handleLogin"/>
+                        <Label text="Đăng nhập"
+                               style="-fx-text-fill: #374151;
+                                      -fx-font-size: 20px;
+                                      -fx-font-weight: bold;"/>
 
-                <Button text="Register"
-                        prefWidth="120.0"
-                        prefHeight="35.0"
-                        onAction="#showRegister"/>
+                        <TextField fx:id="usernameField"
+                                   prefWidth="300.0"
+                                   prefHeight="42.0"
+                                   promptText="Username"/>
+
+                        <PasswordField fx:id="passwordField"
+                                       prefWidth="300.0"
+                                       prefHeight="42.0"
+                                       promptText="Password"/>
+
+                        <Button fx:id="loginButton"
+                                text="Đăng nhập"
+                                prefWidth="180.0"
+                                prefHeight="42.0"
+                                styleClass="start-button"
+                                onAction="#handleLogin"/>
+
+                        <Button text="Đăng ký"
+                                prefWidth="180.0"
+                                prefHeight="40.0"
+                                styleClass="secondary-button"
+                                onAction="#showRegister"/>
+
+                    </children>
+
+                </VBox>
+
+                <!-- Register Form -->
+                <VBox fx:id="registerForm"
+                      alignment="CENTER"
+                      spacing="15.0"
+                      maxWidth="400.0"
+                      maxHeight="520.0"
+                      visible="false"
+                      managed="false"
+                      style="-fx-background-color: white;
+                             -fx-background-radius: 18;
+                             -fx-padding: 35;
+                             -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.12), 15, 0, 0, 5);">
+
+                    <children>
+
+                        <Label text="TANK 2D ONLINE"
+                               style="-fx-text-fill: #2563eb;
+                                      -fx-font-size: 28px;
+                                      -fx-font-weight: bold;"/>
+
+                        <Label text="Đăng ký"
+                               style="-fx-text-fill: #374151;
+                                      -fx-font-size: 20px;
+                                      -fx-font-weight: bold;"/>
+
+                        <TextField fx:id="registerUsernameField"
+                                   prefWidth="300.0"
+                                   prefHeight="42.0"
+                                   promptText="Username"/>
+
+                        <PasswordField fx:id="registerPasswordField"
+                                       prefWidth="300.0"
+                                       prefHeight="42.0"
+                                       promptText="Password"/>
+
+                        <PasswordField fx:id="confirmPasswordField"
+                                       prefWidth="300.0"
+                                       prefHeight="42.0"
+                                       promptText="Confirm Password"/>
+
+                        <Button text="Đăng ký"
+                                prefWidth="180.0"
+                                prefHeight="42.0"
+                                styleClass="start-button"
+                                onAction="#handleRegister"/>
+
+                        <Button text="Quay lại đăng nhập"
+                                prefWidth="180.0"
+                                prefHeight="40.0"
+                                styleClass="secondary-button"
+                                onAction="#showLogin"/>
+
+                    </children>
+
+                </VBox>
 
             </children>
 
-        </VBox>
+        </StackPane>
 
-        <!-- Register Form -->
-        <VBox fx:id="registerForm"
-              alignment="CENTER"
-              spacing="15.0"
-              visible="false"
-              managed="false">
+    </center>
 
-            <children>
-
-                <Label text="Tank 2D">
-                    <font>
-                        <Font size="24.0"/>
-                    </font>
-                </Label>
-
-                <Label text="Register">
-                    <font>
-                        <Font size="18.0"/>
-                    </font>
-                </Label>
-
-                <TextField fx:id="registerUsernameField"
-                           prefWidth="300.0"
-                           promptText="Username"/>
-
-                <PasswordField fx:id="registerPasswordField"
-                               prefWidth="300.0"
-                               promptText="Password"/>
-
-                <PasswordField fx:id="confirmPasswordField"
-                               prefWidth="300.0"
-                               promptText="Confirm Password"/>
-
-                <Button text="Register"
-                        prefWidth="120.0"
-                        prefHeight="35.0"
-                        onAction="#handleRegister"/>
-
-                <Button text="Login"
-                        prefWidth="120.0"
-                        prefHeight="35.0"
-                        onAction="#showLogin"/>
-
-            </children>
-
-        </VBox>
-
-    </children>
-
-</VBox>
+</BorderPane>

@@ -36,6 +36,12 @@ public class LobbyController {
     private Button joinRoomButton;
 
     @FXML
+    private Button leaderboardButton;
+
+    @FXML
+    private Button logoutButton;
+
+    @FXML
     private Label statusLabel;
 
     @FXML
@@ -308,6 +314,10 @@ public class LobbyController {
 
                 break;
 
+            case ROOM_LIST_UPDATE:
+                handleLobbyRoomsUpdate(packet.getData());
+                break;
+
             /*
              * Server trả thông tin phòng
              * sau khi Create hoặc Join.
@@ -502,9 +512,8 @@ public class LobbyController {
                                 .getWindow();
 
                 stage.setScene(
-                        new Scene(root)
+                        new Scene(root, 800, 600)
                 );
-
                 stage.setTitle(
                         "Tank 2D Online - "
                         + room.getRoomName()
@@ -524,6 +533,97 @@ public class LobbyController {
                 );
             }
         });
+    }
+
+    @FXML
+    private void handleLogout() {
+
+        try {
+            ClientSocket clientSocket = session.getClientSocket();
+
+            if (clientSocket != null && clientSocket.isConnected()) {
+
+                Packet request = new Packet(
+                        PacketType.LOGOUT_REQ,
+                        ""
+                );
+
+                clientSocket.sendPacket(request);
+            }
+
+            // Xóa listener của Lobby
+            session.removePacketListener(packetListener);
+
+            // Đóng session và xóa currentUser
+            session.close();
+
+            // Quay về Login
+            FXMLLoader loader = new FXMLLoader(
+                    getClass().getResource(
+                            "/com/tank2d/client/view/login.fxml"
+                    )
+            );
+
+            Parent root = loader.load();
+
+            Stage stage = (Stage) logoutButton
+                    .getScene()
+                    .getWindow();
+
+            stage.setScene(new Scene(root, 800, 600));
+            stage.setTitle("Tank 2D Online - Login");
+            stage.show();
+
+        } catch (IOException e) {
+
+            System.err.println(
+                    "[Lobby] Lỗi Logout: "
+                    + e.getMessage()
+            );
+
+            showError("Không thể đăng xuất!");
+        }
+    }
+
+    @FXML
+    private void handleLeaderboard() {
+
+        try {
+
+            FXMLLoader loader = new FXMLLoader(
+                    getClass().getResource(
+                            "/com/tank2d/client/view/leaderboard.fxml"
+                    )
+            );
+
+            Parent root = loader.load();
+
+            // Không để Lobby tiếp tục nhận packet
+            session.removePacketListener(packetListener);
+
+            Stage stage = (Stage) leaderboardButton
+                    .getScene()
+                    .getWindow();
+
+            stage.setScene(new Scene(root, 800, 600));
+
+            stage.setTitle(
+                    "Tank 2D Online - Leaderboard"
+            );
+
+            stage.show();
+
+        } catch (IOException e) {
+
+            System.err.println(
+                    "[Lobby] Không thể mở Leaderboard: "
+                    + e.getMessage()
+            );
+
+            showError(
+                    "Không thể mở bảng xếp hạng!"
+            );
+        }
     }
 
     /**
