@@ -33,6 +33,24 @@ public class AssetLoader {
         return imageCache.get(path);
     }
 
+    /*
+     * Lấy ảnh vật phẩm bổ trợ theo loại (Type):
+     * 1: Túi máu (tiles/medkit.png)
+     * 2: Khiên chắn (tiles/shield.png)
+     * 3: Bình khí tăng tốc (tiles/speed_boots.png)
+     * 4: Đạn tên lửa (bullets/missile.png)
+     */
+    public static Image getPowerUpImage(String type) {
+        if (type == null) return null;
+        switch (type.toUpperCase()) {
+            case "HEALTH_PACK": return getImage("tiles/health_pack.png");
+            case "SHIELD": return getImage("tiles/shield.png");
+            case "NITRO": return getImage("tiles/nitro.png");
+            case "ROCKET_AMMO": return getImage("bullets/rocket_ammo.png");
+            default: return null;
+        }
+    }
+    
     // Nạp cấu hình màu sắc từ file JSON cấu hình
     public static JsonObject getColorTheme() {
         if (colorConfig == null) {

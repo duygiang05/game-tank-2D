@@ -12,6 +12,7 @@ import com.tank2d.common.dto.game.BulletSnapshotDTO;
 import com.tank2d.common.dto.game.GameEventEffectDTO;
 import com.tank2d.common.dto.game.GameOverDTO;
 import com.tank2d.common.dto.game.GameSnapshotDTO;
+import com.tank2d.common.dto.game.ItemSnapshotDTO;
 import com.tank2d.common.dto.game.TankPlayerDTO;
 import com.tank2d.common.dto.game.TankSnapshotDTO;
 import com.tank2d.common.protocol.Packet;
@@ -85,6 +86,7 @@ public class GameCanvasApp extends Application {
     private final List<ExplosionEffect> explosions = new CopyOnWriteArrayList<>();
     private final List<TankPlayerDTO> tankPlayers = new CopyOnWriteArrayList<>();
     private final Map<Integer, TankSnapshotDTO> globalPlayerStates = new ConcurrentHashMap<>();
+    private final List<ItemSnapshotDTO> items = new CopyOnWriteArrayList<>();
 
     // --- DỮ LIỆU ĐỊA HÌNH & THỜI GIAN ---
     private int[][] mapMatrix;
@@ -264,6 +266,11 @@ public class GameCanvasApp extends Application {
         if (packet.getType() == PacketType.GAME_SNAPSHOT) {
             GameSnapshotDTO snapshot = gson.fromJson(packet.getData(), GameSnapshotDTO.class);
             if (snapshot != null) {
+                if (snapshot.getItems() != null) {
+                    this.items.clear();
+                    this.items.addAll(snapshot.getItems());
+                }
+                
                 if (snapshot.getBullets() != null) {
                     this.bullets.clear();
                     this.bullets.addAll(snapshot.getBullets());
@@ -278,12 +285,13 @@ public class GameCanvasApp extends Application {
                         globalPlayerStates.put(incoming.getId(), incoming);
 
                         if (displayTanks.containsKey(incoming.getId())) {
-                            updateTankHpAndStatus(displayTanks.get(incoming.getId()), incoming.getHp(), incoming.isAlive());
+                            updateTankHpAndStatus(displayTanks.get(incoming.getId()), incoming);
                         } else {
                             displayTanks.put(incoming.getId(), 
                                 new TankSnapshotDTO(incoming.getId(), incoming.getX(), incoming.getY(), 
-                                                    incoming.getAngle(), incoming.getHp(), incoming.isAlive()));
-                        }
+                                incoming.getAngle(), incoming.getHp(), incoming.isAlive(),
+                                incoming.isGhost(), incoming.hasShield(), incoming.hasNitro()));
+}
                     }
 
                     displayTanks.keySet().removeIf(id -> !activeTankIds.contains(id));
@@ -398,7 +406,7 @@ public class GameCanvasApp extends Application {
 
                 // 2. Render Ma trận tường
                 renderTerrainAndWalls();
-
+                renderItems();
                 // 3. Render Đạn, Xe & Hiệu ứng nổ
                 renderBullets();
                 renderTanks();
@@ -430,7 +438,7 @@ public class GameCanvasApp extends Application {
                 current.setY(newY);
                 current.setAngle(newAngle);
                 
-                updateTankHpAndStatus(current, target.getHp(), target.isAlive());
+                updateTankHpAndStatus(current, target);
                 
                 if (globalPlayerStates.containsKey(tankId)) {
                     globalPlayerStates.get(tankId).setHp(target.getHp());
@@ -442,16 +450,18 @@ public class GameCanvasApp extends Application {
         explosions.removeIf(exp -> exp.finished);
     }
 
-    private void updateTankHpAndStatus(TankSnapshotDTO dto, int hp, boolean isAlive) {
+    private void updateTankHpAndStatus(TankSnapshotDTO dto, TankSnapshotDTO target) {
+        dto.setHp(target.getHp());
         try {
-            java.lang.reflect.Field hpField = TankSnapshotDTO.class.getDeclaredField("hp");
-            hpField.setAccessible(true);
-            hpField.setInt(dto, hp);
+        java.lang.reflect.Field aliveField = TankSnapshotDTO.class.getDeclaredField("isAlive");
+        aliveField.setAccessible(true);
+        aliveField.setBoolean(dto, target.isAlive());
+        }catch (Exception ignored) {}
 
-            java.lang.reflect.Field aliveField = TankSnapshotDTO.class.getDeclaredField("isAlive");
-            aliveField.setAccessible(true);
-            aliveField.setBoolean(dto, isAlive);
-        } catch (Exception ignored) {}
+    // Đồng bộ các trạng thái Buff & Ghost từ target
+        dto.setGhost(target.isGhost());
+        dto.setShield(target.hasShield());
+        dto.setNitro(target.hasNitro());
     }
 
     private void renderTerrainAndWalls() {
@@ -495,6 +505,45 @@ public class GameCanvasApp extends Application {
             }
         }
     }
+    
+    private void renderItems() {
+    if (items.isEmpty()) return;
+
+    double itemSize = 22.0;
+
+    for (ItemSnapshotDTO item : items) {
+        double x = item.getX();
+        double y = item.getY();
+        String type = item.getType();
+        
+        // Chuẩn hóa chuỗi an toàn null-safe
+        String normalizedType = (type != null) ? type.toUpperCase() : "";
+
+        Image itemImg = AssetLoader.getPowerUpImage(normalizedType);
+
+        gc.save();
+
+        // Vẽ hiệu ứng bóng/đệm nhẹ
+        gc.setFill(Color.rgb(255, 255, 255, 0.25));
+        gc.fillOval(x - itemSize / 1.5, y - itemSize / 1.5, itemSize * 1.33, itemSize * 1.33);
+
+        if (itemImg != null && !itemImg.isError()) {
+            gc.drawImage(itemImg, x - itemSize / 2.0, y - itemSize / 2.0, itemSize, itemSize);
+        } else {
+            // Fallback khi chưa tải được ảnh
+            switch (normalizedType) {
+                case "HEALTH_PACK" -> gc.setFill(Color.RED);
+                case "SHIELD" -> gc.setFill(Color.DODGERBLUE);
+                case "NITRO" -> gc.setFill(Color.ORANGE);
+                case "ROCKET_AMMO" -> gc.setFill(Color.PURPLE);
+                default -> gc.setFill(Color.WHITE);
+            }
+            gc.fillRect(x - itemSize / 2.0, y - itemSize / 2.0, itemSize, itemSize);
+        }
+
+        gc.restore();
+    }
+}
 
     private void renderBushes() {
         if (mapMatrix == null) return;
@@ -568,99 +617,160 @@ public class GameCanvasApp extends Application {
         return null;
     }
 
+    private boolean isTankGhost(TankSnapshotDTO tank) {
+        return tank != null && tank.isGhost();
+    }
+
+    private boolean hasTankShield(TankSnapshotDTO tank) {
+        return tank != null && tank.hasShield();
+    }
+
+    private boolean hasTankNitro(TankSnapshotDTO tank) {
+        return tank != null && tank.hasNitro();
+    }
+    
     private void renderTanks() {
-        String[] tankImageAssets = {
-            "tiles/green_tank.png",
-            "tiles/red_tank.png",
-            "tiles/purple_tank.png",
-            "tiles/yellow_tank.png"
-        };
+    String[] tankImageAssets = {
+        "tiles/green_tank.png",
+        "tiles/red_tank.png",
+        "tiles/purple_tank.png",
+        "tiles/yellow_tank.png"
+    };
 
-        Color[] fallbackColors = {
-            Color.web("#4CAF50"),
-            Color.web("#F44336"),
-            Color.web("#9C27B0"),
-            Color.web("#FFC107")
-        };
+    Color[] fallbackColors = {
+        Color.web("#4CAF50"),
+        Color.web("#F44336"),
+        Color.web("#9C27B0"),
+        Color.web("#FFC107")
+    };
 
-        for (TankSnapshotDTO tank : displayTanks.values()) {
-            if (!tank.isAlive()) continue;
+    for (TankSnapshotDTO tank : displayTanks.values()) {
+        if (!tank.isAlive()) continue;
 
-            boolean isMyTank = (tank.getId() == myTankId);
-            boolean inBush = isTankInBush(tank.getX(), tank.getY());
+        boolean isMyTank = (tank.getId() == myTankId);
+        boolean inBush = isTankInBush(tank.getX(), tank.getY());
 
-            if (inBush && !isMyTank) {
-                continue; 
-            }
+        if (inBush && !isMyTank) {
+            continue; 
+        }
 
-            int colorIdx = Math.abs(tank.getId() - 1) % tankImageAssets.length;
-            Image tankSprite = AssetLoader.getImage(tankImageAssets[colorIdx]);
+        boolean isGhostState = isTankGhost(tank);
+        boolean hasShield = hasTankShield(tank);
+        boolean hasNitro = hasTankNitro(tank);
 
-            gc.save(); 
-            
-            if (inBush && isMyTank) {
-                gc.setGlobalAlpha(0.45);
-            }
+        int colorIdx = Math.abs(tank.getId() - 1) % tankImageAssets.length;
+        Image tankSprite = AssetLoader.getImage(tankImageAssets[colorIdx]);
 
-            gc.translate(tank.getX(), tank.getY());
-            gc.rotate(tank.getAngle() + 90.0);
+        gc.save(); 
 
-            if (tankSprite != null && !tankSprite.isError()) {
-                gc.drawImage(tankSprite, -tankSize / 2.0, -tankSize / 2.0, tankSize, tankSize);
-            } else {
-                Color bodyColor = fallbackColors[colorIdx];
-                
-                gc.setFill(Color.web("#333333"));
-                gc.fillRect(-tankSize / 2.0 - 2, -tankSize / 2.0, 5, tankSize);
-                gc.fillRect(tankSize / 2.0 - 3, -tankSize / 2.0, 5, tankSize);
-                
-                gc.setFill(bodyColor);
-                gc.fillRect(-tankSize / 2.0 + 3, -tankSize / 2.0, tankSize - 6, tankSize);
-                
-                gc.setFill(Color.BLACK);
-                gc.fillRect(-2.5, -tankSize / 2.0 - 10, 5, 12);
-                gc.setFill(Color.web("#212121"));
-                gc.fillOval(-7, -7, 14, 14);
-            }
-            gc.restore(); 
+        // 1. Xe ở trạng thái bảo hộ sau hồi sinh (Ghost): Mờ 50% opacity
+        if (isGhostState) {
+            gc.setGlobalAlpha(0.5);
+        } else if (inBush && isMyTank) {
+            gc.setGlobalAlpha(0.45);
+        }
 
-            // Render Thanh Máu & Tên người chơi
+        // 2. Tác dụng Nitro: Vẽ vệt lửa tăng tốc nhấp nháy sau đuôi xe
+        if (hasNitro) {
             gc.save();
-            if (inBush && isMyTank) {
-                gc.setGlobalAlpha(0.5);
-            }
+            gc.translate(tank.getX(), tank.getY());
+            gc.rotate(tank.getAngle() + 90.0); // Xoay theo hướng thân xe
 
-            double barWidth = this.tankSize;
-            double barHeight = 5.0;
-            double barX = tank.getX() - barWidth / 2.0;
-            double barY = tank.getY() - tankSize / 2.0 - 8.0;
-
-            String username = getUsernameByTankId(tank.getId());
-            if (username != null) {
-                gc.setFill(Color.WHITE);
-                gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
-                double textWidth = username.length() * 6.5;
-                gc.fillText(username, tank.getX() - textWidth / 2.0, barY - 6);
-            }
-
-            gc.setFill(Color.DARKRED);
-            gc.fillRect(barX, barY, barWidth, barHeight);
-
-            int currentHp = (int) Math.max(0, Math.min(maxHp, tank.getHp()));
-            double hpWidth = (barWidth / maxHp) * currentHp;
-            gc.setFill(Color.LIME);
-            gc.fillRect(barX, barY, hpWidth, barHeight);
-
-            gc.setStroke(Color.BLACK);
-            gc.setLineWidth(1);
-            gc.strokeRect(barX, barY, barWidth, barHeight);
-            for (int i = 1; i < maxHp; i++) {
-                double lineX = barX + (barWidth / maxHp) * i;
-                gc.strokeLine(lineX, barY, lineX, barY + barHeight);
-            }
+            double flameLength = 12 + Math.random() * 8; // Vệt lửa rung nhẹ nhấp nháy
+            
+            // Lớp lửa cam đỏ phía ngoài
+            gc.setFill(Color.ORANGERED);
+            gc.fillPolygon(
+                new double[]{-6, 0, 6},
+                new double[]{tankSize / 2.0, tankSize / 2.0 + flameLength, tankSize / 2.0}, 3
+            );
+            // Lớp lửa vàng lõi bên trong
+            gc.setFill(Color.YELLOW);
+            gc.fillPolygon(
+                new double[]{-3, 0, 3},
+                new double[]{tankSize / 2.0, tankSize / 2.0 + (flameLength * 0.6), tankSize / 2.0}, 3
+            );
             gc.restore();
         }
+
+        // 3. Vẽ Thân xe
+        gc.translate(tank.getX(), tank.getY());
+        gc.rotate(tank.getAngle() + 90.0);
+
+        if (tankSprite != null && !tankSprite.isError()) {
+            gc.drawImage(tankSprite, -tankSize / 2.0, -tankSize / 2.0, tankSize, tankSize);
+        } else {
+            Color bodyColor = fallbackColors[colorIdx];
+            
+            gc.setFill(Color.web("#333333"));
+            gc.fillRect(-tankSize / 2.0 - 2, -tankSize / 2.0, 5, tankSize);
+            gc.fillRect(tankSize / 2.0 - 3, -tankSize / 2.0, 5, tankSize);
+            
+            gc.setFill(bodyColor);
+            gc.fillRect(-tankSize / 2.0 + 3, -tankSize / 2.0, tankSize - 6, tankSize);
+            
+            gc.setFill(Color.BLACK);
+            gc.fillRect(-2.5, -tankSize / 2.0 - 10, 5, 12);
+            gc.setFill(Color.web("#212121"));
+            gc.fillOval(-7, -7, 14, 14);
+        }
+        gc.restore(); 
+
+        // 4. Tác dụng Khiên: Vẽ vòng hào quang bảo vệ bao quanh xe
+        if (hasShield) {
+            gc.save();
+            double shieldRadius = tankSize * 1.5;
+            
+            // Vòng sáng Cyan bên ngoài
+            gc.setStroke(Color.CYAN);
+            gc.setLineWidth(2.5);
+            gc.strokeOval(tank.getX() - shieldRadius / 2.0, tank.getY() - shieldRadius / 2.0, shieldRadius, shieldRadius);
+
+            // Lớp đệm mờ phía trong
+            gc.setFill(Color.rgb(0, 255, 255, 0.25));
+            gc.fillOval(tank.getX() - shieldRadius / 2.0, tank.getY() - shieldRadius / 2.0, shieldRadius, shieldRadius);
+            gc.restore();
+        }
+
+        // 5. Render Thanh Máu & Tên người chơi
+        gc.save();
+        if (isGhostState) {
+            gc.setGlobalAlpha(0.6);
+        } else if (inBush && isMyTank) {
+            gc.setGlobalAlpha(0.5);
+        }
+
+        double barWidth = this.tankSize;
+        double barHeight = 5.0;
+        double barX = tank.getX() - barWidth / 2.0;
+        double barY = tank.getY() - tankSize / 2.0 - 8.0;
+
+        String username = getUsernameByTankId(tank.getId());
+        if (username != null) {
+            gc.setFill(Color.WHITE);
+            gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
+            double textWidth = username.length() * 6.5;
+            gc.fillText(username, tank.getX() - textWidth / 2.0, barY - 6);
+        }
+
+        gc.setFill(Color.DARKRED);
+        gc.fillRect(barX, barY, barWidth, barHeight);
+
+        int currentHp = (int) Math.max(0, Math.min(maxHp, tank.getHp()));
+        double hpWidth = (barWidth / maxHp) * currentHp;
+        gc.setFill(Color.LIME);
+        gc.fillRect(barX, barY, hpWidth, barHeight);
+
+        gc.setStroke(Color.BLACK);
+        gc.setLineWidth(1);
+        gc.strokeRect(barX, barY, barWidth, barHeight);
+        for (int i = 1; i < maxHp; i++) {
+            double lineX = barX + (barWidth / maxHp) * i;
+            gc.strokeLine(lineX, barY, lineX, barY + barHeight);
+        }
+        gc.restore();
     }
+}
 
     private void renderExplosions() {
         for (ExplosionEffect exp : explosions) {
