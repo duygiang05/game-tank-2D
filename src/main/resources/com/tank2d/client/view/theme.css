@@ -1,152 +1,101 @@
-/* ================================
-   TANK 2D ONLINE - LIGHT THEME
-   ================================ */
+/* ========================================================
+   TANK 2D ONLINE - MODERN LIGHT GAMING THEME
+   ======================================================== */
 
-.root {
-    -fx-background-color: #f5f7fb;
-    -fx-font-family: "Arial";
+.root, .root-pane {
+    -fx-background-color: #f1f5f9;
+    -fx-font-family: "Segoe UI", "Arial", sans-serif;
 }
 
-/* ---------- Label ---------- */
-
-.label {
-    -fx-text-fill: #1f2937;
+/* Khối Card trắng trung tâm ôm khít form */
+.auth-card {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 18px;
+    -fx-padding: 24px 35px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.09), 18, 0, 0, 5);
 }
 
-/* ---------- Button ---------- */
+/* Định dạng ô nhập liệu */
+.auth-field {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #0f172a;
+    -fx-prompt-text-fill: #94a3b8;
+    -fx-border-color: #cbd5e1;
+    -fx-border-width: 1.4px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 0 12px;
+    -fx-font-size: 13.5px;
+}
 
-.button {
+.auth-field:focused {
+    -fx-border-color: #2563eb;
+    -fx-border-width: 1.8px;
+    -fx-background-color: #fafcff;
+    -fx-effect: dropshadow(three-pass-box, rgba(37, 99, 235, 0.18), 8, 0, 0, 0);
+}
+
+/* Nút chính: Đăng nhập (Màu xanh dương Game) */
+.btn-primary {
     -fx-background-color: #2563eb;
     -fx-text-fill: white;
-    -fx-font-size: 14px;
     -fx-font-weight: bold;
+    -fx-font-size: 14px;
     -fx-background-radius: 8px;
     -fx-border-radius: 8px;
-    -fx-padding: 10px 20px;
     -fx-cursor: hand;
+    -fx-effect: dropshadow(three-pass-box, rgba(37, 99, 235, 0.35), 8, 0, 0, 3);
 }
 
-.button:hover {
+.btn-primary:hover {
     -fx-background-color: #1d4ed8;
+    -fx-effect: dropshadow(three-pass-box, rgba(29, 78, 216, 0.5), 10, 0, 0, 4);
 }
 
-.button:pressed {
+.btn-primary:pressed {
     -fx-background-color: #1e40af;
 }
 
-/* ---------- ListView ---------- */
-
-.list-view {
-    -fx-background-color: white;
-    -fx-border-color: #dbe2ea;
-    -fx-border-radius: 10px;
-    -fx-background-radius: 10px;
-}
-
-/* ---------- List Cell ---------- */
-
-.list-cell {
-    -fx-background-color: white;
-    -fx-text-fill: #1f2937;
-    -fx-font-size: 15px;
-    -fx-padding: 12px;
-}
-
-.list-cell:hover {
-    -fx-background-color: #eff6ff;
-}
-
-.list-cell:selected {
-    -fx-background-color: #2563eb;
+/* Nút chính form Đăng ký: Tạo tài khoản (Xanh lá) */
+.btn-success {
+    -fx-background-color: #16a34a;
     -fx-text-fill: white;
-}
-
-/* ---------- TextField ---------- */
-
-.text-field,
-.password-field {
-    -fx-background-color: white;
-    -fx-text-fill: #1f2937;
-    -fx-prompt-text-fill: #9ca3af;
-    -fx-border-color: #d1d5db;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
-    -fx-padding: 9px 12px;
-}
-
-.text-field:focused,
-.password-field:focused {
-    -fx-border-color: #2563eb;
-    -fx-border-width: 2px;
-}
-
-/* ---------- ComboBox ---------- */
-
-.combo-box {
-    -fx-background-color: white;
-    -fx-border-color: #d1d5db;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
-}
-
-.combo-box .list-cell {
-    -fx-background-color: white;
-    -fx-text-fill: #1f2937;
-}
-
-/* ---------- Status ---------- */
-
-#statusLabel {
-    -fx-text-fill: #6b7280;
+    -fx-font-weight: bold;
     -fx-font-size: 14px;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(three-pass-box, rgba(22, 163, 74, 0.35), 8, 0, 0, 3);
 }
 
-/* ---------- Title ---------- */
+.btn-success:hover {
+    -fx-background-color: #15803d;
+    -fx-effect: dropshadow(three-pass-box, rgba(21, 128, 61, 0.5), 10, 0, 0, 4);
+}
 
-#titleLabel {
-    -fx-text-fill: #111827;
+.btn-success:pressed {
+    -fx-background-color: #166534;
+}
+
+/* Nút phụ: Chuyển form (Dạng viền mỏng) */
+.btn-outline {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #475569;
     -fx-font-weight: bold;
+    -fx-font-size: 12.5px;
+    -fx-border-color: #cbd5e1;
+    -fx-border-width: 1.5px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-cursor: hand;
 }
 
-/* ---------- Secondary Button ---------- */
-
-.secondary-button {
-    -fx-background-color: #2563eb;
-    -fx-text-fill: white;
-    -fx-font-size: 15px;
-    -fx-font-weight: bold;
-    -fx-background-radius: 10px;
-    -fx-border-radius: 10px;
+.btn-outline:hover {
+    -fx-background-color: #f8fafc;
+    -fx-text-fill: #1e293b;
+    -fx-border-color: #94a3b8;
 }
 
-.secondary-button:hover {
-    -fx-background-color: #1d4ed8;
-}
-.secondary-button:hover {
-    -fx-background-color: #d1d5db;
-}
-
-/* ---------- Logout Button ---------- */
-
-.logout-button {
-    -fx-background-color: #ef4444;
-}
-
-.logout-button:hover {
-    -fx-background-color: #dc2626;
-}
-
-/* ---------- Start Button ---------- */
-
-.start-button {
-    -fx-background-color: #2563eb;
-    -fx-text-fill: white;
-    -fx-font-size: 16px;
-    -fx-font-weight: bold;
-    -fx-background-radius: 10px;
-    -fx-padding: 12px 30px;
-}
-
-.start-button:hover {
-    -fx-background-color: #1d4ed8;
+.btn-outline:pressed {
+    -fx-background-color: #f1f5f9;
 }
