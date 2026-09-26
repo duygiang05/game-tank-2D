@@ -317,17 +317,27 @@ public class GameCanvasApp extends Application {
             GameEventEffectDTO effect = gson.fromJson(packet.getData(), GameEventEffectDTO.class);
             if (effect != null) {
                 String eventType = effect.getEventType() != null ? effect.getEventType().toUpperCase() : "";
-                if ("EXPLOSION".equalsIgnoreCase(eventType)) {
+                
+                if ("EXPLOSION".equalsIgnoreCase(eventType) || "WALL_BREAK".equalsIgnoreCase(eventType)) {
                     explosions.add(new ExplosionEffect(effect.getX(), effect.getY()));
-                } else if (eventType.contains("BRICK") || eventType.contains("TILE") || eventType.contains("WALL")) {
-                    int c = (int) Math.floor(effect.getX() / tileSize);
-                    int r = (int) Math.floor(effect.getY() / tileSize);
+                } 
+                else if (eventType.contains("WALL") || eventType.contains("BRICK") || eventType.contains("TILE")) {
+                    // Tọa độ Server gửi về là tâm ô gạch (centerX, centerY)
+                    int c = (int) (effect.getX() / tileSize);
+                    int r = (int) (effect.getY() / tileSize);
+
                     if (mapMatrix != null && r >= 0 && r < mapMatrix.length && c >= 0 && c < mapMatrix[0].length) {
                         if (mapMatrix[r][c] == 2) {
                             brickHitsLeft[r][c]--;
-                            if (brickHitsLeft[r][c] <= 0) mapMatrix[r][c] = 0;
+                            if (brickHitsLeft[r][c] <= 0) {
+                                mapMatrix[r][c] = 0;
+                            }
                         }
                     }
+                    // Tạo một cụm khói/bụi nhỏ tại điểm va chạm
+                    explosions.add(new ExplosionEffect(effect.getX(), effect.getY()));
+                } 
+                else if (eventType.startsWith("ITEM_PICKUP")) {
                     explosions.add(new ExplosionEffect(effect.getX(), effect.getY()));
                 }
             }
@@ -469,6 +479,8 @@ public class GameCanvasApp extends Application {
 
         Image stoneImg = AssetLoader.getImage("tiles/stone_wall.png");
         Image brickImg = AssetLoader.getImage("tiles/brick_wall.png");
+        Image brickCrackedImg = AssetLoader.getImage("tiles/brick_wall_cracked.png");
+        Image brickDamagedImg = AssetLoader.getImage("tiles/brick_wall_damaged.png");
 
         for (int r = 0; r < mapMatrix.length; r++) {
             for (int c = 0; c < mapMatrix[r].length; c++) {
@@ -479,8 +491,12 @@ public class GameCanvasApp extends Application {
                 if (tileType == 0) continue;
 
                 if (tileType == 1) { // Tường đá
-                    if (stoneImg != null) gc.drawImage(stoneImg, x, y, tileSize, tileSize);
-                    else { gc.setFill(Color.GRAY); gc.fillRect(x, y, tileSize, tileSize); }
+                    if (stoneImg != null && !stoneImg.isError()) {
+                        gc.drawImage(stoneImg, x, y, tileSize, tileSize);
+                    } else {
+                        gc.setFill(Color.GRAY);
+                        gc.fillRect(x, y, tileSize, tileSize);
+                    }
                 } else if (tileType == 2) { // Tường gạch
                     int hp = brickHitsLeft[r][c];
 
@@ -489,17 +505,30 @@ public class GameCanvasApp extends Application {
                         continue;
                     }
 
-                    if (brickImg != null) gc.drawImage(brickImg, x, y, tileSize, tileSize);
-                    else { gc.setFill(Color.CHOCOLATE); gc.fillRect(x, y, tileSize, tileSize); }
+                    // LỰA CHỌN SPRITE THEO SỐ MÁU CỦA GẠCH
+                    Image currentBrickSprite = brickImg;
 
-                    gc.setStroke(Color.BLACK);
-                    gc.setLineWidth(2);
-
-                    if (hp < brickWallMaxHits && hp > 1) {
-                        gc.strokeLine(x + 8, y + 8, x + 24, y + 24);
+                    if (hp == 2) {
+                        // Bị bắn 1 phát (còn 2 máu) -> Dùng ảnh nứt nhẹ
+                        if (brickCrackedImg != null && !brickCrackedImg.isError()) {
+                            currentBrickSprite = brickCrackedImg;
+                        }
                     } else if (hp == 1) {
-                        gc.strokeLine(x + 8, y + 8, x + 24, y + 24);
-                        gc.strokeLine(x + 26, y + 8, x + 10, y + 30);
+                        // Bị bắn 2 phát (còn 1 máu) -> Dùng ảnh vỡ nặng
+                        if (brickDamagedImg != null && !brickDamagedImg.isError()) {
+                            currentBrickSprite = brickDamagedImg;
+                        } else if (brickCrackedImg != null && !brickCrackedImg.isError()) {
+                            currentBrickSprite = brickCrackedImg;
+                        }
+                    }
+
+                    // VẼ HÌNH ẢNH GẠCH ĐÃ CHỌN
+                    if (currentBrickSprite != null && !currentBrickSprite.isError()) {
+                        gc.drawImage(currentBrickSprite, x, y, tileSize, tileSize);
+                    } else {
+                        // Fallback màu nếu chưa tải được ảnh
+                        gc.setFill(Color.CHOCOLATE);
+                        gc.fillRect(x, y, tileSize, tileSize);
                     }
                 }
             }
@@ -582,25 +611,31 @@ public class GameCanvasApp extends Application {
     }
 
     private void renderBullets() {
-        Image missileImg = AssetLoader.getImage("bullets/missile.png");
+        Image missileImg = AssetLoader.getImage("bullets/rocket.png");
 
         for (BulletSnapshotDTO bullet : bullets) {
-            double speed = Math.hypot(bullet.getVx(), bullet.getVy());
-            boolean isMissile = speed > 450.0;
+            boolean isMissile = bullet.getType() != null && "ROCKET".equalsIgnoreCase(bullet.getType());
 
             if (isMissile) {
                 gc.save();
                 gc.translate(bullet.getX(), bullet.getY());
-                double angle = Math.toDegrees(Math.atan2(bullet.getVy(), bullet.getVx()));
-                gc.rotate(angle);
 
-                if (missileImg != null) {
-                    gc.drawImage(missileImg, -10, -5, 20, 10);
+                // Tính góc bay theo radian sang độ
+                double angle = Math.toDegrees(Math.atan2(bullet.getVy(), bullet.getVx()));
+                
+                // + 90 độ để bù cho ảnh gốc đang hướng đầu lên trên
+                gc.rotate(angle + 90.0);
+
+                if (missileImg != null && !missileImg.isError()) {
+                    // GIỮ NGUYÊN TỈ LỆ GỐC CỦA ẢNH MỚI (KHÔNG BỊ BÓP MÉO)
+                    double targetHeight = 22.0; // chiều dài tên lửa
+                    double aspectRatio = missileImg.getWidth() / missileImg.getHeight();
+                    double targetWidth = targetHeight * aspectRatio; // tự động tính chiều ngang chuẩn
+
+                    gc.drawImage(missileImg, -targetWidth / 2.0, -targetHeight / 2.0, targetWidth, targetHeight);
                 } else {
                     gc.setFill(Color.ORANGE);
-                    gc.fillPolygon(new double[]{-10, 10, -10}, new double[]{-5, 0, 5}, 3);
-                    gc.setFill(Color.RED);
-                    gc.fillOval(-16, -3, 6, 6);
+                    gc.fillPolygon(new double[]{-5, 5, 0}, new double[]{10, 10, -10}, 3);
                 }
                 gc.restore();
             } else {

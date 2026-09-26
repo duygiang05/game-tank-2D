@@ -1,13 +1,5 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package com.tank2d.common.dto.game;
 
-/**
- *
- * @author Admin
- */
 public class BulletSnapshotDTO {
     private int id;
     private int ownerId;
@@ -15,14 +7,19 @@ public class BulletSnapshotDTO {
     private double y;
     private double vx;
     private double vy;
+    private String type; // "NORMAL" hoặc "ROCKET"
 
-    public BulletSnapshotDTO(int id, int ownerId, double x, double y, double vx, double vy) {
+    // Constructor mặc định cho Gson deserialize
+    public BulletSnapshotDTO() {}
+
+    public BulletSnapshotDTO(int id, int ownerId, double x, double y, double vx, double vy, String type) {
         this.id = id;
         this.ownerId = ownerId;
         this.x = x;
         this.y = y;
         this.vx = vx;
         this.vy = vy;
+        this.type = type;
     }
     
     public int getId() { return id; }
@@ -31,8 +28,8 @@ public class BulletSnapshotDTO {
     public double getY() { return y; }
     public double getVx() { return vx; }
     public double getVy() { return vy; }
+    public String getType() { return type; }
     
-    public void setX(double x) {
-        this.x = x;
-    }
+    public void setX(double x) { this.x = x; }
+    public void setType(String type) { this.type = type; }
 }

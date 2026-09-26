@@ -103,8 +103,20 @@ public final class CollisionDetector {
             if (map != null && map.isSolid(bullet.getX(), bullet.getY())) {
                 boolean instaBreak = bullet.getType() == BulletEntity.BulletType.ROCKET;
                 GameMap.WallHitResult result = map.hitBrickWall(bullet.getX(), bullet.getY(), instaBreak);
-                if (result.broken) {
-                    mapEvents.add(new MapChangeEvent(result.row, result.col, /* EMPTY */ 0));
+                
+                if (result.hit) {
+                    if (result.broken) {
+                        mapEvents.add(new MapChangeEvent(result.row, result.col, /* EMPTY */ 0));
+                    } else {
+                        // TƯỜNG BỊ BẮN TRÚNG NHƯNG CHƯA VỠ -> Bắn CombatEvent để GameStateManager broadcast hiệu ứng
+                        combatEvents.add(new CombatEvent(
+                            bullet.getId(),
+                            bullet.getOwnerId(),
+                            result.row * 10000 + result.col, // Mã hóa tọa độ row/col vào targetId hoặc x,y
+                            1, // 1 hit
+                            CombatEvent.EventType.WALL_HIT
+                        ));
+                    }
                 }
                 bullet.setAlive(false);
             }

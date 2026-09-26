@@ -120,6 +120,17 @@ public class ConfigLoader {
         int tickRate = physics.has("server_tick_rate") ? physics.get("server_tick_rate").getAsInt() : 30;
         return perTick * tickRate;
     }
+    
+    public static double getMissileBulletSpeedPerSecond() {
+        JsonObject physics = getPhysicsStats();
+        double perTick = physics.has("missile_bullet_speed") 
+                ? physics.get("missile_bullet_speed").getAsDouble() 
+                : 16.0; // fallback nếu chưa có trong json
+        int tickRate = physics.has("server_tick_rate") 
+                ? physics.get("server_tick_rate").getAsInt() 
+                : 30;
+        return perTick * tickRate;
+    }
 
     public static double getTankSpeedPerSecond() {
         JsonObject physics = getPhysicsStats();
