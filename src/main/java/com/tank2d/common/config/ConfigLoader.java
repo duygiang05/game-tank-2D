@@ -45,8 +45,8 @@ public class ConfigLoader {
             System.err.println("[ConfigLoader] Không thể đọc config/game_rules.yml: " + e.getMessage());
         }
 
-        // 4. Nạp map JSON mặc định (map_snow.json)
-        loadMapConfig("config/maps/map_snow.json");
+        // 4. Nạp map JSON mặc định (map_default.json)
+        loadMapConfig("config/maps/map_default.json");
     }
 
     public static void loadMapConfig(String mapPath) {
@@ -86,6 +86,21 @@ public class ConfigLoader {
         }
         return new JsonObject();
     }
+    
+    public static int getTileSize() {
+        JsonObject physics = getPhysicsStats();
+        return physics.has("tile_size") ? physics.get("tile_size").getAsInt() : 30;
+    }
+    
+    public static double getTankSize() {
+        JsonObject physics = getPhysicsStats();
+        return physics.has("tank_size") ? physics.get("tank_size").getAsDouble() : 24.0;
+    }
+    
+    public static double getBulletSize() {
+        JsonObject physics = getPhysicsStats();
+        return physics.has("bullet_size") ? physics.get("bullet_size").getAsDouble() : 6.0;
+    }
 
     public static JsonObject getDamageStats() {
         if (statsConfig != null && statsConfig.has("damage")) {
@@ -94,10 +109,26 @@ public class ConfigLoader {
         return new JsonObject();
     }
 
+    public static int getBrickWallMaxHits() {
+        JsonObject damage = getDamageStats();
+        return damage.has("brick_wall_max_hits") ? damage.get("brick_wall_max_hits").getAsInt() : 3;
+    }
+    
     public static double getBulletSpeedPerSecond() {
         JsonObject physics = getPhysicsStats();
         double perTick = physics.has("bullet_speed") ? physics.get("bullet_speed").getAsDouble() : 9.0;
         int tickRate = physics.has("server_tick_rate") ? physics.get("server_tick_rate").getAsInt() : 30;
+        return perTick * tickRate;
+    }
+    
+    public static double getMissileBulletSpeedPerSecond() {
+        JsonObject physics = getPhysicsStats();
+        double perTick = physics.has("missile_bullet_speed") 
+                ? physics.get("missile_bullet_speed").getAsDouble() 
+                : 16.0; // fallback nếu chưa có trong json
+        int tickRate = physics.has("server_tick_rate") 
+                ? physics.get("server_tick_rate").getAsInt() 
+                : 30;
         return perTick * tickRate;
     }
 
@@ -107,7 +138,7 @@ public class ConfigLoader {
         int tickRate = physics.has("server_tick_rate") ? physics.get("server_tick_rate").getAsInt() : 30;
         return perTick * tickRate;
     }
-
+    
     // =========================================================================
     // ĐỌC LUẬT CHƠI (game_rules.yml)
     // =========================================================================
@@ -247,5 +278,36 @@ public class ConfigLoader {
     public static int getRocketBulletDamage() {
         JsonObject damage = getDamageStats();
         return damage.has("rocket_bullet") ? damage.get("rocket_bullet").getAsInt() : 3;
+    }
+    
+    // =========================================================================
+    // ĐỌC THÔNG TIN TỪ MAP JSON (map_default.json)
+    // =========================================================================
+    public static int getMapCols() {
+        return (currentMapConfig != null && currentMapConfig.has("width")) 
+                ? currentMapConfig.get("width").getAsInt() : 20;
+    }
+
+    public static int getMapRows() {
+        return (currentMapConfig != null && currentMapConfig.has("height")) 
+                ? currentMapConfig.get("height").getAsInt() : 20;
+    }
+
+    public static int[][] getMapMatrix() {
+        if (currentMapConfig == null || !currentMapConfig.has("matrix")) {
+            return new int[0][0];
+        }
+        JsonArray rows = currentMapConfig.getAsJsonArray("matrix");
+        int h = rows.size();
+        int w = rows.get(0).getAsJsonArray().size();
+        int[][] matrix = new int[h][w];
+
+        for (int r = 0; r < h; r++) {
+            JsonArray cols = rows.get(r).getAsJsonArray();
+            for (int c = 0; c < w; c++) {
+                matrix[r][c] = cols.get(c).getAsInt();
+            }
+        }
+        return matrix;
     }
 }

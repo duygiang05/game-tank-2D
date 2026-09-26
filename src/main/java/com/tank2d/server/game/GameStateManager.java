@@ -136,6 +136,18 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
     @Override
     public void onCombatEvent(CombatEvent event) {
         if (isGameOver) return;
+        // XỬ LÝ PHÁT BẮN TRÚNG TƯỜNG (CHƯA VỠ HOÀN TOÀN)
+        if (event.getType() == CombatEvent.EventType.WALL_HIT) {
+            int row = event.getTargetTankId() / 10000;
+            int col = event.getTargetTankId() % 10000;
+            double tileSize = ConfigLoader.getTileSize();
+            double cx = col * tileSize + tileSize / 2.0;
+            double cy = row * tileSize + tileSize / 2.0;
+            
+            // Broadcast báo cho toàn bộ Client biết ô tường tại (cx, cy) vừa bị bắn trúng
+            broadcastEffect(new GameEventEffectDTO("WALL_HIT", cx, cy, -1));
+            return;
+        }
         if (event.getType() == CombatEvent.EventType.SHIELD_BLOCKED) return;
         TankEntity targetTank = gameLoop.getTank(event.getTargetTankId());
         TankEntity shooterTank = gameLoop.getTank(event.getShooterId());
@@ -369,6 +381,12 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
     public void onMapChanged(MapChangeEvent event) {
             MapUpdateDTO dto = new MapUpdateDTO(event.getRow(), event.getCol(), event.getNewTileCode());
             broadcastPacket(new Packet(PacketType.MAP_UPDATE, GSON.toJson(dto)));
+            
+            // Broadcast hiệu ứng vỡ vụn
+            double tileSize = ConfigLoader.getTileSize();
+            double centerX = event.getCol() * tileSize + tileSize / 2.0;
+            double centerY = event.getRow() * tileSize + tileSize / 2.0;
+            broadcastEffect(new GameEventEffectDTO("WALL_BREAK", centerX, centerY, -1));
         }
 
     @Override

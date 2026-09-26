@@ -5,6 +5,7 @@ import com.tank2d.common.config.ConfigLoader;
 import com.tank2d.common.dto.LoginRequest;
 import com.tank2d.common.dto.LoginResponse;
 import com.tank2d.common.dto.RegisterResponse;
+import com.tank2d.common.dto.game.PlayerShootRequestDTO;
 import com.tank2d.common.model.User;
 import com.tank2d.common.protocol.NetworkUtil;
 import com.tank2d.common.protocol.Packet;
@@ -18,6 +19,7 @@ import com.tank2d.server.room.Room;
 import com.tank2d.server.room.RoomManager;
 import com.tank2d.common.dto.game.TankPlayerDTO;
 import com.tank2d.server.dao.MatchDAO;
+import com.tank2d.server.model.BulletEntity;
 import java.util.ArrayList;
 import java.util.List;
 import java.io.DataInputStream;
@@ -347,23 +349,22 @@ public class ClientHandler implements Runnable {
             return;
         }
 
-        com.tank2d.server.model.BulletEntity.BulletType requestedType = com.tank2d.server.model.BulletEntity.BulletType.NORMAL;
+        BulletEntity.BulletType requestedType = BulletEntity.BulletType.NORMAL;
         try {
-            com.tank2d.common.dto.game.PlayerShootRequestDTO req
-                    = gson.fromJson(rawJson, com.tank2d.common.dto.game.PlayerShootRequestDTO.class);
+            PlayerShootRequestDTO req = gson.fromJson(rawJson, PlayerShootRequestDTO.class);
             if (req != null && "ROCKET".equalsIgnoreCase(req.getBulletType())) {
-                requestedType = com.tank2d.server.model.BulletEntity.BulletType.ROCKET;
+                requestedType = BulletEntity.BulletType.ROCKET;
             }
-        } catch (Exception ignored) {
-        } // payload rỗng "{}" hoặc lỗi -> mặc định NORMAL
+        } catch (Exception ignored) {}
 
+        // Chuyển toàn bộ quyền quyết định loại đạn cho GameLoop
         currentGameLoop.handleShootRequest(tank, requestedType);
     }
 
     // =========================================================================
     // TASK 1 (GIANG) & FIX THEO PHẢN HỒI CỦA HOÀNG (PHYSICS & MAP)
     // =========================================================================
-    private void handleStartGame() {
+private void handleStartGame() {
         try {
             if (currentUser == null || currentRoomId == -1) {
                 return;
@@ -431,6 +432,7 @@ public class ClientHandler implements Runnable {
                 }
             }
 
+
             // Gửi mapping Tank -> Username cho tất cả client trong phòng.
             List<TankPlayerDTO> tankPlayers = new ArrayList<>();
             for (ClientHandler client : connectedClients) {
@@ -459,6 +461,7 @@ public class ClientHandler implements Runnable {
                     }
                 }
             }
+
 
             // 6. Snapshot Listener hỗ trợ Bụi Cỏ / Tàng hình cá nhân hóa
             int finalRoomId = currentRoomId;
