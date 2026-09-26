@@ -46,7 +46,7 @@ public class AssetLoader {
             case "HEALTH_PACK": return getImage("tiles/health_pack.png");
             case "SHIELD": return getImage("tiles/shield.png");
             case "NITRO": return getImage("tiles/nitro.png");
-            case "ROCKET_AMMO": return getImage("bullets/rocket_ammo.png");
+            case "ROCKET_AMMO": return getImage("bullets/rocket.png");
             default: return null;
         }
     }

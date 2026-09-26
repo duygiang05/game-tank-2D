@@ -10,6 +10,10 @@
   "server_tick_rate": 30,
   "tank_speed": 3.0,          
   "bullet_speed": 7.0,        
+<<<<<<< HEAD
+=======
+  "missile_bullet_speed": 16.0,
+>>>>>>> origin/dev
   "nitro_speed_multiplier": 2.0,
   "tank_size": 24,            
   "bullet_size": 6,

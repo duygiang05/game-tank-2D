@@ -79,8 +79,16 @@ public class GameLoop implements Runnable {
     }
 
     public boolean handleShootRequest(TankEntity tank, BulletEntity.BulletType requestedType) {
-        ShootingProcessor.ShotResult result = ShootingProcessor.tryShoot(tank, requestedType, System.currentTimeMillis());
+        long now = System.currentTimeMillis();
+
+        // Engine tự quyết định loại đạn: Nếu còn hạn buff thì bắn ROCKET, ngược lại bắn NORMAL
+        BulletEntity.BulletType finalType = (now < tank.getRocketBuffActiveUntilMillis())
+                ? BulletEntity.BulletType.ROCKET
+                : BulletEntity.BulletType.NORMAL;
+
+        ShootingProcessor.ShotResult result = ShootingProcessor.tryShoot(tank, finalType, now);
         if (!result.success) return false;
+
         spawnBullet(tank.getId(), tank.getX(), tank.getY(), result.vx, result.vy, result.type);
         return true;
     }
@@ -226,46 +234,55 @@ public class GameLoop implements Runnable {
     }
 
     private GameSnapshotDTO buildInternal(int viewerTankId, boolean applyBushStealth) {
-    long now = System.currentTimeMillis();
-    long revealWindowMs = (long) (ConfigLoader.getRevealDurationSeconds() * 1000);
+        long now = System.currentTimeMillis();
+        long revealWindowMs = (long) (ConfigLoader.getRevealDurationSeconds() * 1000);
 
-    List<TankSnapshotDTO> tankDTOs = new ArrayList<>();
-    for (TankEntity tank : tanks.values()) {
-        if (applyBushStealth && tank.getId() != viewerTankId && gameMap != null) {
-            boolean inBush = gameMap.getTileAt(tank.getX(), tank.getY()) == TileType.BUSH;
-            boolean recentlyFired = (now - tank.getLastShotTimeMillis()) < revealWindowMs;
-            if (inBush && !recentlyFired) continue; // Ẩn khỏi snapshot của viewer này
+        List<TankSnapshotDTO> tankDTOs = new ArrayList<>();
+        for (TankEntity tank : tanks.values()) {
+            if (applyBushStealth && tank.getId() != viewerTankId && gameMap != null) {
+                boolean inBush = gameMap.getTileAt(tank.getX(), tank.getY()) == TileType.BUSH;
+                boolean recentlyFired = (now - tank.getLastShotTimeMillis()) < revealWindowMs;
+                if (inBush && !recentlyFired) continue; // Ẩn khỏi snapshot của viewer này
+            }
+
+            // 1. Tính toán trạng thái Buff dựa trên thời gian thực tế của Server
+            boolean isGhost = tank.isProtected();
+            boolean hasShield = now < tank.getShieldActiveUntilMillis();
+            boolean hasNitro = now < tank.getNitroActiveUntilMillis();
+
+            // 2. Khởi tạo DTO với đủ 9 tham số
+            tankDTOs.add(new TankSnapshotDTO(
+                tank.getId(),
+                tank.getX(),
+                tank.getY(),
+                tank.getAngle(),
+                tank.getHp(),
+                tank.isAlive(),
+                isGhost,     // true nếu đang trong thời gian bảo hộ sau khi hồi sinh
+                hasShield,   // true nếu thời gian hiện tại chưa vượt quá shieldActiveUntilMillis
+                hasNitro     // true nếu thời gian hiện tại chưa vượt quá nitroActiveUntilMillis
+            ));
         }
 
-        // 1. Tính toán trạng thái Buff dựa trên thời gian thực tế của Server
-        boolean isGhost = tank.isProtected();
-        boolean hasShield = now < tank.getShieldActiveUntilMillis();
-        boolean hasNitro = now < tank.getNitroActiveUntilMillis();
+        // Đóng gói danh sách đạn với đầy đủ 7 tham số (có kèm String type)
+        List<BulletSnapshotDTO> bulletDTOs = new ArrayList<>();
+        for (BulletEntity bullet : bullets.values()) {
+            bulletDTOs.add(new BulletSnapshotDTO(
+                bullet.getId(),
+                bullet.getOwnerId(),
+                bullet.getX(),
+                bullet.getY(),
+                bullet.getVx(),
+                bullet.getVy(),
+                bullet.getType() != null ? bullet.getType().name() : "NORMAL"
+            ));
+        }
 
-        // 2. Khởi tạo DTO với đủ 9 tham số
-        tankDTOs.add(new TankSnapshotDTO(
-            tank.getId(),
-            tank.getX(),
-            tank.getY(),
-            tank.getAngle(),
-            tank.getHp(),
-            tank.isAlive(),
-            isGhost,     // true nếu đang trong thời gian bảo hộ sau khi sinh
-            hasShield,   // true nếu thời gian hiện tại chưa vượt quá shieldActiveUntilMillis
-            hasNitro     // true nếu thời gian hiện tại chưa vượt quá nitroActiveUntilMillis
-        ));
-    }
+        List<ItemSnapshotDTO> itemDTOs = new ArrayList<>();
+        for (ItemEntity item : items.values()) {
+            itemDTOs.add(new ItemSnapshotDTO(item.getId(), item.getType().name(), item.getX(), item.getY()));
+        }
 
-    List<BulletSnapshotDTO> bulletDTOs = new ArrayList<>();
-    for (BulletEntity bullet : bullets.values()) {
-        bulletDTOs.add(new BulletSnapshotDTO(bullet.getId(), bullet.getOwnerId(), bullet.getX(), bullet.getY(), bullet.getVx(), bullet.getVy()));
-    }
-
-    List<ItemSnapshotDTO> itemDTOs = new ArrayList<>();
-    for (ItemEntity item : items.values()) {
-        itemDTOs.add(new ItemSnapshotDTO(item.getId(), item.getType().name(), item.getX(), item.getY()));
-    }
-
-    return new GameSnapshotDTO(tickCount, tankDTOs, bulletDTOs, itemDTOs);
+        return new GameSnapshotDTO(tickCount, tankDTOs, bulletDTOs, itemDTOs);
     }
 }
