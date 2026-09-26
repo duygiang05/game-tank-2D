@@ -53,7 +53,7 @@ public class ClientHandler implements Runnable {
     private GameStateManager currentGameStateManager;
     private int myTankId = -1;
 
-    public ClientHandler(Socket socket, UserDAO userDAO,MatchDAO matchDAO, RoomManager roomManager) {
+    public ClientHandler(Socket socket, UserDAO userDAO, MatchDAO matchDAO, RoomManager roomManager) {
         this.socket = socket;
         this.userDAO = userDAO;
         this.matchDAO = matchDAO;
@@ -117,7 +117,9 @@ public class ClientHandler implements Runnable {
     // DISPATCH PACKET
     // =========================================================
     private void dispatchPacket(Packet packet) {
-        if (packet.getType() == null) return;
+        if (packet.getType() == null) {
+            return;
+        }
 
         switch (packet.getType()) {
 
@@ -127,6 +129,15 @@ public class ClientHandler implements Runnable {
             case AUTH_REGISTER_REQ:
                 handleRegister(packet.getData());
                 break;
+
+            case LEADERBOARD_REQ:
+                handleLeaderboard();
+                break;
+
+            case LOGOUT_REQ:
+                handleLogout();
+                break;
+
             case LOBBY_GET_ROOMS_REQ:
                 handleGetRooms();
                 break;
@@ -217,6 +228,32 @@ public class ClientHandler implements Runnable {
         }
     }
 
+    private void handleLogout() {
+        try {
+            // Nếu người chơi đang ở trong phòng thì rời phòng trước
+            if (currentRoomId != -1) {
+                int roomId = currentRoomId;
+
+                roomManager.leaveRoom(roomId, currentUser.getId());
+
+                currentRoomId = -1;
+                myTankId = -1;
+
+                broadcastRoomStateForRoom(roomId);
+                broadcastLobbyRooms();
+            }
+
+            // Xóa thông tin user khỏi session phía server
+            currentUser = null;
+
+            System.out.println("Client logged out successfully.");
+
+        } catch (Exception e) {
+            System.err.println("Error while logging out: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
     // =========================================================
     // LOGIN
     // =========================================================
@@ -241,7 +278,8 @@ public class ClientHandler implements Runnable {
 
         try {
             NetworkUtil.sendPacket(dos, new Packet(PacketType.AUTH_LOGIN_RES, gson.toJson(res)));
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
     }
 
     // =========================================================
@@ -250,14 +288,17 @@ public class ClientHandler implements Runnable {
     private void handleCreateRoom() {
 
         try {
-            if (currentUser == null) return;
+            if (currentUser == null) {
+                return;
+            }
             Room room = roomManager.createRoom(currentUser);
             currentRoomId = room.getRoomId();
 
             Packet response = new Packet(PacketType.ROOM_STATE_UPDATE, gson.toJson(roomManager.getRoomDTO(currentRoomId)));
             NetworkUtil.sendPacket(dos, response);
             broadcastLobbyRooms();
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
     }
 
     // =========================================================
@@ -278,7 +319,8 @@ public class ClientHandler implements Runnable {
                 Packet response = new Packet(PacketType.ROOM_STATE_UPDATE, gson.toJson(roomManager.getRoomDTO(roomId)));
                 NetworkUtil.sendPacket(dos, response);
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
     }
 
     // =========================================================
@@ -287,18 +329,25 @@ public class ClientHandler implements Runnable {
     private void handleReady(String rawJson) {
 
         try {
-            if (currentUser == null || currentRoomId == -1) return;
+            if (currentUser == null || currentRoomId == -1) {
+                return;
+            }
             boolean ready = gson.fromJson(rawJson, Boolean.class);
             if (roomManager.setPlayerReady(currentRoomId, currentUser.getId(), ready)) {
                 broadcastRoomState();
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
     }
 
     private void handlePlayerShoot(String rawJson) {
-        if (currentGameLoop == null || myTankId == -1) return;
+        if (currentGameLoop == null || myTankId == -1) {
+            return;
+        }
         TankEntity tank = currentGameLoop.getTank(myTankId);
-        if (tank == null || !tank.isAlive()) return;
+        if (tank == null || !tank.isAlive()) {
+            return;
+        }
 
         BulletEntity.BulletType requestedType = BulletEntity.BulletType.NORMAL;
         try {
@@ -317,21 +366,25 @@ public class ClientHandler implements Runnable {
     // =========================================================================
 private void handleStartGame() {
         try {
-            if (currentUser == null || currentRoomId == -1) return;
+            if (currentUser == null || currentRoomId == -1) {
+                return;
+            }
             Room room = roomManager.getRoom(currentRoomId);
-            if (room == null || !room.isHost(currentUser.getId())) return;
+            if (room == null || !room.isHost(currentUser.getId())) {
+                return;
+            }
 
             // FIX 1: Chỉ cần tối thiểu 2 người (hoặc >= 1 khi test solo) và tất cả đã Ready
             if (room.getCurrentPlayers() < 2 || !room.areAllPlayersReady()) {
-                System.out.println("[Game] Chưa đủ điều kiện bắt đầu: Số người = " 
-                    + room.getCurrentPlayers() + ", Ready = " + room.areAllPlayersReady());
+                System.out.println("[Game] Chưa đủ điều kiện bắt đầu: Số người = "
+                        + room.getCurrentPlayers() + ", Ready = " + room.areAllPlayersReady());
                 return;
             }
 
             broadcastGameStart();
 
             // 1. Khởi tạo GameLoop với Tick-rate chuẩn từ Config
-            int serverTickRate = ConfigLoader.getPhysicsStats().has("server_tick_rate") 
+            int serverTickRate = ConfigLoader.getPhysicsStats().has("server_tick_rate")
                     ? ConfigLoader.getPhysicsStats().get("server_tick_rate").getAsInt() : 30;
             GameLoop gameLoop = new GameLoop(serverTickRate);
 
@@ -350,7 +403,7 @@ private void handleStartGame() {
                 matchDuration = room.getMatchDuration();
             }
 
-            GameStateManager stateManager = new GameStateManager(gameLoop, userDAO,matchDAO, matchDuration);
+            GameStateManager stateManager = new GameStateManager(gameLoop, userDAO, matchDAO, matchDuration);
             gameLoop.setStateManager(stateManager);
             gameLoop.setMapChangeListener(stateManager);
             gameLoop.setItemEventListener(stateManager);
@@ -418,12 +471,15 @@ private void handleStartGame() {
                         for (ClientHandler client : connectedClients) {
                             if (client.currentRoomId == finalRoomId && client.dos != null) {
                                 var snap = perViewerSnapshots.get(client.myTankId);
-                                if (snap == null) continue;
+                                if (snap == null) {
+                                    continue;
+                                }
                                 String json = gson.toJson(snap);
                                 NetworkUtil.sendPacket(client.dos, new Packet(PacketType.GAME_SNAPSHOT, json));
                             }
                         }
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                    }
                 });
             });
 
@@ -441,7 +497,9 @@ private void handleStartGame() {
     // =========================================================================
     private void handleLeaveRoom() {
         try {
-            if (currentUser == null || currentRoomId == -1) return;
+            if (currentUser == null || currentRoomId == -1) {
+                return;
+            }
 
             // 1. Nếu đang trong trận đấu:
             if (currentGameStateManager != null && myTankId != -1) {
@@ -466,6 +524,8 @@ private void handleStartGame() {
                 System.out.println("[Room] User " + currentUser.getUsername() + " đã thoát phòng " + roomId);
                 currentRoomId = -1;
                 broadcastRoomStateForRoom(roomId);
+
+                broadcastLobbyRooms();
             }
 
         } catch (Exception e) {
@@ -482,19 +542,59 @@ private void handleStartGame() {
         }
 
         try {
-            if (dis != null) dis.close();
-            if (dos != null) dos.close();
-            if (socket != null && !socket.isClosed()) socket.close();
-        } catch (IOException ignored) {}
+            if (dis != null) {
+                dis.close();
+            }
+            if (dos != null) {
+                dos.close();
+            }
+            if (socket != null && !socket.isClosed()) {
+                socket.close();
+            }
+        } catch (IOException ignored) {
+        }
+    }
+
+    private void handleLeaderboard() {
+
+        try {
+
+            List<com.tank2d.common.dto.LeaderboardDTO> leaderboard
+                    = userDAO.getLeaderboard();
+
+            Packet response = new Packet(
+                    PacketType.LEADERBOARD_RES,
+                    gson.toJson(leaderboard)
+            );
+
+            NetworkUtil.sendPacket(
+                    dos,
+                    response
+            );
+
+            System.out.println(
+                    "[Leaderboard] Đã gửi bảng xếp hạng cho Client."
+            );
+
+        } catch (IOException e) {
+
+            System.err.println(
+                    "[Leaderboard] Lỗi gửi bảng xếp hạng: "
+                    + e.getMessage()
+            );
+        }
     }
 
     private void broadcastLobbyRooms() {
         try {
-            Packet packet = new Packet(PacketType.LOBBY_ROOMS_RES, gson.toJson(roomManager.getAllRooms()));
+            Packet packet = new Packet(PacketType.ROOM_LIST_UPDATE, gson.toJson(roomManager.getAllRooms()));
             for (ClientHandler client : connectedClients) {
-                if (client.currentRoomId == -1) NetworkUtil.sendPacket(client.dos, packet);
+                if (client.currentRoomId == -1) {
+                    NetworkUtil.sendPacket(client.dos, packet);
+                }
             }
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
     }
 
     private void broadcastRoomState() {
@@ -502,22 +602,29 @@ private void handleStartGame() {
     }
 
     private void broadcastRoomStateForRoom(int roomId) {
-        if (roomId == -1) return;
+        if (roomId == -1) {
+            return;
+        }
         Room room = roomManager.getRoom(roomId);
-        if (room == null) return;
+        if (room == null) {
+            return;
+        }
 
         Packet packet = new Packet(PacketType.ROOM_STATE_UPDATE, gson.toJson(roomManager.getRoomDTO(roomId)));
         for (ClientHandler client : connectedClients) {
             if (client.currentRoomId == roomId) {
                 try {
                     NetworkUtil.sendPacket(client.dos, packet);
-                } catch (IOException ignored) {}
+                } catch (IOException ignored) {
+                }
             }
         }
     }
 
     private void broadcastGameStart() {
-        if (currentRoomId == -1) return;
+        if (currentRoomId == -1) {
+            return;
+        }
         Map<String, Object> dataMap = new HashMap<>();
         dataMap.put("roomId", currentRoomId);
         Packet packet = new Packet(PacketType.GAME_START_NOTIFY, gson.toJson(dataMap));
@@ -526,7 +633,8 @@ private void handleStartGame() {
             if (client.currentRoomId == currentRoomId) {
                 try {
                     NetworkUtil.sendPacket(client.dos, packet);
-                } catch (IOException ignored) {}
+                } catch (IOException ignored) {
+                }
             }
         }
     }
@@ -536,23 +644,26 @@ private void handleStartGame() {
         try {
             LoginRequest req = gson.fromJson(rawJson, LoginRequest.class);
             boolean isSuccess = userDAO.register(req.getUsername(), req.getPassword());
-            res = isSuccess ? new RegisterResponse(true, "Đăng ký thành công!") 
-                            : new RegisterResponse(false, "Đăng ký thất bại! Tài khoản đã tồn tại.");
+            res = isSuccess ? new RegisterResponse(true, "Đăng ký thành công!")
+                    : new RegisterResponse(false, "Đăng ký thất bại! Tài khoản đã tồn tại.");
         } catch (Exception e) {
             res = new RegisterResponse(false, "Lỗi định dạng dữ liệu đăng ký!");
         }
 
         try {
             NetworkUtil.sendPacket(dos, new Packet(PacketType.AUTH_REGISTER_RES, gson.toJson(res)));
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
     }
 
     private void handleGetRooms() {
         try {
             Packet response = new Packet(PacketType.LOBBY_ROOMS_RES, gson.toJson(roomManager.getAllRooms()));
             NetworkUtil.sendPacket(dos, response);
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
     }
+
     // ROOM DURATION
 // =========================================================
     private void handleRoomDuration(String rawJson) {
@@ -753,47 +864,28 @@ private void handleStartGame() {
     // =========================================================
     // PLAYER SHOOT
     // =========================================================
-    
-
     // =========================================================
     // BROADCAST LOBBY
     // =========================================================
-    
-
     // =========================================================
     // BROADCAST ROOM STATE
     // =========================================================
-    
-
-    
-
     // =========================================================
     // GAME START NOTIFY
     // =========================================================
-    
-
     // =========================================================
     // START GAME
     // =========================================================
-    
-
     // =========================================================
     // REGISTER
     // =========================================================
-    
-
     // =========================================================
     // GET ROOMS
     // =========================================================
-    
-
     // =========================================================
     // LEAVE ROOM
     // =========================================================
-    
-
     // =========================================================
     // CLOSE CONNECTION
     // =========================================================
-    
 }
