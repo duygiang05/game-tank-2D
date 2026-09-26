@@ -1,0 +1,101 @@
+/* ========================================================
+   TANK 2D ONLINE - MODERN LIGHT GAMING THEME
+   ======================================================== */
+
+.root, .root-pane {
+    -fx-background-color: #f1f5f9;
+    -fx-font-family: "Segoe UI", "Arial", sans-serif;
+}
+
+/* Khối Card trắng trung tâm ôm khít form */
+.auth-card {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 18px;
+    -fx-padding: 24px 35px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.09), 18, 0, 0, 5);
+}
+
+/* Định dạng ô nhập liệu */
+.auth-field {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #0f172a;
+    -fx-prompt-text-fill: #94a3b8;
+    -fx-border-color: #cbd5e1;
+    -fx-border-width: 1.4px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 0 12px;
+    -fx-font-size: 13.5px;
+}
+
+.auth-field:focused {
+    -fx-border-color: #2563eb;
+    -fx-border-width: 1.8px;
+    -fx-background-color: #fafcff;
+    -fx-effect: dropshadow(three-pass-box, rgba(37, 99, 235, 0.18), 8, 0, 0, 0);
+}
+
+/* Nút chính: Đăng nhập (Màu xanh dương Game) */
+.btn-primary {
+    -fx-background-color: #2563eb;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(three-pass-box, rgba(37, 99, 235, 0.35), 8, 0, 0, 3);
+}
+
+.btn-primary:hover {
+    -fx-background-color: #1d4ed8;
+    -fx-effect: dropshadow(three-pass-box, rgba(29, 78, 216, 0.5), 10, 0, 0, 4);
+}
+
+.btn-primary:pressed {
+    -fx-background-color: #1e40af;
+}
+
+/* Nút chính form Đăng ký: Tạo tài khoản (Xanh lá) */
+.btn-success {
+    -fx-background-color: #16a34a;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(three-pass-box, rgba(22, 163, 74, 0.35), 8, 0, 0, 3);
+}
+
+.btn-success:hover {
+    -fx-background-color: #15803d;
+    -fx-effect: dropshadow(three-pass-box, rgba(21, 128, 61, 0.5), 10, 0, 0, 4);
+}
+
+.btn-success:pressed {
+    -fx-background-color: #166534;
+}
+
+/* Nút phụ: Chuyển form (Dạng viền mỏng) */
+.btn-outline {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #475569;
+    -fx-font-weight: bold;
+    -fx-font-size: 12.5px;
+    -fx-border-color: #cbd5e1;
+    -fx-border-width: 1.5px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-cursor: hand;
+}
+
+.btn-outline:hover {
+    -fx-background-color: #f8fafc;
+    -fx-text-fill: #1e293b;
+    -fx-border-color: #94a3b8;
+}
+
+.btn-outline:pressed {
+    -fx-background-color: #f1f5f9;
+}
