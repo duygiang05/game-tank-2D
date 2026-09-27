@@ -1,9 +1,9 @@
 package com.tank2d.client;
 
-import com.tank2d.client.view.GameCanvasApp;
+import javafx.application.Application;
 
 public class MainLauncher {
     public static void main(String[] args) {
-         GameCanvasApp.main(args);
+        Application.launch(com.tank2d.Tank2DOnline.class, args);
     }
 }
