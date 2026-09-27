@@ -6,6 +6,7 @@ import com.tank2d.client.ClientSession;
 import com.tank2d.client.controller.RoomController;
 import com.tank2d.client.network.ClientSocket;
 import com.tank2d.client.util.AssetLoader;
+import com.tank2d.client.util.SoundManager;
 import com.tank2d.common.config.ConfigLoader;
 import com.tank2d.common.dto.RoomDTO;
 import com.tank2d.common.dto.game.*;
@@ -131,6 +132,8 @@ public class GameCanvasApp extends Application {
     public Scene createGameScene() {
         initGameConfigurations();
         clearGameState();
+        SoundManager.init();
+        SoundManager.playBGM();
 
         canvas = new Canvas(canvasWidth, canvasHeight);
         gc = canvas.getGraphicsContext2D();
@@ -250,6 +253,7 @@ public class GameCanvasApp extends Application {
         if (clientSocket == null || !clientSocket.isConnected()) return;
         try {
             clientSocket.sendPacket(new Packet(PacketType.PLAYER_SHOOT_REQ, "{}"));
+            SoundManager.playSound("shoot_normal");
         } catch (IOException ignored) {}
     }
 
@@ -323,6 +327,11 @@ public class GameCanvasApp extends Application {
                 String eventType = effect.getEventType() != null ? effect.getEventType().toUpperCase() : "";
                 if ("EXPLOSION".equalsIgnoreCase(eventType) || "WALL_BREAK".equalsIgnoreCase(eventType)) {
                     explosions.add(new ExplosionEffect(effect.getX(), effect.getY()));
+                    if ("EXPLOSION".equalsIgnoreCase(eventType)) {
+                        SoundManager.playSound("explosion"); // Tiếng nổ xe
+                    } else {
+                        SoundManager.playSound("wall_break"); // Tiếng vỡ tường
+                    }
                 } else if (eventType.contains("WALL") || eventType.contains("BRICK") || eventType.contains("TILE")) {
                     int c = (int) (effect.getX() / tileSize);
                     int r = (int) (effect.getY() / tileSize);
@@ -333,14 +342,20 @@ public class GameCanvasApp extends Application {
                         }
                     }
                     explosions.add(new ExplosionEffect(effect.getX(), effect.getY()));
+                    SoundManager.playSound("wall_break");
                 } else if (eventType.startsWith("ITEM_PICKUP")) {
                     explosions.add(new ExplosionEffect(effect.getX(), effect.getY()));
+                    String itemType = eventType.replace("ITEM_PICKUP_", "");
+                    SoundManager.playItemSound(itemType);
                 }
             }
         } else if (packet.getType() == PacketType.GAME_OVER_NOTIFY) {
             GameOverDTO gameOver = gson.fromJson(packet.getData(), GameOverDTO.class);
             Platform.runLater(() -> {
                 stopAllTimers();
+                showGameOverPopup(gameOver);
+                SoundManager.stopBGM(); // Tắt nhạc nền
+                SoundManager.playSound("game_over"); // Tiếng kết thúc
                 showGameOverPopup(gameOver);
             });
         } else if (packet.getType() == PacketType.MAP_UPDATE) {
@@ -804,6 +819,7 @@ public class GameCanvasApp extends Application {
     }
 
     private void handleExit() {
+        SoundManager.stopBGM();
         clearGameState();
         try {
             if (clientSocket != null && clientSocket.isConnected()) {
@@ -831,7 +847,6 @@ public class GameCanvasApp extends Application {
 
     private void handlePlayAgain() {
         clearGameState();
-
         Platform.runLater(() -> {
             try {
                 if (primaryStage == null && canvas != null && canvas.getScene() != null) {
@@ -858,6 +873,7 @@ public class GameCanvasApp extends Application {
     }
 
     private void clearGameState() {
+        SoundManager.stopBGM();
         stopAllTimers();
         activeKeys.clear();
         spacePressed = false;
