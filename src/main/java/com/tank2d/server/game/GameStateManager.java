@@ -60,6 +60,11 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
         }
     }
     private final Map<Integer, SpawnPoint> spawnPoints = new HashMap<>();
+    private Runnable onGameOverCallback;
+
+    public void setOnGameOverCallback(Runnable onGameOverCallback) {
+        this.onGameOverCallback = onGameOverCallback;
+    }
 
     public GameStateManager(GameLoop gameLoop, UserDAO userDAO, MatchDAO matchDAO, double matchDurationSeconds) {
         this.gameLoop = gameLoop;
@@ -91,11 +96,18 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
     }
 
     private void initSpawnPoints() {
-        // Tự động load từ MapLoader/ConfigLoader hoặc map JSON hiện hành
-        spawnPoints.put(1, new SpawnPoint(ConfigLoader.getSpawnX(1, 20.0), ConfigLoader.getSpawnY(1, 20.0), ConfigLoader.getSpawnAngle(1, 135.0)));
-        spawnPoints.put(2, new SpawnPoint(ConfigLoader.getSpawnX(2, 780.0), ConfigLoader.getSpawnY(2, 20.0), ConfigLoader.getSpawnAngle(2, 225.0)));
-        spawnPoints.put(3, new SpawnPoint(ConfigLoader.getSpawnX(3, 20.0), ConfigLoader.getSpawnY(3, 780.0), ConfigLoader.getSpawnAngle(3, 45.0)));
-        spawnPoints.put(4, new SpawnPoint(ConfigLoader.getSpawnX(4, 780.0), ConfigLoader.getSpawnY(4, 780.0), ConfigLoader.getSpawnAngle(4, 315.0)));
+        int tileSize = ConfigLoader.getTileSize();
+        int cols = ConfigLoader.getMapCols();
+        int rows = ConfigLoader.getMapRows();
+
+        double minCoord = tileSize / 2.0;                          // 15.0 (tâm ô [0,0])
+        double maxCoordX = (cols - 1) * tileSize + tileSize / 2.0; // 585.0 (tâm ô [0,19])
+        double maxCoordY = (rows - 1) * tileSize + tileSize / 2.0; // 585.0 (tâm ô [19,0])
+
+        spawnPoints.put(1, new SpawnPoint(ConfigLoader.getSpawnX(1, minCoord),  ConfigLoader.getSpawnY(1, minCoord),  ConfigLoader.getSpawnAngle(1, 135.0)));
+        spawnPoints.put(2, new SpawnPoint(ConfigLoader.getSpawnX(2, maxCoordX), ConfigLoader.getSpawnY(2, minCoord),  ConfigLoader.getSpawnAngle(2, 225.0)));
+        spawnPoints.put(3, new SpawnPoint(ConfigLoader.getSpawnX(3, minCoord),  ConfigLoader.getSpawnY(3, maxCoordY), ConfigLoader.getSpawnAngle(3, 45.0)));
+        spawnPoints.put(4, new SpawnPoint(ConfigLoader.getSpawnX(4, maxCoordX), ConfigLoader.getSpawnY(4, maxCoordY), ConfigLoader.getSpawnAngle(4, 315.0)));
     }
 
     public void registerPlayer(int tankId, int userId, DataOutputStream dos) {
@@ -136,6 +148,18 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
     @Override
     public void onCombatEvent(CombatEvent event) {
         if (isGameOver) return;
+        // XỬ LÝ PHÁT BẮN TRÚNG TƯỜNG (CHƯA VỠ HOÀN TOÀN)
+        if (event.getType() == CombatEvent.EventType.WALL_HIT) {
+            int row = event.getTargetTankId() / 10000;
+            int col = event.getTargetTankId() % 10000;
+            double tileSize = ConfigLoader.getTileSize();
+            double cx = col * tileSize + tileSize / 2.0;
+            double cy = row * tileSize + tileSize / 2.0;
+            
+            // Broadcast báo cho toàn bộ Client biết ô tường tại (cx, cy) vừa bị bắn trúng
+            broadcastEffect(new GameEventEffectDTO("WALL_HIT", cx, cy, -1));
+            return;
+        }
         if (event.getType() == CombatEvent.EventType.SHIELD_BLOCKED) return;
         TankEntity targetTank = gameLoop.getTank(event.getTargetTankId());
         TankEntity shooterTank = gameLoop.getTank(event.getShooterId());
@@ -299,13 +323,28 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
             finalHits.put(state.getTankId(), state.getHits());
         }
 
-        // 5. Lưu kết quả vào CSDL (Người ở lại có winnerTankId hợp lệ -> được cộng total_wins + 1)
-        saveMatchResultToDatabase(winnerTankId, isDraw, players);
-
-        // 6. Gửi thông báo kết thúc trận về toàn bộ Client
+        // 5. ƯU TIÊN GỬI THÔNG BÁO KẾT THÚC TRẬN ĐẦU TIÊN (ĐẢM BẢO CLIENT LUÔN HIỆN POPUP)
         String finalReason = isDraw ? "DRAW" : reason;
         GameOverDTO dto = new GameOverDTO(winnerTankId, finalReason, finalScores, finalKills, finalHits);
         broadcastPacket(new Packet(PacketType.GAME_OVER_NOTIFY, GSON.toJson(dto)));
+        LOGGER.info("[Game] Đã broadcast GAME_OVER_NOTIFY thành công tới toàn bộ client!");
+
+        // 6. Lưu kết quả vào CSDL (Bọc try-catch để lỗi DB không làm ảnh hưởng game)
+        try {
+            saveMatchResultToDatabase(winnerTankId, isDraw, players);
+        } catch (Exception e) {
+            LOGGER.severe("[DB] Lỗi lưu kết quả trận đấu: " + e.getMessage());
+        }
+
+        // 7. BÁO CHO ROOM BIẾT ĐỂ RESET TRẠNG THÁI (Bọc try-catch độc lập)
+        if (onGameOverCallback != null) {
+            try {
+                onGameOverCallback.run();
+                LOGGER.info("[GameStateManager] Đã kích hoạt Callback reset trạng thái phòng!");
+            } catch (Exception e) {
+                LOGGER.severe("[GameStateManager] Lỗi khi gọi onGameOverCallback: " + e.getMessage());
+            }
+        }
     }
     
     private void saveMatchResultToDatabase(int winnerTankId, boolean isDraw, List<PlayerCombatState> players) {
@@ -369,6 +408,12 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
     public void onMapChanged(MapChangeEvent event) {
             MapUpdateDTO dto = new MapUpdateDTO(event.getRow(), event.getCol(), event.getNewTileCode());
             broadcastPacket(new Packet(PacketType.MAP_UPDATE, GSON.toJson(dto)));
+            
+            // Broadcast hiệu ứng vỡ vụn
+            double tileSize = ConfigLoader.getTileSize();
+            double centerX = event.getCol() * tileSize + tileSize / 2.0;
+            double centerY = event.getRow() * tileSize + tileSize / 2.0;
+            broadcastEffect(new GameEventEffectDTO("WALL_BREAK", centerX, centerY, -1));
         }
 
     @Override

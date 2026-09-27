@@ -36,15 +36,22 @@ public final class ShootingProcessor {
 
         long cooldownMs = ConfigLoader.getFireCooldownMs();
         if (nowMillis - tank.getLastShotTimeMillis() < cooldownMs) {
-            return ShotResult.fail(); // đang khóa spam đạn
+            return ShotResult.fail(); // đang khóa cooldown
         }
 
+        // TỰ ĐỘNG BẬT ROCKET NẾU XE CÒN BUFF TRÊN SERVER (KHÔNG PHỤ THUỘC CLIENT GỬI GÌ)
         BulletEntity.BulletType actualType = BulletEntity.BulletType.NORMAL;
-        if (requestedType == BulletEntity.BulletType.ROCKET && tank.getRocketBuffActiveUntilMillis() > nowMillis) {
+        if (tank.getRocketBuffActiveUntilMillis() > nowMillis) {
             actualType = BulletEntity.BulletType.ROCKET;
+            // Vừa bấm bắn đạn Rocket xong là tiêu hao Buff ngay lập tức (về 0)
+            tank.setRocketBuffActiveUntilMillis(0L);
         }
 
-        double bulletSpeed = ConfigLoader.getBulletSpeedPerSecond();
+        // LẤY TỐC ĐỘ TỪ CONFIGLOADER TƯƠNG ỨNG TỪNG LOẠI ĐẠN
+        double bulletSpeed = (actualType == BulletEntity.BulletType.ROCKET)
+                ? ConfigLoader.getMissileBulletSpeedPerSecond()
+                : ConfigLoader.getBulletSpeedPerSecond();
+
         double radians = Math.toRadians(tank.getAngle());
         double vx = bulletSpeed * Math.cos(radians);
         double vy = bulletSpeed * Math.sin(radians);

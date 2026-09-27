@@ -1,23 +1,21 @@
 package com.tank2d.client.view;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
 import com.tank2d.client.ClientSession;
 import com.tank2d.client.controller.RoomController;
 import com.tank2d.client.network.ClientSocket;
 import com.tank2d.client.util.AssetLoader;
+import com.tank2d.common.config.ConfigLoader;
 import com.tank2d.common.dto.RoomDTO;
-import com.tank2d.common.dto.game.BulletSnapshotDTO;
-import com.tank2d.common.dto.game.GameEventEffectDTO;
-import com.tank2d.common.dto.game.GameOverDTO;
-import com.tank2d.common.dto.game.GameSnapshotDTO;
-import com.tank2d.common.dto.game.TankPlayerDTO;
-import com.tank2d.common.dto.game.TankSnapshotDTO;
+import com.tank2d.common.dto.game.*;
+import com.tank2d.common.model.User;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
 
 import javafx.animation.AnimationTimer;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
@@ -39,10 +37,11 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
-import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -50,21 +49,29 @@ import java.util.function.Consumer;
 
 public class GameCanvasApp extends Application {
 
-    private static final int CANVAS_WIDTH = 800;
-    private static final int CANVAS_HEIGHT = 600;
-    private static final double TANK_SIZE = 36.0;
-    private static final double LERP_FACTOR = 0.3;
-    private static final double MAX_HP = 3.0;
+    // --- CẤU HÌNH BẢN ĐỒ VÀ THÔNG SỐ VẬT LÝ ---
+    private int canvasWidth;
+    private int canvasHeight;
+    private double tankSize;
+    private double lerpFactor = 0.3;
+    private int maxHp;
+    private int brickWallMaxHits;
+    private int tileSize;
+    private int myTankId = -1;
 
+    // --- JAVA FX & NETWORKING ---
+    private StackPane rootPane;
     private Canvas canvas;
     private GraphicsContext gc;
-    private final Gson gson = new Gson();
-    private ClientSocket clientSocket;
     private Stage primaryStage;
     private RoomDTO currentRoom;
+    private ClientSocket clientSocket;
     private AnimationTimer renderTimer;
+    private Timeline matchTimer;
     private Consumer<Packet> packetListener;
+    private final Gson gson = new Gson();
 
+    // --- INPUT CONTROLS ---
     private final Set<KeyCode> activeKeys = new HashSet<>();
     private boolean spacePressed = false;
 
@@ -74,14 +81,15 @@ public class GameCanvasApp extends Application {
     private final List<BulletSnapshotDTO> bullets = new CopyOnWriteArrayList<>();
     private final List<ExplosionEffect> explosions = new CopyOnWriteArrayList<>();
     private final List<TankPlayerDTO> tankPlayers = new CopyOnWriteArrayList<>();
+    private final Map<Integer, TankSnapshotDTO> globalPlayerStates = new ConcurrentHashMap<>();
+    private final List<ItemSnapshotDTO> items = new CopyOnWriteArrayList<>();
 
-    // --- DỮ LIỆU ĐỊA HÌNH & THỜI GIAN ---
+    // --- ĐỊA HÌNH VÀ THỜI GIAN TRẬN ĐẤU ---
     private int[][] mapMatrix;
     private int[][] brickHitsLeft;
-    private int tileSize = 40;
     private int matchRemainingTime = 60;
 
-    // Quản lý hiệu ứng nổ
+    // Quản lý hiệu ứng vụ nổ
     private static class ExplosionEffect {
         double x, y;
         int radius = 6;
@@ -121,20 +129,28 @@ public class GameCanvasApp extends Application {
     }
 
     public Scene createGameScene() {
-        canvas = new Canvas(CANVAS_WIDTH, CANVAS_HEIGHT);
+        initGameConfigurations();
+        clearGameState();
+
+        canvas = new Canvas(canvasWidth, canvasHeight);
         gc = canvas.getGraphicsContext2D();
 
-        StackPane root = new StackPane();
-        root.getChildren().add(canvas);
+        rootPane = new StackPane();
+        rootPane.setStyle("-fx-background-color: #16181D;");
+        rootPane.getChildren().add(canvas);
+        StackPane.setAlignment(canvas, Pos.CENTER);
 
-        Button exitButton = new Button("THOÁT");
-        exitButton.setStyle("-fx-background-color: #E74C3C; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 5;");
+        // Nút Thoát nhỏ gọn dạng pill button bán trong suốt để không che khuất góc xe P2
+        Button exitButton = new Button("✕ Thoát");
+        exitButton.setStyle("-fx-background-color: rgba(231, 76, 60, 0.75); -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: bold; -fx-background-radius: 15px; -fx-padding: 3px 10px; -fx-cursor: hand;");
+        exitButton.setOnMouseEntered(e -> exitButton.setStyle("-fx-background-color: rgba(231, 76, 60, 1.0); -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: bold; -fx-background-radius: 15px; -fx-padding: 3px 10px; -fx-cursor: hand;"));
+        exitButton.setOnMouseExited(e -> exitButton.setStyle("-fx-background-color: rgba(231, 76, 60, 0.75); -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: bold; -fx-background-radius: 15px; -fx-padding: 3px 10px; -fx-cursor: hand;"));
         StackPane.setAlignment(exitButton, Pos.TOP_RIGHT);
-        StackPane.setMargin(exitButton, new Insets(10));
+        StackPane.setMargin(exitButton, new Insets(6, 6, 0, 0));
         exitButton.setOnAction(e -> handleExit());
-        root.getChildren().add(exitButton);
+        rootPane.getChildren().add(exitButton);
 
-        Scene scene = new Scene(root, CANVAS_WIDTH, CANVAS_HEIGHT);
+        Scene scene = new Scene(rootPane, canvasWidth, canvasHeight);
 
         scene.setOnKeyPressed(e -> {
             activeKeys.add(e.getCode());
@@ -151,44 +167,63 @@ public class GameCanvasApp extends Application {
             }
         });
 
-        canvas.setFocusTraversable(true);
-        Platform.runLater(() -> canvas.requestFocus());
+        scene.windowProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null) {
+                newVal.focusedProperty().addListener((obsF, oldF, isFocused) -> {
+                    if (!isFocused) activeKeys.clear();
+                });
+            }
+        });
 
-        loadMapConfigFromFile("map_default");
+        canvas.setFocusTraversable(true);
+        Platform.runLater(() -> {
+            canvas.requestFocus();
+            if (primaryStage != null) {
+                primaryStage.sizeToScene();
+                primaryStage.centerOnScreen();
+            }
+        });
+
         initNetworkReceiver();
         requestTankPlayerInfo();
+        startMatchTimer();
         startRenderLoop();
 
         return scene;
     }
 
-    private void requestTankPlayerInfo() {
-        if (clientSocket == null || !clientSocket.isConnected()) return;
-        try {
-            clientSocket.sendPacket(new Packet(PacketType.TANK_PLAYER_INFO_REQ, ""));
-        } catch (IOException ignored) {}
-    }
+    private void initGameConfigurations() {
+        this.tileSize = ConfigLoader.getTileSize();
+        this.tankSize = ConfigLoader.getTankSize();
+        this.maxHp = ConfigLoader.getMaxHp();
+        this.brickWallMaxHits = ConfigLoader.getBrickWallMaxHits();
 
-    private void loadMapConfigFromFile(String mapName) {
-        JsonObject mapJson = AssetLoader.loadMapConfig(mapName);
-        if (mapJson != null && mapJson.has("matrix")) {
-            JsonArray rows = mapJson.getAsJsonArray("matrix");
-            int h = rows.size();
-            int w = rows.get(0).getAsJsonArray().size();
-            mapMatrix = new int[h][w];
-            brickHitsLeft = new int[h][w];
+        int cols = ConfigLoader.getMapCols();
+        int rows = ConfigLoader.getMapRows();
+        this.canvasWidth = cols * this.tileSize;
+        this.canvasHeight = rows * this.tileSize;
 
-            for (int r = 0; r < h; r++) {
-                JsonArray cols = rows.get(r).getAsJsonArray();
-                for (int c = 0; c < w; c++) {
-                    int type = cols.get(c).getAsInt();
-                    mapMatrix[r][c] = type;
-                    if (type == 2) {
-                        brickHitsLeft[r][c] = 3;
-                    }
+        this.mapMatrix = ConfigLoader.getMapMatrix();
+        int h = mapMatrix.length;
+        int w = h > 0 ? mapMatrix[0].length : 0;
+
+        this.brickHitsLeft = new int[h][w];
+        for (int r = 0; r < h; r++) {
+            for (int c = 0; c < w; c++) {
+                if (mapMatrix[r][c] == 2) {
+                    brickHitsLeft[r][c] = this.brickWallMaxHits;
                 }
             }
         }
+    }
+
+    private void startMatchTimer() {
+        if (matchTimer != null) matchTimer.stop();
+        matchTimer = new Timeline(new KeyFrame(Duration.seconds(1), e -> {
+            if (matchRemainingTime > 0) matchRemainingTime--;
+        }));
+        matchTimer.setCycleCount(Timeline.INDEFINITE);
+        matchTimer.play();
     }
 
     private void initNetworkReceiver() {
@@ -204,48 +239,18 @@ public class GameCanvasApp extends Application {
         }
     }
 
-    private void processIncomingPacket(Packet packet) {
-        if (packet.getType() == PacketType.GAME_SNAPSHOT) {
-            GameSnapshotDTO snapshot = gson.fromJson(packet.getData(), GameSnapshotDTO.class);
-            if (snapshot != null) {
-                if (snapshot.getBullets() != null) {
-                    this.bullets.clear();
-                    this.bullets.addAll(snapshot.getBullets());
-                }
+    private void requestTankPlayerInfo() {
+        if (clientSocket == null || !clientSocket.isConnected()) return;
+        try {
+            clientSocket.sendPacket(new Packet(PacketType.TANK_PLAYER_INFO_REQ, ""));
+        } catch (IOException ignored) {}
+    }
 
-                if (snapshot.getTanks() != null) {
-                    Set<Integer> currentVisibleTankIds = new HashSet<>();
-
-                    for (TankSnapshotDTO incoming : snapshot.getTanks()) {
-                        currentVisibleTankIds.add(incoming.getId());
-                        targetTanks.put(incoming.getId(), incoming);
-                        displayTanks.putIfAbsent(incoming.getId(), 
-                            new TankSnapshotDTO(incoming.getId(), incoming.getX(), incoming.getY(), 
-                                                incoming.getAngle(), incoming.getHp(), incoming.isAlive()));
-                    }
-
-                    // FIX KẸT BÓNG XE: Xóa sạch các xe đã bị khuất khỏi tầm nhìn (vào bụi cỏ)
-                    displayTanks.keySet().removeIf(id -> !currentVisibleTankIds.contains(id));
-                    targetTanks.keySet().removeIf(id -> !currentVisibleTankIds.contains(id));
-                }
-            }
-        } else if (packet.getType() == PacketType.GAME_EVENT_EFFECT) {
-            GameEventEffectDTO effect = gson.fromJson(packet.getData(), GameEventEffectDTO.class);
-            if (effect != null && "EXPLOSION".equalsIgnoreCase(effect.getEventType())) {
-                explosions.add(new ExplosionEffect(effect.getX(), effect.getY()));
-            }
-        } else if (packet.getType() == PacketType.TANK_PLAYER_INFO) {
-            TankPlayerDTO[] players = gson.fromJson(packet.getData(), TankPlayerDTO[].class);
-            if (players != null) {
-                tankPlayers.clear();
-                tankPlayers.addAll(Arrays.asList(players));
-            }
-        } else if (packet.getType() == PacketType.GAME_OVER_NOTIFY) {
-            GameOverDTO gameOver = gson.fromJson(packet.getData(), GameOverDTO.class);
-            if (gameOver != null) {
-                Platform.runLater(() -> showGameOverPopup(gameOver));
-            }
-        }
+    private void sendShootRequestToServer() {
+        if (clientSocket == null || !clientSocket.isConnected()) return;
+        try {
+            clientSocket.sendPacket(new Packet(PacketType.PLAYER_SHOOT_REQ, "{}"));
+        } catch (IOException ignored) {}
     }
 
     private void sendInputToServer() {
@@ -266,11 +271,92 @@ public class GameCanvasApp extends Application {
         } catch (IOException ignored) {}
     }
 
-    private void sendShootRequestToServer() {
-        if (clientSocket == null || !clientSocket.isConnected()) return;
-        try {
-            clientSocket.sendPacket(new Packet(PacketType.PLAYER_SHOOT_REQ, "{}"));
-        } catch (IOException ignored) {}
+    private void processIncomingPacket(Packet packet) {
+        if (packet.getType() == PacketType.GAME_SNAPSHOT) {
+            GameSnapshotDTO snapshot = gson.fromJson(packet.getData(), GameSnapshotDTO.class);
+            if (snapshot != null) {
+                if (snapshot.getItems() != null) {
+                    this.items.clear();
+                    this.items.addAll(snapshot.getItems());
+                }
+                if (snapshot.getBullets() != null) {
+                    this.bullets.clear();
+                    this.bullets.addAll(snapshot.getBullets());
+                }
+                if (snapshot.getTanks() != null) {
+                    Set<Integer> activeTankIds = new HashSet<>();
+                    for (TankSnapshotDTO incoming : snapshot.getTanks()) {
+                        activeTankIds.add(incoming.getId());
+                        targetTanks.put(incoming.getId(), incoming);
+                        globalPlayerStates.put(incoming.getId(), incoming);
+
+                        if (displayTanks.containsKey(incoming.getId())) {
+                            updateTankHpAndStatus(displayTanks.get(incoming.getId()), incoming);
+                        } else {
+                            displayTanks.put(incoming.getId(), new TankSnapshotDTO(
+                                incoming.getId(), incoming.getX(), incoming.getY(),
+                                incoming.getAngle(), incoming.getHp(), incoming.isAlive(),
+                                incoming.isGhost(), incoming.hasShield(), incoming.hasNitro()
+                            ));
+                        }
+                    }
+                    displayTanks.keySet().removeIf(id -> !activeTankIds.contains(id));
+                    targetTanks.keySet().removeIf(id -> !activeTankIds.contains(id));
+                    globalPlayerStates.keySet().removeIf(id -> !activeTankIds.contains(id));
+
+                    if (myTankId == -1) {
+                        updateMyTankIdFromSession();
+                    }
+                }
+            }
+        } else if (packet.getType() == PacketType.TANK_PLAYER_INFO) {
+            Type listType = new TypeToken<ArrayList<TankPlayerDTO>>(){}.getType();
+            List<TankPlayerDTO> players = gson.fromJson(packet.getData(), listType);
+            if (players != null) {
+                tankPlayers.clear();
+                tankPlayers.addAll(players);
+                updateMyTankIdFromSession();
+            }
+        } else if (packet.getType() == PacketType.GAME_EVENT_EFFECT) {
+            GameEventEffectDTO effect = gson.fromJson(packet.getData(), GameEventEffectDTO.class);
+            if (effect != null) {
+                String eventType = effect.getEventType() != null ? effect.getEventType().toUpperCase() : "";
+                if ("EXPLOSION".equalsIgnoreCase(eventType) || "WALL_BREAK".equalsIgnoreCase(eventType)) {
+                    explosions.add(new ExplosionEffect(effect.getX(), effect.getY()));
+                } else if (eventType.contains("WALL") || eventType.contains("BRICK") || eventType.contains("TILE")) {
+                    int c = (int) (effect.getX() / tileSize);
+                    int r = (int) (effect.getY() / tileSize);
+                    if (mapMatrix != null && r >= 0 && r < mapMatrix.length && c >= 0 && c < mapMatrix[0].length) {
+                        if (mapMatrix[r][c] == 2) {
+                            brickHitsLeft[r][c]--;
+                            if (brickHitsLeft[r][c] <= 0) mapMatrix[r][c] = 0;
+                        }
+                    }
+                    explosions.add(new ExplosionEffect(effect.getX(), effect.getY()));
+                } else if (eventType.startsWith("ITEM_PICKUP")) {
+                    explosions.add(new ExplosionEffect(effect.getX(), effect.getY()));
+                }
+            }
+        } else if (packet.getType() == PacketType.GAME_OVER_NOTIFY) {
+            GameOverDTO gameOver = gson.fromJson(packet.getData(), GameOverDTO.class);
+            Platform.runLater(() -> {
+                stopAllTimers();
+                showGameOverPopup(gameOver);
+            });
+        } else if (packet.getType() == PacketType.MAP_UPDATE) {
+            MapUpdateDTO mapUpdate = gson.fromJson(packet.getData(), MapUpdateDTO.class);
+            if (mapUpdate != null && mapMatrix != null) {
+                int r = mapUpdate.getRow();
+                int c = mapUpdate.getCol();
+                if (r >= 0 && r < mapMatrix.length && c >= 0 && c < mapMatrix[0].length) {
+                    mapMatrix[r][c] = mapUpdate.getNewTileCode();
+                    brickHitsLeft[r][c] = 0;
+                    double centerX = c * tileSize + tileSize / 2.0;
+                    double centerY = r * tileSize + tileSize / 2.0;
+                    explosions.add(new ExplosionEffect(centerX, centerY));
+                }
+            }
+        }
     }
 
     private void startRenderLoop() {
@@ -280,22 +366,28 @@ public class GameCanvasApp extends Application {
                 sendInputToServer();
                 updateClientState();
 
-                // 1. Clear nền tối
-                gc.setFill(Color.rgb(22, 24, 29));
-                gc.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                // 1. Render Nền
+                Image bgImg = AssetLoader.getImage("tiles/background.png");
+                if (bgImg != null && !bgImg.isError()) {
+                    gc.drawImage(bgImg, 0, 0, canvasWidth, canvasHeight);
+                } else {
+                    gc.setFill(Color.rgb(22, 24, 29));
+                    gc.fillRect(0, 0, canvasWidth, canvasHeight);
+                }
 
-                // 2. Render ma trận tường
+                // 2. Render Tường & Items
                 renderTerrainAndWalls();
+                renderItems();
 
-                // 3. Render đạn, xe & hiệu ứng nổ
+                // 3. Render Đạn, Xe & Vụ nổ
                 renderBullets();
                 renderTanks();
                 renderExplosions();
 
-                // 4. Render bụi cỏ đè lên xe
+                // 4. Render Bụi cỏ
                 renderBushes();
 
-                // 5. Render bảng HUD & đồng hồ
+                // 5. Render HUD tinh gọn
                 renderHUD();
             }
         };
@@ -309,43 +401,39 @@ public class GameCanvasApp extends Application {
             TankSnapshotDTO target = targetTanks.get(tankId);
 
             if (target != null) {
-                double newX = current.getX() + (target.getX() - current.getX()) * LERP_FACTOR;
-                double newY = current.getY() + (target.getY() - current.getY()) * LERP_FACTOR;
-                
+                double newX = current.getX() + (target.getX() - current.getX()) * lerpFactor;
+                double newY = current.getY() + (target.getY() - current.getY()) * lerpFactor;
                 double diffAngle = (target.getAngle() - current.getAngle() + 540) % 360 - 180;
-                double newAngle = (current.getAngle() + diffAngle * LERP_FACTOR + 360) % 360;
+                double newAngle = (current.getAngle() + diffAngle * lerpFactor + 360) % 360;
 
                 current.setX(newX);
                 current.setY(newY);
                 current.setAngle(newAngle);
 
-                updateTankHpAndStatus(current, target.getHp(), target.isAlive());
+                updateTankHpAndStatus(current, target);
+                if (globalPlayerStates.containsKey(tankId)) {
+                    globalPlayerStates.get(tankId).setHp(target.getHp());
+                }
             }
         }
 
-        for (ExplosionEffect exp : explosions) {
-            exp.update();
-        }
+        for (ExplosionEffect exp : explosions) exp.update();
         explosions.removeIf(exp -> exp.finished);
     }
 
-    private void updateTankHpAndStatus(TankSnapshotDTO dto, int hp, boolean isAlive) {
-        try {
-            java.lang.reflect.Field hpField = TankSnapshotDTO.class.getDeclaredField("hp");
-            hpField.setAccessible(true);
-            hpField.setInt(dto, hp);
-
-            java.lang.reflect.Field aliveField = TankSnapshotDTO.class.getDeclaredField("isAlive");
-            aliveField.setAccessible(true);
-            aliveField.setBoolean(dto, isAlive);
-        } catch (Exception ignored) {}
+    private void updateTankHpAndStatus(TankSnapshotDTO dto, TankSnapshotDTO target) {
+        dto.setHp(target.getHp());
+        dto.setGhost(target.isGhost());
+        dto.setShield(target.hasShield());
+        dto.setNitro(target.hasNitro());
     }
 
     private void renderTerrainAndWalls() {
         if (mapMatrix == null) return;
-
         Image stoneImg = AssetLoader.getImage("tiles/stone_wall.png");
         Image brickImg = AssetLoader.getImage("tiles/brick_wall.png");
+        Image brickCrackedImg = AssetLoader.getImage("tiles/brick_wall_cracked.png");
+        Image brickDamagedImg = AssetLoader.getImage("tiles/brick_wall_damaged.png");
 
         for (int r = 0; r < mapMatrix.length; r++) {
             for (int c = 0; c < mapMatrix[r].length; c++) {
@@ -354,75 +442,112 @@ public class GameCanvasApp extends Application {
                 double y = r * tileSize;
 
                 if (tileType == 1) {
-                    if (stoneImg != null) {
+                    if (stoneImg != null && !stoneImg.isError()) {
                         gc.drawImage(stoneImg, x, y, tileSize, tileSize);
                     } else {
                         gc.setFill(Color.GRAY);
                         gc.fillRect(x, y, tileSize, tileSize);
                     }
                 } else if (tileType == 2) {
-                    if (brickImg != null) {
-                        gc.drawImage(brickImg, x, y, tileSize, tileSize);
+                    int hp = brickHitsLeft[r][c];
+                    if (hp <= 0) {
+                        mapMatrix[r][c] = 0;
+                        continue;
+                    }
+                    Image sprite = (hp == 1 && brickDamagedImg != null) ? brickDamagedImg :
+                                   (hp <= 2 && brickCrackedImg != null) ? brickCrackedImg : brickImg;
+
+                    if (sprite != null && !sprite.isError()) {
+                        gc.drawImage(sprite, x, y, tileSize, tileSize);
                     } else {
                         gc.setFill(Color.CHOCOLATE);
                         gc.fillRect(x, y, tileSize, tileSize);
                     }
-
-                    int hitsLeft = brickHitsLeft[r][c];
-                    if (hitsLeft < 3) {
-                        gc.setStroke(Color.BLACK);
-                        gc.setLineWidth(2);
-                        gc.strokeLine(x + 8, y + 8, x + 18, y + 22);
-                        if (hitsLeft <= 1) {
-                            gc.strokeLine(x + 24, y + 10, x + 32, y + 32);
-                            gc.strokeLine(x + 10, y + 26, x + 28, y + 34);
-                        }
-                    }
                 }
             }
+        }
+    }
+
+    private void renderItems() {
+        if (items.isEmpty()) return;
+        double itemSize = 22.0;
+
+        for (ItemSnapshotDTO item : items) {
+            double x = item.getX();
+            double y = item.getY();
+            String normalizedType = (item.getType() != null) ? item.getType().toUpperCase() : "";
+            Image itemImg = AssetLoader.getPowerUpImage(normalizedType);
+
+            gc.save();
+            gc.setFill(Color.rgb(255, 255, 255, 0.25));
+            gc.fillOval(x - itemSize / 1.5, y - itemSize / 1.5, itemSize * 1.33, itemSize * 1.33);
+
+            if (itemImg != null && !itemImg.isError()) {
+                gc.drawImage(itemImg, x - itemSize / 2.0, y - itemSize / 2.0, itemSize, itemSize);
+            } else {
+                switch (normalizedType) {
+                    case "HEALTH_PACK" -> gc.setFill(Color.RED);
+                    case "SHIELD" -> gc.setFill(Color.DODGERBLUE);
+                    case "NITRO" -> gc.setFill(Color.ORANGE);
+                    case "ROCKET_AMMO" -> gc.setFill(Color.PURPLE);
+                    default -> gc.setFill(Color.WHITE);
+                }
+                gc.fillRect(x - itemSize / 2.0, y - itemSize / 2.0, itemSize, itemSize);
+            }
+            gc.restore();
         }
     }
 
     private void renderBushes() {
         if (mapMatrix == null) return;
         Image bushImg = AssetLoader.getImage("tiles/grass.png");
+        TankSnapshotDTO myTank = displayTanks.get(myTankId);
 
         for (int r = 0; r < mapMatrix.length; r++) {
             for (int c = 0; c < mapMatrix[r].length; c++) {
                 if (mapMatrix[r][c] == 3) {
                     double x = c * tileSize;
                     double y = r * tileSize;
-                    if (bushImg != null) {
+
+                    gc.save();
+                    if (myTank != null && myTank.isAlive()) {
+                        double myC = Math.floor(myTank.getX() / tileSize);
+                        double myR = Math.floor(myTank.getY() / tileSize);
+                        if ((int) myC == c && (int) myR == r) {
+                            gc.setGlobalAlpha(0.55);
+                        }
+                    }
+                    if (bushImg != null && !bushImg.isError()) {
                         gc.drawImage(bushImg, x, y, tileSize, tileSize);
                     } else {
                         gc.setFill(Color.rgb(34, 139, 34, 0.75));
                         gc.fillRect(x, y, tileSize, tileSize);
                     }
+                    gc.restore();
                 }
             }
         }
     }
 
     private void renderBullets() {
-        Image missileImg = AssetLoader.getImage("bullets/missile.png");
+        Image missileImg = AssetLoader.getImage("bullets/rocket.png");
 
         for (BulletSnapshotDTO bullet : bullets) {
-            double speed = Math.hypot(bullet.getVx(), bullet.getVy());
-            boolean isMissile = speed > 450.0;
+            boolean isMissile = "ROCKET".equalsIgnoreCase(bullet.getType());
 
             if (isMissile) {
                 gc.save();
                 gc.translate(bullet.getX(), bullet.getY());
                 double angle = Math.toDegrees(Math.atan2(bullet.getVy(), bullet.getVx()));
-                gc.rotate(angle);
+                gc.rotate(angle + 90.0);
 
-                if (missileImg != null) {
-                    gc.drawImage(missileImg, -10, -5, 20, 10);
+                if (missileImg != null && !missileImg.isError()) {
+                    double targetHeight = 22.0;
+                    double targetWidth = targetHeight * (missileImg.getWidth() / missileImg.getHeight());
+                    gc.drawImage(missileImg, -targetWidth / 2.0, -targetHeight / 2.0, targetWidth, targetHeight);
                 } else {
                     gc.setFill(Color.ORANGE);
-                    gc.fillPolygon(new double[]{-10, 10, -10}, new double[]{-5, 0, 5}, 3);
-                    gc.setFill(Color.RED);
-                    gc.fillOval(-16, -3, 6, 6);
+                    gc.fillPolygon(new double[]{-5, 5, 0}, new double[]{10, 10, -10}, 3);
                 }
                 gc.restore();
             } else {
@@ -432,208 +557,206 @@ public class GameCanvasApp extends Application {
         }
     }
 
-    private String getUsernameByTankId(int tankId) {
-        for (TankPlayerDTO player : tankPlayers) {
-            if (player.getTankId() == tankId) return player.getUsername();
-        }
-        return null;
-    }
-
     private void renderTanks() {
+        String[] tankImageAssets = {
+            "tiles/green_tank.png", "tiles/red_tank.png",
+            "tiles/purple_tank.png", "tiles/yellow_tank.png"
+        };
+        Color[] fallbackColors = {
+            Color.web("#4CAF50"), Color.web("#F44336"),
+            Color.web("#9C27B0"), Color.web("#FFC107")
+        };
+
         for (TankSnapshotDTO tank : displayTanks.values()) {
             if (!tank.isAlive()) continue;
 
-            // 1. Thân & nòng xe
+            boolean isMyTank = (tank.getId() == myTankId);
+            boolean inBush = isTankInBush(tank.getX(), tank.getY());
+
+            if (inBush && !isMyTank && myTankId != -1) continue;
+
+            int colorIdx = Math.abs(tank.getId() - 1) % tankImageAssets.length;
+            Image tankSprite = AssetLoader.getImage(tankImageAssets[colorIdx]);
+
             gc.save();
+
+            if (tank.isGhost()) {
+                gc.setGlobalAlpha(0.5);
+            } else if (inBush && isMyTank) {
+                gc.setGlobalAlpha(0.55);
+            }
+
+            // Nitro effect
+            if (tank.hasNitro()) {
+                gc.save();
+                gc.translate(tank.getX(), tank.getY());
+                gc.rotate(tank.getAngle() + 90.0);
+                double flame = 12 + Math.random() * 8;
+                gc.setFill(Color.ORANGERED);
+                gc.fillPolygon(new double[]{-6, 0, 6}, new double[]{tankSize / 2.0, tankSize / 2.0 + flame, tankSize / 2.0}, 3);
+                gc.setFill(Color.YELLOW);
+                gc.fillPolygon(new double[]{-3, 0, 3}, new double[]{tankSize / 2.0, tankSize / 2.0 + flame * 0.6, tankSize / 2.0}, 3);
+                gc.restore();
+            }
+
+            // Thân xe
             gc.translate(tank.getX(), tank.getY());
             gc.rotate(tank.getAngle() + 90.0);
 
-            Color bodyColor = (tank.getId() == 1) ? Color.web("#4CAF50") : Color.web("#F44336");
-
-            // Xích xe
-            gc.setFill(Color.web("#333333"));
-            gc.fillRect(-TANK_SIZE / 2.0 - 2, -TANK_SIZE / 2.0, 5, TANK_SIZE);
-            gc.fillRect(TANK_SIZE / 2.0 - 3, -TANK_SIZE / 2.0, 5, TANK_SIZE);
-
-            // Thân xe
-            gc.setFill(bodyColor);
-            gc.fillRect(-TANK_SIZE / 2.0 + 3, -TANK_SIZE / 2.0, TANK_SIZE - 6, TANK_SIZE);
-
-            // Nòng pháo
-            gc.setFill(Color.BLACK);
-            gc.fillRect(-2.5, -TANK_SIZE / 2.0 - 10, 5, 12);
-
-            // Tháp pháo
-            gc.setFill(Color.web("#212121"));
-            gc.fillOval(-7, -7, 14, 14);
+            if (tankSprite != null && !tankSprite.isError()) {
+                gc.drawImage(tankSprite, -tankSize / 2.0, -tankSize / 2.0, tankSize, tankSize);
+            } else {
+                gc.setFill(fallbackColors[colorIdx]);
+                gc.fillRect(-tankSize / 2.0 + 3, -tankSize / 2.0, tankSize - 6, tankSize);
+                gc.setFill(Color.BLACK);
+                gc.fillRect(-2.5, -tankSize / 2.0 - 8, 5, 10);
+            }
             gc.restore();
 
-            // 2. Thanh máu & tên người chơi
-            double barWidth = 36.0;
-            double barHeight = 6.0;
+            // Hiệu ứng Khiên
+            if (tank.hasShield()) {
+                gc.save();
+                double radius = tankSize * 1.5;
+                gc.setStroke(Color.CYAN);
+                gc.setLineWidth(2.0);
+                gc.strokeOval(tank.getX() - radius / 2.0, tank.getY() - radius / 2.0, radius, radius);
+                gc.setFill(Color.rgb(0, 255, 255, 0.2));
+                gc.fillOval(tank.getX() - radius / 2.0, tank.getY() - radius / 2.0, radius, radius);
+                gc.restore();
+            }
+
+            // Thanh Máu & Tên
+            gc.save();
+            double barWidth = this.tankSize;
+            double barHeight = 4.0;
             double barX = tank.getX() - barWidth / 2.0;
-            double barY = tank.getY() - TANK_SIZE / 2.0 - 12.0;
+            double barY = tank.getY() - tankSize / 2.0 - 7.0;
 
             String username = getUsernameByTankId(tank.getId());
             if (username != null) {
                 gc.setFill(Color.WHITE);
-                gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
-                double textWidth = username.length() * 6.5;
-                gc.fillText(username, tank.getX() - textWidth / 2.0, barY - 6);
+                gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10.5));
+                gc.fillText(username, tank.getX() - (username.length() * 5.5) / 2.0, barY - 4);
             }
 
             gc.setFill(Color.DARKRED);
             gc.fillRect(barX, barY, barWidth, barHeight);
 
-            int currentHp = (int) Math.max(0, Math.min(MAX_HP, tank.getHp()));
-            double hpWidth = (barWidth / MAX_HP) * currentHp;
+            int currentHp = Math.max(0, Math.min(maxHp, tank.getHp()));
             gc.setFill(Color.LIME);
-            gc.fillRect(barX, barY, hpWidth, barHeight);
+            gc.fillRect(barX, barY, (barWidth / maxHp) * currentHp, barHeight);
 
             gc.setStroke(Color.BLACK);
-            gc.setLineWidth(1);
+            gc.setLineWidth(0.8);
             gc.strokeRect(barX, barY, barWidth, barHeight);
-            for (int i = 1; i < MAX_HP; i++) {
-                double lineX = barX + (barWidth / MAX_HP) * i;
-                gc.strokeLine(lineX, barY, lineX, barY + barHeight);
-            }
+            gc.restore();
         }
     }
 
     private void renderExplosions() {
-        for (ExplosionEffect exp : explosions) {
-            exp.render(gc);
-        }
+        for (ExplosionEffect exp : explosions) exp.render(gc);
     }
 
     private void renderHUD() {
         gc.save();
 
-        // Đồng hồ đếm ngược
-        gc.setFill(Color.rgb(0, 0, 0, 0.3));
-        gc.fillRoundRect(340, 10, 120, 35, 10, 10);
-        gc.setStroke(Color.rgb(255, 215, 0, 0.5));
-        gc.setLineWidth(1.5);
-        gc.strokeRoundRect(340, 10, 120, 35, 10, 10);
+        // 1. Đồng hồ đếm ngược tinh gọn giữa màn hình
+        double clockWidth = 76;
+        double clockHeight = 22;
+        double clockX = (canvasWidth / 2.0) - (clockWidth / 2.0);
+        gc.setFill(Color.rgb(0, 0, 0, 0.45));
+        gc.fillRoundRect(clockX, 6, clockWidth, clockHeight, 6, 6);
+        gc.setStroke(Color.rgb(255, 215, 0, 0.4));
+        gc.setLineWidth(1.0);
+        gc.strokeRoundRect(clockX, 6, clockWidth, clockHeight, 6, 6);
 
-        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
-        gc.setFill(Color.rgb(255, 255, 0, 0.75));
-        String timeStr = String.format("%02d:%02d", matchRemainingTime / 60, matchRemainingTime % 60);
-        gc.fillText("⏱ " + timeStr, 365, 34);
+        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
+        gc.setFill(Color.rgb(255, 235, 59, 0.95));
+        gc.fillText(String.format("⏱ %02d:%02d", matchRemainingTime / 60, matchRemainingTime % 60), clockX + 11, 21);
 
-        // Bảng xếp hạng mini
-        gc.setFill(Color.rgb(15, 18, 24, 0.25));
-        gc.fillRoundRect(10, 10, 210, 115, 8, 8);
-        gc.setStroke(Color.rgb(58, 63, 77, 0.4));
-        gc.strokeRoundRect(10, 10, 210, 115, 8, 8);
+        // 2. Bảng điểm mini bán trong suốt
+        int boardWidth = 145;
+        int rowHeight = 14;
+        int boardHeight = 20 + (Math.max(1, tankPlayers.size()) * rowHeight) + 4;
 
-        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
-        gc.setFill(Color.rgb(255, 255, 255, 0.7));
-        gc.fillText("BẢNG ĐIỂM TRẬN ĐẤU", 20, 28);
-        gc.setStroke(Color.rgb(128, 128, 128, 0.4));
-        gc.strokeLine(20, 34, 200, 34);
+        gc.setFill(Color.rgb(15, 18, 24, 0.45));
+        gc.fillRoundRect(6, 6, boardWidth, boardHeight, 6, 6);
+        gc.setStroke(Color.rgb(255, 255, 255, 0.15));
+        gc.strokeRoundRect(6, 6, boardWidth, boardHeight, 6, 6);
 
-        gc.setFont(Font.font("Consolas", FontWeight.NORMAL, 12));
-        int startY = 52;
-        if (displayTanks.isEmpty()) {
-            gc.setFill(Color.rgb(211, 211, 211, 0.6));
-            gc.fillText("Đang chờ người chơi...", 20, startY);
+        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 9.5));
+        gc.setFill(Color.rgb(200, 200, 200, 0.85));
+        gc.fillText("DANH SÁCH CHIẾN ĐẤU", 10, 18);
+        gc.setStroke(Color.rgb(255, 255, 255, 0.1));
+        gc.strokeLine(10, 21, boardWidth + 2, 21);
+
+        gc.setFont(Font.font("Consolas", FontWeight.BOLD, 10));
+        int startY = 33;
+        Color[] tankColors = {
+            Color.rgb(76, 175, 80, 0.95), Color.rgb(244, 67, 54, 0.95),
+            Color.rgb(156, 39, 176, 0.95), Color.rgb(255, 193, 7, 0.95)
+        };
+
+        if (tankPlayers.isEmpty()) {
+            gc.setFill(Color.rgb(200, 200, 200, 0.5));
+            gc.fillText("Đang nạp...", 10, startY);
         } else {
-            for (TankSnapshotDTO tank : displayTanks.values()) {
-                String uName = getUsernameByTankId(tank.getId());
-                String displayName = (uName != null) ? uName : ("Tank #" + tank.getId());
-                if (displayName.length() > 8) displayName = displayName.substring(0, 8);
+            for (TankPlayerDTO player : tankPlayers) {
+                int tId = player.getTankId();
+                String displayName = player.getUsername();
 
-                Color textColor = (tank.getId() == 1) ? Color.rgb(76, 175, 80, 0.75) : Color.rgb(244, 67, 54, 0.75);
-                gc.setFill(textColor);
-                gc.fillText(String.format("%-8s | HP:%d", displayName, tank.getHp()), 20, startY);
-                startY += 18;
+                if (tId == myTankId) displayName += "*";
+                if (displayName.length() > 7) displayName = displayName.substring(0, 7);
+
+                int currentHp = (int) maxHp;
+                if (globalPlayerStates.containsKey(tId)) {
+                    currentHp = globalPlayerStates.get(tId).getHp();
+                } else if (displayTanks.containsKey(tId)) {
+                    currentHp = displayTanks.get(tId).getHp();
+                }
+
+                int colorIdx = Math.abs(tId - 1) % tankColors.length;
+                gc.setFill(tankColors[colorIdx]);
+                gc.fillText(String.format("%-7s | HP:%d", displayName, currentHp), 10, startY);
+                startY += rowHeight;
             }
         }
 
         gc.restore();
     }
 
-    private void handleExit() {
-        if (renderTimer != null) renderTimer.stop();
-        activeKeys.clear();
-        spacePressed = false;
-        removeNetworkReceiver();
-
-        try {
-            if (clientSocket != null && clientSocket.isConnected()) {
-                clientSocket.sendPacket(new Packet(PacketType.ROOM_LEAVE_REQ, ""));
-            }
-        } catch (IOException ignored) {}
-
-        Platform.runLater(() -> {
-            try {
-                if (primaryStage == null) {
-                    primaryStage = (Stage) canvas.getScene().getWindow();
-                }
-                FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/tank2d/client/view/lobby.fxml"));
-                primaryStage.setScene(new Scene(loader.load()));
-                primaryStage.setTitle("Tank 2D Online - Lobby");
-                primaryStage.show();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        });
-    }
-
-    private void handlePlayAgain() {
-        if (renderTimer != null) renderTimer.stop();
-        activeKeys.clear();
-        spacePressed = false;
-        removeNetworkReceiver();
-
-        Platform.runLater(() -> {
-            try {
-                if (primaryStage == null) {
-                    primaryStage = (Stage) canvas.getScene().getWindow();
-                }
-                FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/tank2d/client/view/room.fxml"));
-                Parent root = loader.load();
-                RoomController controller = loader.getController();
-                controller.setRoom(currentRoom);
-                controller.resetReadyForReplay();
-
-                primaryStage.setScene(new Scene(root));
-                primaryStage.setTitle("Tank 2D Online - Room");
-                primaryStage.show();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        });
-    }
-
     private void showGameOverPopup(GameOverDTO gameOver) {
-        Stage popup = new Stage();
-        if (primaryStage == null && canvas != null && canvas.getScene() != null) {
-            primaryStage = (Stage) canvas.getScene().getWindow();
-        }
-        if (primaryStage != null) popup.initOwner(primaryStage);
-        popup.initModality(Modality.APPLICATION_MODAL);
-        popup.setTitle("Tank 2D - Kết quả");
+        if (rootPane == null) return;
 
-        Label title = new Label("🏆 KẾT THÚC VÁN ĐẤU");
-        title.setStyle("-fx-text-fill: #FFD700; -fx-font-size: 24px; -fx-font-weight: bold;");
+        // Lớp phủ tối đè lên toàn bộ màn hình Game hiện tại (In-game Overlay)
+        StackPane overlay = new StackPane();
+        overlay.setStyle("-fx-background-color: rgba(10, 12, 18, 0.85);");
+        overlay.setPrefSize(canvasWidth, canvasHeight);
+
+        VBox card = new VBox(12);
+        card.setAlignment(Pos.CENTER);
+        card.setPadding(new Insets(20, 25, 20, 25));
+        card.setMaxWidth(420);
+        card.setStyle("-fx-background-color: #1A202C; -fx-background-radius: 12px; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.6), 15, 0, 0, 5); -fx-border-color: #2D3748; -fx-border-width: 1px; -fx-border-radius: 12px;");
+
+        Label title = new Label("🏆 KẾT THÚC TRẬN ĐẤU");
+        title.setStyle("-fx-text-fill: #F6E05E; -fx-font-size: 20px; -fx-font-weight: bold;");
 
         String winnerUsername = getUsernameByTankId(gameOver.getWinnerTankId());
-        String winnerText = "🏆 Người chiến thắng: TANK " + gameOver.getWinnerTankId() 
-                + (winnerUsername != null ? " - " + winnerUsername : "");
+        String winnerText = "Người thắng: TANK " + gameOver.getWinnerTankId() 
+                + (winnerUsername != null ? " (" + winnerUsername + ")" : "");
         Label winnerLabel = new Label(winnerText);
-        winnerLabel.setStyle("-fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold;");
+        winnerLabel.setStyle("-fx-text-fill: #E2E8F0; -fx-font-size: 14px; -fx-font-weight: bold;");
 
         GridPane table = new GridPane();
-        table.setHgap(15);
-        table.setVgap(10);
+        table.setHgap(12);
+        table.setVgap(8);
         table.setAlignment(Pos.CENTER);
 
-        String[] headerTitles = {"HẠNG", "TANK", "SCORE", "KILL", "HIT"};
+        String[] headerTitles = {"HẠNG", "NGƯỜI CHƠI", "ĐIỂM", "HẠ GỤC", "BẮN TRÚNG"};
         for (int i = 0; i < headerTitles.length; i++) {
             Label h = new Label(headerTitles[i]);
-            h.setStyle("-fx-text-fill: #AAAAAA; -fx-font-size: 13px; -fx-font-weight: bold;");
+            h.setStyle("-fx-text-fill: #A0AEC0; -fx-font-size: 11px; -fx-font-weight: bold;");
             table.add(h, i, 0);
         }
 
@@ -643,7 +766,7 @@ public class GameCanvasApp extends Application {
         int rank = 1;
         for (Integer tId : tankIds) {
             String uName = getUsernameByTankId(tId);
-            String displayName = "TANK " + tId + (uName != null ? " - " + uName : "");
+            String displayName = "P" + tId + (uName != null ? " - " + uName : "");
 
             Label rankLbl = new Label(rank == 1 ? "🥇" : rank == 2 ? "🥈" : rank == 3 ? "🥉" : String.valueOf(rank));
             Label nameLbl = new Label(displayName);
@@ -653,35 +776,134 @@ public class GameCanvasApp extends Application {
 
             Label[] row = {rankLbl, nameLbl, scoreLbl, killLbl, hitLbl};
             for (int i = 0; i < row.length; i++) {
-                row[i].setStyle("-fx-text-fill: " + (tId == gameOver.getWinnerTankId() ? "#FFD700" : "white") + "; -fx-font-size: 14px;");
+                row[i].setStyle("-fx-text-fill: " + (tId == gameOver.getWinnerTankId() ? "#ECC94B" : "#EDF2F7") + "; -fx-font-size: 12px; -fx-font-weight: bold;");
                 GridPane.setHalignment(row[i], i == 1 ? HPos.LEFT : HPos.CENTER);
                 table.add(row[i], i, rank);
             }
             rank++;
         }
 
-        Label reasonLabel = new Label("⏱ Kết thúc: " + gameOver.getReason());
-        reasonLabel.setStyle("-fx-text-fill: #AAAAAA; -fx-font-size: 13px;");
+        Label reasonLabel = new Label("Lý do: " + gameOver.getReason());
+        reasonLabel.setStyle("-fx-text-fill: #718096; -fx-font-size: 11px;");
 
         Button playAgainBtn = new Button("🔄 CHƠI TIẾP");
-        playAgainBtn.setStyle("-fx-background-color: #2ECC71; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold;");
-        playAgainBtn.setOnAction(e -> { popup.close(); handlePlayAgain(); });
+        playAgainBtn.setStyle("-fx-background-color: #38A169; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold; -fx-background-radius: 6px; -fx-padding: 8px 16px; -fx-cursor: hand;");
+        playAgainBtn.setOnAction(e -> handlePlayAgain());
 
-        Button exitBtn = new Button("🚪 THOÁT");
-        exitBtn.setStyle("-fx-background-color: #E74C3C; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold;");
-        exitBtn.setOnAction(e -> { popup.close(); handleExit(); });
+        Button exitBtn = new Button("🚪 RỜI PHÒNG");
+        exitBtn.setStyle("-fx-background-color: #E53E3E; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold; -fx-background-radius: 6px; -fx-padding: 8px 16px; -fx-cursor: hand;");
+        exitBtn.setOnAction(e -> handleExit());
 
-        HBox btns = new HBox(20, playAgainBtn, exitBtn);
+        HBox btns = new HBox(15, playAgainBtn, exitBtn);
         btns.setAlignment(Pos.CENTER);
 
-        VBox content = new VBox(15, title, winnerLabel, table, reasonLabel, btns);
-        content.setAlignment(Pos.CENTER);
-        content.setPadding(new Insets(25));
-        content.setStyle("-fx-background-color: #151A24; -fx-background-radius: 12;");
+        card.getChildren().addAll(title, winnerLabel, table, reasonLabel, btns);
+        overlay.getChildren().add(card);
 
-        popup.setScene(new Scene(new StackPane(content), 580, 460));
-        popup.setResizable(false);
-        popup.showAndWait();
+        rootPane.getChildren().add(overlay);
+    }
+
+    private void handleExit() {
+        clearGameState();
+        try {
+            if (clientSocket != null && clientSocket.isConnected()) {
+                clientSocket.sendPacket(new Packet(PacketType.ROOM_LEAVE_REQ, ""));
+            }
+        } catch (IOException ignored) {}
+
+        this.currentRoom = null;
+
+        Platform.runLater(() -> {
+            try {
+                if (primaryStage == null && canvas != null && canvas.getScene() != null) {
+                    primaryStage = (Stage) canvas.getScene().getWindow();
+                }
+                FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/tank2d/client/view/lobby.fxml"));
+                primaryStage.setScene(new Scene(loader.load(), 800, 600));
+                primaryStage.setTitle("Tank 2D Online - Lobby");
+                primaryStage.centerOnScreen();
+                primaryStage.show();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    private void handlePlayAgain() {
+        clearGameState();
+
+        Platform.runLater(() -> {
+            try {
+                if (primaryStage == null && canvas != null && canvas.getScene() != null) {
+                    primaryStage = (Stage) canvas.getScene().getWindow();
+                }
+                FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/tank2d/client/view/room.fxml"));
+                Parent root = loader.load();
+                RoomController controller = loader.getController();
+
+                if (currentRoom != null) {
+                    currentRoom.setStatus("Waiting");
+                    controller.setRoom(currentRoom);
+                    controller.resetReadyForReplay();
+                }
+
+                primaryStage.setScene(new Scene(root, 800, 600));
+                primaryStage.setTitle("Tank 2D Online - Room");
+                primaryStage.centerOnScreen();
+                primaryStage.show();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    private void clearGameState() {
+        stopAllTimers();
+        activeKeys.clear();
+        spacePressed = false;
+        displayTanks.clear();
+        targetTanks.clear();
+        bullets.clear();
+        explosions.clear();
+        items.clear();
+        globalPlayerStates.clear();
+        myTankId = -1;
+        removeNetworkReceiver();
+    }
+
+    private void stopAllTimers() {
+        if (renderTimer != null) renderTimer.stop();
+        if (matchTimer != null) matchTimer.stop();
+    }
+
+    private boolean isTankInBush(double tankX, double tankY) {
+        if (mapMatrix == null) return false;
+        int c = (int) (tankX / tileSize);
+        int r = (int) (tankY / tileSize);
+        if (r >= 0 && r < mapMatrix.length && c >= 0 && c < mapMatrix[0].length) {
+            return mapMatrix[r][c] == 3;
+        }
+        return false;
+    }
+
+    private String getUsernameByTankId(int tankId) {
+        for (TankPlayerDTO player : tankPlayers) {
+            if (player.getTankId() == tankId) return player.getUsername();
+        }
+        return null;
+    }
+
+    private void updateMyTankIdFromSession() {
+        User currentUser = ClientSession.getInstance().getCurrentUser();
+        if (currentUser != null && currentUser.getUsername() != null && !tankPlayers.isEmpty()) {
+            String myUsername = currentUser.getUsername().trim();
+            for (TankPlayerDTO player : tankPlayers) {
+                if (player.getUsername() != null && myUsername.equalsIgnoreCase(player.getUsername().trim())) {
+                    this.myTankId = player.getTankId();
+                    return;
+                }
+            }
+        }
     }
 
     @Override

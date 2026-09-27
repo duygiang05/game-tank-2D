@@ -232,4 +232,15 @@ public class RoomManager {
                 room.getDuration()
         );
     }
+    
+    // =========================================================
+    // RESET PHÒNG VÀ HỦY SẴN SÀNG KHI HẾT TRẬN ĐẤU
+    // =========================================================
+    public synchronized void resetRoomAfterMatch(int roomId) {
+        Room room = rooms.get(roomId);
+        if (room != null) {
+            room.resetReadyStatesForNewGame(); // GỌI TRỰC TIẾP HÀM CÓ SẴN TRONG Room.java
+            System.out.println("[RoomManager] Đã kích hoạt resetReadyStatesForNewGame() cho phòng " + roomId);
+        }
+    }
 }

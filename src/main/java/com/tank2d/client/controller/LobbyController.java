@@ -5,6 +5,7 @@ import com.google.gson.reflect.TypeToken;
 import com.tank2d.client.ClientSession;
 import com.tank2d.client.network.ClientSocket;
 import com.tank2d.common.dto.RoomDTO;
+import com.tank2d.common.model.User;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
 
@@ -275,8 +276,20 @@ public class LobbyController {
                 return;
             }
 
-            System.out.println("[Lobby] Vào phòng thành công: " + room.getRoomName());
-            openRoom(room);
+            // KIỂM TRA ĐIỀU KIỆN TIÊN QUYẾT: TÊN MÌNH PHẢI CÓ TRONG PHÒNG
+            User currentUser = session.getCurrentUser();
+            boolean isJoined = currentUser != null 
+                    && room.getPlayerNames() != null 
+                    && room.getPlayerNames().contains(currentUser.getUsername());
+
+            if (isJoined) {
+                System.out.println("[Lobby] Vào phòng thành công: " + room.getRoomName());
+                openRoom(room);
+            } else {
+                // Nếu mình không có trong phòng (do phòng đang chơi hoặc đã đầy bị Server từ chối)
+                System.out.println("[Lobby] Không thể vào phòng (bị Server từ chối): " + room.getRoomName());
+                showError("Không thể vào phòng! Phòng đang chiến đấu hoặc đã đầy.");
+            }
 
         } catch (Exception e) {
             System.err.println("[Lobby] Lỗi xử lý ROOM_STATE_UPDATE: " + e.getMessage());
