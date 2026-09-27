@@ -170,8 +170,22 @@ public class ClientHandler implements Runnable {
             User user = userDAO.login(req.getUsername(), req.getPassword());
 
             if (user != null) {
-                this.currentUser = user;
-                res = new LoginResponse(true, user.getId(), user.getUsername(), "Đăng nhập thành công!");
+                // Kiểm tra xem User này đã có kết nối nào khác đang dùng hay chưa
+                boolean isAlreadyLoggedIn = false;
+                for (ClientHandler client : connectedClients) {
+                    if (client != this && client.currentUser != null && client.currentUser.getId() == user.getId()) {
+                        isAlreadyLoggedIn = true;
+                        break;
+                    }
+                }
+
+                if (isAlreadyLoggedIn) {
+                    System.out.println("[Auth] Chặn đăng nhập trùng lặp cho User: " + user.getUsername());
+                    res = new LoginResponse(false, -1, "", "Tài khoản đang đăng nhập ở thiết bị/cửa sổ khác!");
+                } else {
+                    this.currentUser = user;
+                    res = new LoginResponse(true, user.getId(), user.getUsername(), "Đăng nhập thành công!");
+                }
             } else {
                 res = new LoginResponse(false, -1, "", "Sai tên tài khoản hoặc mật khẩu!");
             }
@@ -574,8 +588,12 @@ public class ClientHandler implements Runnable {
         isRunning = false;
         connectedClients.remove(this);
 
-        if (currentUser != null && currentRoomId != -1) {
-            handleLeaveRoom();
+        if (currentUser != null) {
+            if (currentRoomId != -1) {
+                handleLeaveRoom();
+            }
+            // Giải phóng user khi đóng kết nối để có thể đăng nhập lại bình thường
+            this.currentUser = null;
         }
 
         // Đảm bảo sảnh luôn nhận danh sách phòng mới nhất khi có client ngắt kết nối đột ngột
