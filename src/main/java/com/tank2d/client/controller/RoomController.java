@@ -82,6 +82,14 @@ public class RoomController {
             listenerRegistered = true;
             System.out.println("[Room] Đã đăng ký Room Packet Listener.");
         }
+
+        // Xin Server dữ liệu Room mới nhất ngay khi mở lại phòng
+        try {
+            ClientSocket socket = session.getClientSocket();
+            if (socket != null && socket.isConnected()) {
+                socket.sendPacket(new Packet(PacketType.ROOM_JOIN_REQ, String.valueOf(room.getRoomId())));
+            }
+        } catch (Exception ignored) {}
     }
 
     // ==========================================
@@ -104,7 +112,7 @@ public class RoomController {
         Platform.runLater(() -> {
             roomNameLabel.setText(room.getRoomName());
 
-            String statusVi = "Playing".equalsIgnoreCase(room.getStatus()) ? "Đang chiến đấu" : "Đang chờ người chơi";
+            String statusVi = "Đang chờ người chơi";
             roomStatusLabel.setText(
                     room.getCurrentPlayers() + "/" + room.getMaxPlayers()
                     + " người chơi  •  " + statusVi
@@ -141,22 +149,23 @@ public class RoomController {
                 badgeLabel.setText("👑 CHỦ PHÒNG");
                 badgeLabel.setStyle("-fx-background-color: #dbeafe; -fx-text-fill: #1d4ed8; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
             } else {
-                // 2. Slot người chơi thường (P2, P3, P4):
+                // 2. Slot thành viên (P2, P3, P4)
                 User currentUser = session.getCurrentUser();
                 boolean isReady = false;
 
-                // Nếu slot này thuộc về chính client hiện tại đang xem
+                // Nếu là chính bản thân Client này
                 if (currentUser != null && playerName.equalsIgnoreCase(currentUser.getUsername())) {
                     isReady = isCurrentUserReady(room);
                 } else {
-                    // Nếu là người chơi khác trên màn hình Host/Client:
-                    // Server Room lưu Host không ở trong readyStates, chỉ những ai là khách mới có trong map
+                    // Nếu là người chơi khác: Lấy theo thứ tự index trong danh sách thành viên không phải host
                     if (readyMap != null && !readyMap.isEmpty()) {
-                        for (Map.Entry<Integer, Boolean> entry : readyMap.entrySet()) {
-                            if (entry.getKey() != room.getHostId() && Boolean.TRUE.equals(entry.getValue())) {
-                                isReady = true;
-                                break;
-                            }
+                        List<Map.Entry<Integer, Boolean>> nonHostReady = readyMap.entrySet().stream()
+                                .filter(e -> e.getKey() != room.getHostId())
+                                .toList();
+                        
+                        int guestIndex = index - 1; // Slot 1 là khách thứ 0, Slot 2 là khách thứ 1
+                        if (guestIndex >= 0 && guestIndex < nonHostReady.size()) {
+                            isReady = Boolean.TRUE.equals(nonHostReady.get(guestIndex).getValue());
                         }
                     }
                 }
@@ -166,7 +175,7 @@ public class RoomController {
                     badgeLabel.setStyle("-fx-background-color: #dcfce7; -fx-text-fill: #15803d; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
                 } else {
                     badgeLabel.setText("⏳ CHƯA SẴN SÀNG");
-                    badgeLabel.setStyle("-fx-background-color: #f1f5f9; -fx-text-fill: #64748b; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
+                    badgeLabel.setStyle("-fx-background-color: #f1f5f9; -fx-text-fill: #64748b; -fx-font-weight: bold; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
                 }
             }
         } else {
@@ -174,7 +183,7 @@ public class RoomController {
             nameLabel.setText("Trống");
             nameLabel.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 14px; -fx-font-weight: bold;");
             badgeLabel.setText("ĐANG CHỜ...");
-            badgeLabel.setStyle("-fx-background-color: #f8fafc; -fx-text-fill: #cbd5e1; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
+            badgeLabel.setStyle("-fx-background-color: #f8fafc; -fx-text-fill: #cbd5e1; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
         }
     }
 
@@ -246,12 +255,8 @@ public class RoomController {
 
         boolean isHost = room.getHostId() == currentUser.getId();
 
-        if ("Playing".equalsIgnoreCase(room.getStatus())) {
-            readyButton.setText("ĐANG CHIẾN ĐẤU");
-            readyButton.setDisable(true);
-            readyButton.setStyle("-fx-background-color: #94a3b8; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8px;");
-            return;
-        }
+        // BỎ HOÀN TOÀN KHỐI: if ("Playing".equalsIgnoreCase(room.getStatus())) khóa nút!
+        // Vì người chơi đang ở màn hình room.fxml thì luôn ở chế độ chuẩn bị/chờ ván mới.
 
         if (isHost) {
             readyButton.setText("BẮT ĐẦU TRẬN ĐẤU");
@@ -290,11 +295,23 @@ public class RoomController {
     }
 
     private boolean areAllPlayersReady(RoomDTO room) {
-        if (room.getReadyStates() == null || room.getReadyStates().isEmpty()) return false;
-        for (Map.Entry<Integer, Boolean> entry : room.getReadyStates().entrySet()) {
-            if (!Boolean.TRUE.equals(entry.getValue())) return false;
+        Map<Integer, Boolean> readyMap = room.getReadyStates();
+        if (readyMap == null || readyMap.isEmpty()) return false;
+
+        // Chỉ kiểm tra những người KHÔNG PHẢI HOST
+        // Tất cả khách trong phòng bắt buộc phải có ready == true
+        int nonHostCount = 0;
+        for (Map.Entry<Integer, Boolean> entry : readyMap.entrySet()) {
+            if (entry.getKey() != room.getHostId()) {
+                nonHostCount++;
+                if (!Boolean.TRUE.equals(entry.getValue())) {
+                    return false; // Có ít nhất 1 người chơi chưa bấm Sẵn sàng
+                }
+            }
         }
-        return true;
+
+        // Phòng phải có ít nhất 1 khách và tất cả khách đều đã bấm Sẵn sàng
+        return nonHostCount > 0;
     }
 
     private void handleServerPacket(Packet packet) {
@@ -393,6 +410,14 @@ public class RoomController {
         Platform.runLater(() -> {
             try {
                 Stage stage = (Stage) roomNameLabel.getScene().getWindow();
+                
+                // 1. MỞ KHÓA KÍCH THƯỚC (RẤT QUAN TRỌNG ĐỂ KHÔNG BỊ VIỀN TRẮNG)
+                stage.setMinWidth(0);
+                stage.setMinHeight(0);
+                stage.setMaxWidth(Double.MAX_VALUE);
+                stage.setMaxHeight(Double.MAX_VALUE);
+                stage.setResizable(true);
+
                 GameCanvasApp gameCanvasApp = new GameCanvasApp();
                 gameCanvasApp.setStage(stage);
                 gameCanvasApp.setRoom(currentRoom);
@@ -400,9 +425,13 @@ public class RoomController {
                 Scene gameScene = gameCanvasApp.createGameScene();
                 stage.setScene(gameScene);
                 stage.setTitle("Tank 2D - Game");
+                
+                // 2. Ép cửa sổ co vừa vặn với Scene 600x600
+                stage.sizeToScene();
                 stage.setResizable(false);
+                stage.centerOnScreen();
                 stage.show();
-                System.out.println("[Game] Đã chuyển sang màn hình Game!");
+                System.out.println("[Game] Đã chuyển sang màn hình Game chuẩn 600x600!");
 
             } catch (Exception e) {
                 System.err.println("[Game] Không thể mở màn hình Game: " + e.getMessage());

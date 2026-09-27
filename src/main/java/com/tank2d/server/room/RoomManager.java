@@ -21,20 +21,15 @@ public class RoomManager {
     // CREATE ROOM
     // =========================
     public synchronized Room createRoom(User creator) {
-
         if (creator == null) {
             return null;
         }
 
         int roomId = 1;
-
         while (rooms.containsKey(roomId)) {
             roomId++;
         }
 
-        /*
-         * Người tạo phòng chính là Host.
-         */
         Room room = new Room(
                 roomId,
                 "Room " + String.format("%02d", roomId),
@@ -42,7 +37,6 @@ public class RoomManager {
         );
 
         room.addPlayer(creator);
-
         rooms.put(roomId, room);
 
         System.out.println(
@@ -59,98 +53,92 @@ public class RoomManager {
     }
 
     // =========================
-    // JOIN ROOM
+    // JOIN ROOM (ĐÃ SỬA: CHẶN VÀO PHÒNG ĐANG CHƠI HOẶC ĐÃ ĐẦY)
     // =========================
-    public synchronized boolean joinRoom(
-        int roomId,
-        User user) {
+    public synchronized boolean joinRoom(int roomId, User user) {
+        Room room = rooms.get(roomId);
 
-    Room room = rooms.get(roomId);
+        if (room == null || user == null) {
+            return false;
+        }
 
-    if (room == null || user == null) {
-        return false;
+        // Chặn vào phòng đang chơi
+        if ("Playing".equalsIgnoreCase(room.getStatus())) {
+            System.out.println("[RoomManager] Từ chối vào phòng " + roomId + ": Trận đấu đang diễn ra.");
+            return false;
+        }
+
+        // Chặn vào phòng đã đủ người
+        if (room.getCurrentPlayers() >= room.getMaxPlayers()) {
+            System.out.println("[RoomManager] Từ chối vào phòng " + roomId + ": Phòng đã đầy.");
+            return false;
+        }
+
+        boolean success = room.addPlayer(user);
+
+        if (success) {
+            System.out.println(
+                    "[RoomManager] "
+                    + user.getUsername()
+                    + " vào "
+                    + room.getRoomName()
+                    + " ("
+                    + room.getCurrentPlayers()
+                    + "/"
+                    + room.getMaxPlayers()
+                    + ")"
+            );
+        }
+
+        return success;
     }
-
-    // Không cho vào phòng đang chơi
-
-
-    boolean success
-            = room.addPlayer(user);
-
-    if (success) {
-
-        System.out.println(
-                "[RoomManager] "
-                + user.getUsername()
-                + " vào "
-                + room.getRoomName()
-                + " ("
-                + room.getCurrentPlayers()
-                + "/"
-                + room.getMaxPlayers()
-                + ")"
-        );
-    }
-
-    return success;
-}
 
     // =========================
     // LEAVE ROOM
     // =========================
     public synchronized boolean leaveRoom(int roomId, int userId) {
-
         Room room = rooms.get(roomId);
 
         if (room == null) {
             return false;
         }
 
-        // Kiểm tra người rời có phải Host không
         boolean wasHost = room.isHost(userId);
-
-        // Xóa player khỏi phòng
         boolean success = room.removePlayer(userId);
 
         if (!success) {
             return false;
         }
 
-        // Không còn ai -> xóa phòng
-        if (room.getCurrentPlayers() == 0) {
-
+        // Không còn ai -> Xóa phòng triệt để khỏi bộ nhớ Server
+        if (room.getCurrentPlayers() <= 0) {
             rooms.remove(roomId);
-
             System.out.println(
-                    "[Room] Phòng "
+                    "[RoomManager] Phòng "
                     + roomId
                     + " đã được xóa vì không còn người chơi."
             );
-
             return true;
         }
 
-        // Nếu Host rời -> chọn Host mới
+        // Nếu Host rời -> chuyển quyền Host cho người kế tiếp
         if (wasHost) {
-
             room.transferHostRandom();
-
             System.out.println(
-                    "[Room] Host cũ đã rời phòng "
+                    "[RoomManager] Host cũ đã rời phòng "
                     + roomId
-                    + ". Đã chuyển Host."
+                    + ". Đã chuyển quyền Host sang ID: "
+                    + room.getHostId()
             );
         }
 
         return true;
     }
+
     // =========================
     // GET ROOM
     // =========================
-
-    public synchronized Room getRoom(
-            int roomId) {
-
+    public synchronized Room getRoom(int roomId) {
         return rooms.get(roomId);
     }
 
@@ -158,85 +146,49 @@ public class RoomManager {
     // GET ALL ROOMS
     // =========================
     public synchronized List<RoomDTO> getAllRooms() {
-
-        List<RoomDTO> roomDTOs
-                = new ArrayList<>();
-
+        List<RoomDTO> roomDTOs = new ArrayList<>();
         for (Room room : rooms.values()) {
-
-            roomDTOs.add(
-                    toRoomDTO(room)
-            );
+            roomDTOs.add(toRoomDTO(room));
         }
-
         return roomDTOs;
     }
 
     // =========================
     // GET ROOM DTO
     // =========================
-    public synchronized RoomDTO getRoomDTO(
-            int roomId) {
-
-        Room room
-                = rooms.get(roomId);
-
+    public synchronized RoomDTO getRoomDTO(int roomId) {
+        Room room = rooms.get(roomId);
         if (room == null) {
             return null;
         }
-
         return toRoomDTO(room);
     }
 
     // =========================
     // SET PLAYER READY
     // =========================
-    public synchronized boolean setPlayerReady(
-            int roomId,
-            int userId,
-            boolean ready) {
-
-        Room room
-                = rooms.get(roomId);
-
+    public synchronized boolean setPlayerReady(int roomId, int userId, boolean ready) {
+        Room room = rooms.get(roomId);
         if (room == null) {
             return false;
         }
-
-        return room.setReady(
-                userId,
-                ready
-        );
+        return room.setReady(userId, ready);
     }
 
     // =========================
     // SET ROOM DURATION
     // =========================
-    /**
-     * Đổi thời lượng trận đấu của phòng.
-     *
-     * Chỉ cho phép: 45 giây 60 giây 90 giây
-     */
-    public synchronized boolean setRoomDuration(
-            int roomId,
-            int duration) {
-
-        Room room
-                = rooms.get(roomId);
-
+    public synchronized boolean setRoomDuration(int roomId, int duration) {
+        Room room = rooms.get(roomId);
         if (room == null) {
             return false;
         }
 
-        if (duration != 45
-                && duration != 60
-                && duration != 90) {
-
+        if (duration != 45 && duration != 60 && duration != 90) {
             return false;
         }
 
         room.setDuration(duration);
-
         System.out.println(
                 "[RoomManager] "
                 + room.getRoomName()
@@ -251,16 +203,11 @@ public class RoomManager {
     // =========================
     // GET ROOM DURATION
     // =========================
-    public synchronized int getRoomDuration(
-            int roomId) {
-
-        Room room
-                = rooms.get(roomId);
-
+    public synchronized int getRoomDuration(int roomId) {
+        Room room = rooms.get(roomId);
         if (room == null) {
             return 60;
         }
-
         return room.getDuration();
     }
 
@@ -268,15 +215,9 @@ public class RoomManager {
     // CONVERT ROOM → DTO
     // =========================
     private RoomDTO toRoomDTO(Room room) {
-
-        List<String> playerNames
-                = new ArrayList<>();
-
+        List<String> playerNames = new ArrayList<>();
         for (User user : room.getPlayers()) {
-
-            playerNames.add(
-                    user.getUsername()
-            );
+            playerNames.add(user.getUsername());
         }
 
         return new RoomDTO(
@@ -290,5 +231,16 @@ public class RoomManager {
                 room.getReadyStates(),
                 room.getDuration()
         );
+    }
+    
+    // =========================================================
+    // RESET PHÒNG VÀ HỦY SẴN SÀNG KHI HẾT TRẬN ĐẤU
+    // =========================================================
+    public synchronized void resetRoomAfterMatch(int roomId) {
+        Room room = rooms.get(roomId);
+        if (room != null) {
+            room.resetReadyStatesForNewGame(); // GỌI TRỰC TIẾP HÀM CÓ SẴN TRONG Room.java
+            System.out.println("[RoomManager] Đã kích hoạt resetReadyStatesForNewGame() cho phòng " + roomId);
+        }
     }
 }

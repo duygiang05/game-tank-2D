@@ -113,13 +113,14 @@ public class UserDAO {
     }
 
     /**
-     * Lấy bảng xếp hạng người chơi.
-     *
-     * Thứ tự: 1. Tổng điểm giảm dần 2. Tổng kills giảm dần 3. Tổng số trận
-     * thắng giảm dần
+     * Lấy bảng xếp hạng Top 10 người chơi theo đặc tả:
+     * 1. Tổng điểm giảm dần (total_points DESC)
+     * 2. Tổng kills giảm dần (total_kills DESC)
+     * 3. Tổng số trận thắng giảm dần (total_wins DESC)
+     * 4. Id người dùng tăng dần (u.id ASC - ổn định thứ hạng khi bằng điểm)
+     * Giới hạn: LIMIT 10
      */
     public List<LeaderboardDTO> getLeaderboard() {
-
         List<LeaderboardDTO> leaderboard = new ArrayList<>();
 
         String sql = "SELECT "
@@ -133,14 +134,16 @@ public class UserDAO {
                 + "ORDER BY "
                 + "s.total_points DESC, "
                 + "s.total_kills DESC, "
-                + "s.total_wins DESC";
+                + "s.total_wins DESC, "
+                + "u.id ASC "
+                + "LIMIT 10";
 
-        try (Connection conn = DatabaseConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
 
             int rank = 1;
-
             while (rs.next()) {
-
                 LeaderboardDTO dto = new LeaderboardDTO(
                         rank,
                         rs.getInt("user_id"),
@@ -149,25 +152,17 @@ public class UserDAO {
                         rs.getInt("total_kills"),
                         rs.getInt("total_wins")
                 );
-
                 leaderboard.add(dto);
-
                 rank++;
             }
 
         } catch (SQLException e) {
-
-            System.err.println(
-                    "[UserDAO] Lỗi khi lấy Leaderboard: "
-                    + e.getMessage()
-            );
-
+            System.err.println("[UserDAO] Lỗi khi lấy Top 10 Leaderboard: " + e.getMessage());
             e.printStackTrace();
         }
 
         return leaderboard;
     }
-
     /**
      * Kiểm tra nhanh sự tồn tại của username để tránh lỗi duplicate key.
      */
