@@ -18,13 +18,25 @@ public final class CollisionDetector {
 
     private CollisionDetector() {}
 
-    // ============ XE - TƯỜNG / BIÊN MAP (không đổi) ============
+    // ============ XE - TƯỜNG / BIÊN MAP (ĐÃ SỬA — sliding collision, tách riêng từng trục) ============
     public static void resolveTankMapCollision(TankEntity tank, GameMap map, double prevX, double prevY, int tankSize) {
         if (map == null || !tank.isAlive()) return;
-        if (isTankBlockedByMap(tank.getX(), tank.getY(), tankSize, map)) {
-            tank.setX(prevX);
-            tank.setY(prevY);
+
+        double newX = tank.getX();
+        double newY = tank.getY();
+
+        // BƯỚC 1: Thử di chuyển CHỈ trục X — giữ Y ở giá trị CŨ (prevY) để cô lập phép kiểm tra
+        if (isTankBlockedByMap(newX, prevY, tankSize, map)) {
+            newX = prevX; // Trục X bị chặn -> revert lại X, KHÔNG đụng tới Y
         }
+
+        // BƯỚC 2: Thử di chuyển CHỈ trục Y — dùng X đã xử lý ở bước 1 (newX)
+        if (isTankBlockedByMap(newX, newY, tankSize, map)) {
+            newY = prevY; // Trục Y bị chặn -> revert lại Y
+        }
+
+        tank.setX(newX);
+        tank.setY(newY);
     }
 
     private static boolean isTankBlockedByMap(double centerX, double centerY, int tankSize, GameMap map) {
@@ -103,7 +115,7 @@ public final class CollisionDetector {
             if (map != null && map.isSolid(bullet.getX(), bullet.getY())) {
                 boolean instaBreak = bullet.getType() == BulletEntity.BulletType.ROCKET;
                 GameMap.WallHitResult result = map.hitBrickWall(bullet.getX(), bullet.getY(), instaBreak);
-                
+
                 if (result.hit) {
                     if (result.broken) {
                         mapEvents.add(new MapChangeEvent(result.row, result.col, /* EMPTY */ 0));
