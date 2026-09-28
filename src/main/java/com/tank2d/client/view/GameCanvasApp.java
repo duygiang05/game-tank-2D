@@ -430,6 +430,9 @@ public class GameCanvasApp extends Application {
                 SoundManager.stopBGM(); // Tắt nhạc nền
                 SoundManager.playSound("game_over"); // Tiếng kết thúc
                 showGameOverPopup(gameOver);
+                SoundManager.stopBGM(); // Tắt nhạc nền
+                SoundManager.playSound("game_over"); // Tiếng kết thúc
+                showGameOverPopup(gameOver);
             });
         } else if (packet.getType() == PacketType.MAP_UPDATE) {
             MapUpdateDTO mapUpdate = gson.fromJson(packet.getData(), MapUpdateDTO.class);
