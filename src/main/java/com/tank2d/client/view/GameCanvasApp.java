@@ -13,7 +13,7 @@ import com.tank2d.common.dto.game.*;
 import com.tank2d.common.model.User;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
-
+import com.tank2d.client.util.BushClusterUtil;
 import javafx.animation.AnimationTimer;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -47,6 +47,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import javafx.scene.effect.DropShadow;
 
 public class GameCanvasApp extends Application {
 
@@ -64,10 +65,13 @@ public class GameCanvasApp extends Application {
     private StackPane rootPane;
     private Canvas canvas;
     private GraphicsContext gc;
+    private Canvas fireworkCanvas;
+    private GraphicsContext gcFirework;
     private Stage primaryStage;
     private RoomDTO currentRoom;
     private ClientSocket clientSocket;
     private AnimationTimer renderTimer;
+    private AnimationTimer fireworkTimer;
     private Timeline matchTimer;
     private Consumer<Packet> packetListener;
     private final Gson gson = new Gson();
@@ -88,27 +92,38 @@ public class GameCanvasApp extends Application {
     // --- ĐỊA HÌNH VÀ THỜI GIAN TRẬN ĐẤU ---
     private int[][] mapMatrix;
     private int[][] brickHitsLeft;
+    private int[][] bushClusterIds;
     private int matchRemainingTime = 60;
+
+    private final List<ExplosionEffect> activeExplosions = new ArrayList<>();
+    private final ExplosionPool explosionPool = new ExplosionPool(30);
 
     // Quản lý hiệu ứng vụ nổ
     private static class ExplosionEffect {
+
         double x, y;
         int radius = 6;
         int maxRadius = 24;
         boolean finished = false;
 
-        ExplosionEffect(double x, double y) {
+        void init(double x, double y) {
             this.x = x;
             this.y = y;
+            this.radius = 6;
+            this.finished = false;
         }
 
         void update() {
             radius += 3;
-            if (radius > maxRadius) finished = true;
+            if (radius > maxRadius) {
+                finished = true;
+            }
         }
 
         void render(GraphicsContext gc) {
-            if (finished) return;
+            if (finished) {
+                return;
+            }
             gc.setFill(Color.ORANGE);
             gc.fillOval(x - radius, y - radius, radius * 2, radius * 2);
             gc.setFill(Color.RED);
@@ -117,6 +132,73 @@ public class GameCanvasApp extends Application {
             gc.fillOval(x - (radius / 4.0), y - (radius / 4.0), radius / 2.0, radius / 2.0);
         }
     }
+
+    private static class ExplosionPool {
+
+        private final Queue<ExplosionEffect> pool = new ArrayDeque<>();
+
+        public ExplosionPool(int initialCapacity) {
+            for (int i = 0; i < initialCapacity; i++) {
+                pool.add(new ExplosionEffect());
+            }
+        }
+
+        public ExplosionEffect obtain(double x, double y) {
+            ExplosionEffect effect = pool.poll();
+            if (effect == null) {
+                effect = new ExplosionEffect();
+            }
+            effect.init(x, y);
+            return effect;
+        }
+
+        public void recycle(ExplosionEffect effect) {
+            if (pool.size() < 50) {
+                pool.offer(effect);
+            }
+        }
+    }
+
+    private void addExplosion(double x, double y) {
+        ExplosionEffect exp = explosionPool.obtain(x, y);
+        activeExplosions.add(exp);
+    }
+
+    private static class FireworkParticle {
+
+        double x, y, vx, vy, alpha, size;
+        Color color;
+
+        FireworkParticle(double x, double y, Color color) {
+            this.x = x;
+            this.y = y;
+            double angle = Math.random() * Math.PI * 2;
+            double speed = 2 + Math.random() * 5;
+            this.vx = Math.cos(angle) * speed;
+            this.vy = Math.sin(angle) * speed;
+            this.alpha = 1.0;
+            this.size = 3 + Math.random() * 3;
+            this.color = color;
+        }
+
+        boolean update() {
+            x += vx;
+            y += vy;
+            vy += 0.08; // Trọng lực nhẹ
+            alpha -= 0.015;
+            return alpha > 0;
+        }
+
+        void render(GraphicsContext gc) {
+            gc.save();
+            gc.setGlobalAlpha(Math.max(0, alpha));
+            gc.setFill(color);
+            gc.fillOval(x - size / 2, y - size / 2, size, size);
+            gc.restore();
+        }
+    }
+
+    private final List<FireworkParticle> fireworkParticles = new ArrayList<>();
 
     public void setStage(Stage stage) {
         this.primaryStage = stage;
@@ -173,7 +255,9 @@ public class GameCanvasApp extends Application {
         scene.windowProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null) {
                 newVal.focusedProperty().addListener((obsF, oldF, isFocused) -> {
-                    if (!isFocused) activeKeys.clear();
+                    if (!isFocused) {
+                        activeKeys.clear();
+                    }
                 });
             }
         });
@@ -207,6 +291,7 @@ public class GameCanvasApp extends Application {
         this.canvasHeight = rows * this.tileSize;
 
         this.mapMatrix = ConfigLoader.getMapMatrix();
+        this.bushClusterIds = BushClusterUtil.computeClusterIds(this.mapMatrix);
         int h = mapMatrix.length;
         int w = h > 0 ? mapMatrix[0].length : 0;
 
@@ -221,9 +306,13 @@ public class GameCanvasApp extends Application {
     }
 
     private void startMatchTimer() {
-        if (matchTimer != null) matchTimer.stop();
+        if (matchTimer != null) {
+            matchTimer.stop();
+        }
         matchTimer = new Timeline(new KeyFrame(Duration.seconds(1), e -> {
-            if (matchRemainingTime > 0) matchRemainingTime--;
+            if (matchRemainingTime > 0) {
+                matchRemainingTime--;
+            }
         }));
         matchTimer.setCycleCount(Timeline.INDEFINITE);
         matchTimer.play();
@@ -243,22 +332,30 @@ public class GameCanvasApp extends Application {
     }
 
     private void requestTankPlayerInfo() {
-        if (clientSocket == null || !clientSocket.isConnected()) return;
+        if (clientSocket == null || !clientSocket.isConnected()) {
+            return;
+        }
         try {
             clientSocket.sendPacket(new Packet(PacketType.TANK_PLAYER_INFO_REQ, ""));
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
     }
 
     private void sendShootRequestToServer() {
-        if (clientSocket == null || !clientSocket.isConnected()) return;
+        if (clientSocket == null || !clientSocket.isConnected()) {
+            return;
+        }
         try {
             clientSocket.sendPacket(new Packet(PacketType.PLAYER_SHOOT_REQ, "{}"));
             SoundManager.playSound("shoot_normal");
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
     }
 
     private void sendInputToServer() {
-        if (clientSocket == null || !clientSocket.isConnected()) return;
+        if (clientSocket == null || !clientSocket.isConnected()) {
+            return;
+        }
         boolean up = activeKeys.contains(KeyCode.W) || activeKeys.contains(KeyCode.UP);
         boolean down = activeKeys.contains(KeyCode.S) || activeKeys.contains(KeyCode.DOWN);
         boolean left = activeKeys.contains(KeyCode.A) || activeKeys.contains(KeyCode.LEFT);
@@ -272,7 +369,8 @@ public class GameCanvasApp extends Application {
 
         try {
             clientSocket.sendPacket(new Packet(PacketType.PLAYER_INPUT, gson.toJson(inputMap)));
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
     }
 
     private void processIncomingPacket(Packet packet) {
@@ -298,9 +396,9 @@ public class GameCanvasApp extends Application {
                             updateTankHpAndStatus(displayTanks.get(incoming.getId()), incoming);
                         } else {
                             displayTanks.put(incoming.getId(), new TankSnapshotDTO(
-                                incoming.getId(), incoming.getX(), incoming.getY(),
-                                incoming.getAngle(), incoming.getHp(), incoming.isAlive(),
-                                incoming.isGhost(), incoming.hasShield(), incoming.hasNitro()
+                                    incoming.getId(), incoming.getX(), incoming.getY(),
+                                    incoming.getAngle(), incoming.getHp(), incoming.isAlive(),
+                                    incoming.isGhost(), incoming.hasShield(), incoming.hasNitro()
                             ));
                         }
                     }
@@ -314,7 +412,8 @@ public class GameCanvasApp extends Application {
                 }
             }
         } else if (packet.getType() == PacketType.TANK_PLAYER_INFO) {
-            Type listType = new TypeToken<ArrayList<TankPlayerDTO>>(){}.getType();
+            Type listType = new TypeToken<ArrayList<TankPlayerDTO>>() {
+            }.getType();
             List<TankPlayerDTO> players = gson.fromJson(packet.getData(), listType);
             if (players != null) {
                 tankPlayers.clear();
@@ -326,7 +425,7 @@ public class GameCanvasApp extends Application {
             if (effect != null) {
                 String eventType = effect.getEventType() != null ? effect.getEventType().toUpperCase() : "";
                 if ("EXPLOSION".equalsIgnoreCase(eventType) || "WALL_BREAK".equalsIgnoreCase(eventType)) {
-                    explosions.add(new ExplosionEffect(effect.getX(), effect.getY()));
+                    addExplosion(effect.getX(), effect.getY());
                     if ("EXPLOSION".equalsIgnoreCase(eventType)) {
                         SoundManager.playSound("explosion"); // Tiếng nổ xe
                     } else {
@@ -338,13 +437,15 @@ public class GameCanvasApp extends Application {
                     if (mapMatrix != null && r >= 0 && r < mapMatrix.length && c >= 0 && c < mapMatrix[0].length) {
                         if (mapMatrix[r][c] == 2) {
                             brickHitsLeft[r][c]--;
-                            if (brickHitsLeft[r][c] <= 0) mapMatrix[r][c] = 0;
+                            if (brickHitsLeft[r][c] <= 0) {
+                                mapMatrix[r][c] = 0;
+                            }
                         }
                     }
-                    explosions.add(new ExplosionEffect(effect.getX(), effect.getY()));
+                    addExplosion(effect.getX(), effect.getY());
                     SoundManager.playSound("wall_break");
                 } else if (eventType.startsWith("ITEM_PICKUP")) {
-                    explosions.add(new ExplosionEffect(effect.getX(), effect.getY()));
+                    addExplosion(effect.getX(), effect.getY());
                     String itemType = eventType.replace("ITEM_PICKUP_", "");
                     SoundManager.playItemSound(itemType);
                 }
@@ -353,6 +454,8 @@ public class GameCanvasApp extends Application {
             GameOverDTO gameOver = gson.fromJson(packet.getData(), GameOverDTO.class);
             Platform.runLater(() -> {
                 stopAllTimers();
+                SoundManager.stopBGM(); // Tắt nhạc nền
+                SoundManager.playSound("game_over"); // Tiếng kết thúc
                 showGameOverPopup(gameOver);
                 SoundManager.stopBGM(); // Tắt nhạc nền
                 SoundManager.playSound("game_over"); // Tiếng kết thúc
@@ -368,7 +471,7 @@ public class GameCanvasApp extends Application {
                     brickHitsLeft[r][c] = 0;
                     double centerX = c * tileSize + tileSize / 2.0;
                     double centerY = r * tileSize + tileSize / 2.0;
-                    explosions.add(new ExplosionEffect(centerX, centerY));
+                    addExplosion(centerX, centerY);
                 }
             }
         }
@@ -381,7 +484,6 @@ public class GameCanvasApp extends Application {
                 sendInputToServer();
                 updateClientState();
 
-                // 1. Render Nền
                 Image bgImg = AssetLoader.getImage("tiles/background.png");
                 if (bgImg != null && !bgImg.isError()) {
                     gc.drawImage(bgImg, 0, 0, canvasWidth, canvasHeight);
@@ -389,20 +491,12 @@ public class GameCanvasApp extends Application {
                     gc.setFill(Color.rgb(22, 24, 29));
                     gc.fillRect(0, 0, canvasWidth, canvasHeight);
                 }
-
-                // 2. Render Tường & Items
                 renderTerrainAndWalls();
                 renderItems();
-
-                // 3. Render Đạn, Xe & Vụ nổ
                 renderBullets();
                 renderTanks();
                 renderExplosions();
-
-                // 4. Render Bụi cỏ
                 renderBushes();
-
-                // 5. Render HUD tinh gọn
                 renderHUD();
             }
         };
@@ -432,19 +526,28 @@ public class GameCanvasApp extends Application {
             }
         }
 
-        for (ExplosionEffect exp : explosions) exp.update();
-        explosions.removeIf(exp -> exp.finished);
+        for (int i = activeExplosions.size() - 1; i >= 0; i--) {
+            ExplosionEffect exp = activeExplosions.get(i);
+            exp.update();
+            if (exp.finished) {
+                activeExplosions.remove(i);
+                explosionPool.recycle(exp);
+            }
+        }
     }
 
     private void updateTankHpAndStatus(TankSnapshotDTO dto, TankSnapshotDTO target) {
         dto.setHp(target.getHp());
+        dto.setAlive(target.isAlive());
         dto.setGhost(target.isGhost());
         dto.setShield(target.hasShield());
         dto.setNitro(target.hasNitro());
     }
 
     private void renderTerrainAndWalls() {
-        if (mapMatrix == null) return;
+        if (mapMatrix == null) {
+            return;
+        }
         Image stoneImg = AssetLoader.getImage("tiles/stone_wall.png");
         Image brickImg = AssetLoader.getImage("tiles/brick_wall.png");
         Image brickCrackedImg = AssetLoader.getImage("tiles/brick_wall_cracked.png");
@@ -469,8 +572,8 @@ public class GameCanvasApp extends Application {
                         mapMatrix[r][c] = 0;
                         continue;
                     }
-                    Image sprite = (hp == 1 && brickDamagedImg != null) ? brickDamagedImg :
-                                   (hp <= 2 && brickCrackedImg != null) ? brickCrackedImg : brickImg;
+                    Image sprite = (hp == 1 && brickDamagedImg != null) ? brickDamagedImg
+                            : (hp <= 2 && brickCrackedImg != null) ? brickCrackedImg : brickImg;
 
                     if (sprite != null && !sprite.isError()) {
                         gc.drawImage(sprite, x, y, tileSize, tileSize);
@@ -484,7 +587,9 @@ public class GameCanvasApp extends Application {
     }
 
     private void renderItems() {
-        if (items.isEmpty()) return;
+        if (items.isEmpty()) {
+            return;
+        }
         double itemSize = 22.0;
 
         for (ItemSnapshotDTO item : items) {
@@ -501,11 +606,16 @@ public class GameCanvasApp extends Application {
                 gc.drawImage(itemImg, x - itemSize / 2.0, y - itemSize / 2.0, itemSize, itemSize);
             } else {
                 switch (normalizedType) {
-                    case "HEALTH_PACK" -> gc.setFill(Color.RED);
-                    case "SHIELD" -> gc.setFill(Color.DODGERBLUE);
-                    case "NITRO" -> gc.setFill(Color.ORANGE);
-                    case "ROCKET_AMMO" -> gc.setFill(Color.PURPLE);
-                    default -> gc.setFill(Color.WHITE);
+                    case "HEALTH_PACK" ->
+                        gc.setFill(Color.RED);
+                    case "SHIELD" ->
+                        gc.setFill(Color.DODGERBLUE);
+                    case "NITRO" ->
+                        gc.setFill(Color.ORANGE);
+                    case "ROCKET_AMMO" ->
+                        gc.setFill(Color.PURPLE);
+                    default ->
+                        gc.setFill(Color.WHITE);
                 }
                 gc.fillRect(x - itemSize / 2.0, y - itemSize / 2.0, itemSize, itemSize);
             }
@@ -514,9 +624,14 @@ public class GameCanvasApp extends Application {
     }
 
     private void renderBushes() {
-        if (mapMatrix == null) return;
+        if (mapMatrix == null) {
+            return;
+        }
         Image bushImg = AssetLoader.getImage("tiles/grass.png");
-        TankSnapshotDTO myTank = displayTanks.get(myTankId);
+
+        // Cụm bụi nào có ít nhất 1 xe bên trong -> cả cụm mờ đi
+        Set<Integer> occupiedClusters = BushClusterUtil.findClustersWithTanks(
+                bushClusterIds, displayTanks.values(), tileSize, 1);
 
         for (int r = 0; r < mapMatrix.length; r++) {
             for (int c = 0; c < mapMatrix[r].length; c++) {
@@ -525,19 +640,21 @@ public class GameCanvasApp extends Application {
                     double y = r * tileSize;
 
                     gc.save();
-                    if (myTank != null && myTank.isAlive()) {
-                        double myC = Math.floor(myTank.getX() / tileSize);
-                        double myR = Math.floor(myTank.getY() / tileSize);
-                        if ((int) myC == c && (int) myR == r) {
-                            gc.setGlobalAlpha(0.55);
-                        }
+
+                    int clusterId = (bushClusterIds != null && r < bushClusterIds.length && c < bushClusterIds[r].length)
+                            ? bushClusterIds[r][c] : BushClusterUtil.NO_CLUSTER;
+
+                    if (occupiedClusters.contains(clusterId)) {
+                        gc.setGlobalAlpha(0.35);
                     }
-                    if (bushImg != null && !bushImg.isError()) {
+
+                    if (bushImg != null) {
                         gc.drawImage(bushImg, x, y, tileSize, tileSize);
                     } else {
                         gc.setFill(Color.rgb(34, 139, 34, 0.75));
                         gc.fillRect(x, y, tileSize, tileSize);
                     }
+
                     gc.restore();
                 }
             }
@@ -583,12 +700,12 @@ public class GameCanvasApp extends Application {
         };
 
         for (TankSnapshotDTO tank : displayTanks.values()) {
-            if (!tank.isAlive()) continue;
+            if (!tank.isAlive() || tank.getHp() <= 0) {
+                continue;
+            }
 
             boolean isMyTank = (tank.getId() == myTankId);
             boolean inBush = isTankInBush(tank.getX(), tank.getY());
-
-
 
             int colorIdx = Math.abs(tank.getId() - 1) % tankImageAssets.length;
             Image tankSprite = AssetLoader.getImage(tankImageAssets[colorIdx]);
@@ -669,7 +786,9 @@ public class GameCanvasApp extends Application {
     }
 
     private void renderExplosions() {
-        for (ExplosionEffect exp : explosions) exp.render(gc);
+        for (ExplosionEffect exp : explosions) {
+            exp.render(gc);
+        }
     }
 
     private void renderHUD() {
@@ -720,8 +839,12 @@ public class GameCanvasApp extends Application {
                 int tId = player.getTankId();
                 String displayName = player.getUsername();
 
-                if (tId == myTankId) displayName += "*";
-                if (displayName.length() > 7) displayName = displayName.substring(0, 7);
+                if (tId == myTankId) {
+                    displayName += "*";
+                }
+                if (displayName.length() > 7) {
+                    displayName = displayName.substring(0, 7);
+                }
 
                 int currentHp = (int) maxHp;
                 if (globalPlayerStates.containsKey(tId)) {
@@ -741,31 +864,67 @@ public class GameCanvasApp extends Application {
     }
 
     private void showGameOverPopup(GameOverDTO gameOver) {
-        if (rootPane == null) return;
+        if (rootPane == null) {
+            return;
+        }
 
-        // Lớp phủ tối đè lên toàn bộ màn hình Game hiện tại (In-game Overlay)
+        // Overlay nền mờ chuyên nghiệp
         StackPane overlay = new StackPane();
-        overlay.setStyle("-fx-background-color: rgba(10, 12, 18, 0.85);");
+        overlay.setStyle("-fx-background-color: rgba(10, 12, 18, 0.88);");
         overlay.setPrefSize(canvasWidth, canvasHeight);
 
-        VBox card = new VBox(12);
+        // Canvas hiệu ứng Pháo hoa mừng Top 1 chạy độc lập
+        fireworkCanvas = new Canvas(canvasWidth, canvasHeight);
+        gcFirework = fireworkCanvas.getGraphicsContext2D();
+        overlay.getChildren().add(fireworkCanvas);
+
+        startFireworkAnimation();
+
+        VBox card = new VBox(14);
         card.setAlignment(Pos.CENTER);
-        card.setPadding(new Insets(20, 25, 20, 25));
-        card.setMaxWidth(420);
-        card.setStyle("-fx-background-color: #1A202C; -fx-background-radius: 12px; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.6), 15, 0, 0, 5); -fx-border-color: #2D3748; -fx-border-width: 1px; -fx-border-radius: 12px;");
+        card.setPadding(new Insets(24, 30, 24, 30));
+        card.setMaxWidth(460);
+        card.setStyle("-fx-background-color: linear-gradient(to bottom, #1E2638, #111622); "
+                + "-fx-background-radius: 16px; "
+                + "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 25, 0, 0, 8); "
+                + "-fx-border-color: linear-gradient(to bottom, #F6E05E, #D69E2E); "
+                + "-fx-border-width: 2px; "
+                + "-fx-border-radius: 16px;");
 
-        Label title = new Label("🏆 KẾT THÚC TRẬN ĐẤU");
-        title.setStyle("-fx-text-fill: #F6E05E; -fx-font-size: 20px; -fx-font-weight: bold;");
+        // Biểu tượng Cúp Vàng HD & Tiêu đề hiệu ứng chữ nổi
+        Label trophyIcon = new Label("🏆");
+        trophyIcon.setStyle("-fx-font-size: 52px;");
 
-        String winnerUsername = getUsernameByTankId(gameOver.getWinnerTankId());
-        String winnerText = "Người thắng: TANK " + gameOver.getWinnerTankId()
-                + (winnerUsername != null ? " (" + winnerUsername + ")" : "");
+        Label title = new Label("KẾT THÚC TRẬN ĐẤU");
+        title.setFont(Font.font("Segoe UI", FontWeight.EXTRA_BOLD, 22));
+        title.setStyle("-fx-text-fill: #F6E05E;");
+
+        // Hiệu ứng chữ nổi (3D drop shadow text effect)
+        DropShadow textGlow = new DropShadow();
+        textGlow.setColor(Color.web("#ECC94B"));
+        textGlow.setRadius(12);
+        textGlow.setSpread(0.4);
+        title.setEffect(textGlow);
+
+        // SỬA: Xử lý hiển thị khi kết quả Hòa (winnerTankId < 0 hoặc == -1)
+        int winnerId = gameOver.getWinnerTankId();
+        String winnerText;
+        if (winnerId < 0) {
+            winnerText = "🤝 KHÔNG CÓ NGƯỜI CHIẾN THẮNG";
+        } else {
+            String winnerUsername = getUsernameByTankId(winnerId);
+            winnerText = "👑 QUÁN QUÂN: TANK " + winnerId
+                    + (winnerUsername != null ? " (" + winnerUsername + ")" : "");
+        }
+
         Label winnerLabel = new Label(winnerText);
-        winnerLabel.setStyle("-fx-text-fill: #E2E8F0; -fx-font-size: 14px; -fx-font-weight: bold;");
+        winnerLabel.setStyle("-fx-text-fill: #FFFFFF; -fx-font-size: 15px; -fx-font-weight: bold; "
+                + "-fx-background-color: rgba(236, 201, 75, 0.2); -fx-padding: 6px 16px; -fx-background-radius: 20px;");
 
+        // Bảng tổng kết kết quả thi đấu
         GridPane table = new GridPane();
-        table.setHgap(12);
-        table.setVgap(8);
+        table.setHgap(14);
+        table.setVgap(10);
         table.setAlignment(Pos.CENTER);
 
         String[] headerTitles = {"HẠNG", "NGƯỜI CHƠI", "ĐIỂM", "HẠ GỤC", "BẮN TRÚNG"};
@@ -783,15 +942,18 @@ public class GameCanvasApp extends Application {
             String uName = getUsernameByTankId(tId);
             String displayName = "P" + tId + (uName != null ? " - " + uName : "");
 
-            Label rankLbl = new Label(rank == 1 ? "🥇" : rank == 2 ? "🥈" : rank == 3 ? "🥉" : String.valueOf(rank));
+            Label rankLbl = new Label(rank == 1 ? "🥇 Top 1" : rank == 2 ? "🥈 Top 2" : rank == 3 ? "🥉 Top 3" : "  " + rank);
             Label nameLbl = new Label(displayName);
             Label scoreLbl = new Label(String.valueOf(gameOver.getFinalScores().getOrDefault(tId, 0)));
             Label killLbl = new Label(String.valueOf(gameOver.getFinalKills().getOrDefault(tId, 0)));
             Label hitLbl = new Label(String.valueOf(gameOver.getFinalHits().getOrDefault(tId, 0)));
 
+            boolean isWinner = (tId == gameOver.getWinnerTankId());
+            String textColor = isWinner ? "#F6E05E" : "#EDF2F7";
+
             Label[] row = {rankLbl, nameLbl, scoreLbl, killLbl, hitLbl};
             for (int i = 0; i < row.length; i++) {
-                row[i].setStyle("-fx-text-fill: " + (tId == gameOver.getWinnerTankId() ? "#ECC94B" : "#EDF2F7") + "; -fx-font-size: 12px; -fx-font-weight: bold;");
+                row[i].setStyle("-fx-text-fill: " + textColor + "; -fx-font-size: 12px; -fx-font-weight: " + (isWinner ? "bold" : "normal") + ";");
                 GridPane.setHalignment(row[i], i == 1 ? HPos.LEFT : HPos.CENTER);
                 table.add(row[i], i, rank);
             }
@@ -799,23 +961,62 @@ public class GameCanvasApp extends Application {
         }
 
         Label reasonLabel = new Label("Lý do: " + gameOver.getReason());
-        reasonLabel.setStyle("-fx-text-fill: #718096; -fx-font-size: 11px;");
+        reasonLabel.setStyle("-fx-text-fill: #718096; -fx-font-size: 11px; -fx-font-style: italic;");
 
         Button playAgainBtn = new Button("🔄 CHƠI TIẾP");
-        playAgainBtn.setStyle("-fx-background-color: #38A169; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold; -fx-background-radius: 6px; -fx-padding: 8px 16px; -fx-cursor: hand;");
+        playAgainBtn.setStyle("-fx-background-color: #38A169; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold; -fx-background-radius: 8px; -fx-padding: 8px 18px; -fx-cursor: hand;");
         playAgainBtn.setOnAction(e -> handlePlayAgain());
 
         Button exitBtn = new Button("🚪 RỜI PHÒNG");
-        exitBtn.setStyle("-fx-background-color: #E53E3E; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold; -fx-background-radius: 6px; -fx-padding: 8px 16px; -fx-cursor: hand;");
+        exitBtn.setStyle("-fx-background-color: #E53E3E; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold; -fx-background-radius: 8px; -fx-padding: 8px 18px; -fx-cursor: hand;");
         exitBtn.setOnAction(e -> handleExit());
 
-        HBox btns = new HBox(15, playAgainBtn, exitBtn);
+        HBox btns = new HBox(16, playAgainBtn, exitBtn);
         btns.setAlignment(Pos.CENTER);
 
-        card.getChildren().addAll(title, winnerLabel, table, reasonLabel, btns);
+        card.getChildren().addAll(trophyIcon, title, winnerLabel, table, reasonLabel, btns);
         overlay.getChildren().add(card);
 
         rootPane.getChildren().add(overlay);
+    }
+
+    private void startFireworkAnimation() {
+        Color[] fireworkColors = {Color.GOLD, Color.RED, Color.CYAN, Color.LIME, Color.MAGENTA, Color.ORANGE};
+
+        fireworkTimer = new AnimationTimer() {
+            private long lastSpawn = 0;
+
+            @Override
+            public void handle(long now) {
+                if (gcFirework == null) {
+                    return;
+                }
+                gcFirework.clearRect(0, 0, canvasWidth, canvasHeight);
+
+                // Bắn pháo hoa định kỳ mỗi 400ms
+                if (now - lastSpawn > 400_000_000L) {
+                    double spawnX = Math.random() * canvasWidth;
+                    double spawnY = Math.random() * (canvasHeight * 0.6);
+                    Color color = fireworkColors[(int) (Math.random() * fireworkColors.length)];
+
+                    for (int i = 0; i < 35; i++) {
+                        fireworkParticles.add(new FireworkParticle(spawnX, spawnY, color));
+                    }
+                    lastSpawn = now;
+                }
+
+                // Cập nhật và render hạt pháo hoa
+                for (int i = fireworkParticles.size() - 1; i >= 0; i--) {
+                    FireworkParticle p = fireworkParticles.get(i);
+                    if (!p.update()) {
+                        fireworkParticles.remove(i);
+                    } else {
+                        p.render(gcFirework);
+                    }
+                }
+            }
+        };
+        fireworkTimer.start();
     }
 
     private void handleExit() {
@@ -825,7 +1026,8 @@ public class GameCanvasApp extends Application {
             if (clientSocket != null && clientSocket.isConnected()) {
                 clientSocket.sendPacket(new Packet(PacketType.ROOM_LEAVE_REQ, ""));
             }
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
 
         this.currentRoom = null;
 
@@ -888,12 +1090,21 @@ public class GameCanvasApp extends Application {
     }
 
     private void stopAllTimers() {
-        if (renderTimer != null) renderTimer.stop();
-        if (matchTimer != null) matchTimer.stop();
+        if (renderTimer != null) {
+            renderTimer.stop();
+        }
+        if (matchTimer != null) {
+            matchTimer.stop();
+        }
+        if (fireworkTimer != null) {
+            fireworkTimer.stop();
+        }
     }
 
     private boolean isTankInBush(double tankX, double tankY) {
-        if (mapMatrix == null) return false;
+        if (mapMatrix == null) {
+            return false;
+        }
         int c = (int) (tankX / tileSize);
         int r = (int) (tankY / tileSize);
         if (r >= 0 && r < mapMatrix.length && c >= 0 && c < mapMatrix[0].length) {
@@ -904,7 +1115,9 @@ public class GameCanvasApp extends Application {
 
     private String getUsernameByTankId(int tankId) {
         for (TankPlayerDTO player : tankPlayers) {
-            if (player.getTankId() == tankId) return player.getUsername();
+            if (player.getTankId() == tankId) {
+                return player.getUsername();
+            }
         }
         return null;
     }

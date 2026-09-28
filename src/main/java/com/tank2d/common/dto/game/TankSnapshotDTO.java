@@ -56,4 +56,7 @@ public class TankSnapshotDTO {
     public void setGhost(boolean ghost) { this.isGhost = ghost; }
     public void setShield(boolean shield) { this.hasShield = shield; }
     public void setNitro(boolean nitro) { this.hasNitro = nitro; }
+    public void setAlive(boolean isAlive){
+        this.isAlive = isAlive;
+    }
 }
