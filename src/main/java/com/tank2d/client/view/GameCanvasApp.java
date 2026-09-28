@@ -588,7 +588,7 @@ public class GameCanvasApp extends Application {
             boolean isMyTank = (tank.getId() == myTankId);
             boolean inBush = isTankInBush(tank.getX(), tank.getY());
 
-            if (inBush && !isMyTank && myTankId != -1) continue;
+
 
             int colorIdx = Math.abs(tank.getId() - 1) % tankImageAssets.length;
             Image tankSprite = AssetLoader.getImage(tankImageAssets[colorIdx]);
@@ -758,7 +758,7 @@ public class GameCanvasApp extends Application {
         title.setStyle("-fx-text-fill: #F6E05E; -fx-font-size: 20px; -fx-font-weight: bold;");
 
         String winnerUsername = getUsernameByTankId(gameOver.getWinnerTankId());
-        String winnerText = "Người thắng: TANK " + gameOver.getWinnerTankId() 
+        String winnerText = "Người thắng: TANK " + gameOver.getWinnerTankId()
                 + (winnerUsername != null ? " (" + winnerUsername + ")" : "");
         Label winnerLabel = new Label(winnerText);
         winnerLabel.setStyle("-fx-text-fill: #E2E8F0; -fx-font-size: 14px; -fx-font-weight: bold;");

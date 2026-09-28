@@ -1,11 +1,15 @@
 package com.tank2d.server.map;
 
 public class GameMap {
+    public static final int NO_CLUSTER = -1; // ô không phải bụi
+
     private final int width;
     private final int height;
     private final int tileSize;
     private final int[][] tiles;
     private final int[][] brickHitsLeft;
+    private final int[][] bushClusterIds;   // MỚI: nhãn cụm bụi của từng ô
+    private int bushClusterCount = 0;       // MỚI
 
     public GameMap(int width, int height, int tileSize, int[][] tiles, int brickMaxHits) {
         this.width = width;
@@ -13,8 +17,10 @@ public class GameMap {
         this.tileSize = tileSize;
         this.tiles = tiles;
         this.brickHitsLeft = new int[height][width];
+        this.bushClusterIds = new int[height][width];
         for (int r = 0; r < height; r++) {
             for (int c = 0; c < width; c++) {
+                bushClusterIds[r][c] = NO_CLUSTER;
                 if (tiles[r][c] == TileType.BRICK_WALL.getCode()) {
                     brickHitsLeft[r][c] = brickMaxHits;
                 }
@@ -31,9 +37,18 @@ public class GameMap {
     public double tileCenterX(int col) { return col * tileSize + tileSize / 2.0; }
     public double tileCenterY(int row) { return row * tileSize + tileSize / 2.0; }
 
+    public boolean isInside(int row, int col) {
+        return row >= 0 && row < height && col >= 0 && col < width;
+    }
+
     public boolean isOutOfBounds(double worldX, double worldY) {
-        int col = worldToCol(worldX), row = worldToRow(worldY);
-        return col < 0 || col >= width || row < 0 || row >= height;
+        return !isInside(worldToRow(worldY), worldToCol(worldX));
+    }
+
+    /** Mã ô theo (row, col); ngoài biên trả về mã tường đá. */
+    public int getTileCode(int row, int col) {
+        if (!isInside(row, col)) return TileType.STONE_WALL.getCode();
+        return tiles[row][col];
     }
 
     public TileType getTileAt(double worldX, double worldY) {
@@ -45,6 +60,24 @@ public class GameMap {
         TileType t = getTileAt(worldX, worldY);
         return t == TileType.STONE_WALL || t == TileType.BRICK_WALL;
     }
+
+    // ===== Nhãn cụm bụi (chỉ lưu dữ liệu, KHÔNG chứa thuật toán) =====
+    public int getBushClusterId(int row, int col) {
+        if (!isInside(row, col)) return NO_CLUSTER;
+        return bushClusterIds[row][col];
+    }
+
+    public void setBushClusterId(int row, int col, int clusterId) {
+        if (isInside(row, col)) bushClusterIds[row][col] = clusterId;
+    }
+
+    /** Nhãn cụm bụi tại toạ độ world; NO_CLUSTER nếu không đứng trong bụi. */
+    public int getBushClusterIdAt(double worldX, double worldY) {
+        return getBushClusterId(worldToRow(worldY), worldToCol(worldX));
+    }
+
+    public int getBushClusterCount() { return bushClusterCount; }
+    public void setBushClusterCount(int count) { this.bushClusterCount = count; }
 
     /** Kết quả 1 lần bắn trúng tường gạch — cho biết có ô nào thật sự vỡ (đổi thành EMPTY) không, để phát MAP_UPDATE. */
     public static class WallHitResult {
