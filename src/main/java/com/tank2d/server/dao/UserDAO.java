@@ -1,5 +1,7 @@
 package com.tank2d.server.dao;
 
+import com.tank2d.common.exception.DatabaseException;
+import com.tank2d.common.exception.ErrorCode;
 import com.tank2d.common.model.User;
 import com.tank2d.common.dto.LeaderboardDTO;
 import com.tank2d.server.db.DatabaseConnection;
@@ -11,8 +13,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class UserDAO {
+
+    private static final Logger LOGGER = Logger.getLogger(UserDAO.class.getName());
 
     /**
      * Đăng ký tài khoản mới: băm mật khẩu bằng BCrypt và lưu vào CSDL. CSDL có
@@ -24,7 +30,7 @@ public class UserDAO {
         }
 
         if (isUsernameTaken(username)) {
-            System.err.println("[UserDAO] Đăng ký thất bại: Tên đăng nhập '" + username + "' đã tồn tại.");
+            LOGGER.warning("[UserDAO] Đăng ký thất bại: Tên đăng nhập '" + username + "' đã tồn tại.");
             return false;
         }
 
@@ -42,8 +48,8 @@ public class UserDAO {
             return rowsInserted > 0;
 
         } catch (SQLException e) {
-            System.err.println("[UserDAO] Lỗi khi đăng ký tài khoản: " + e.getMessage());
-            return false;
+            LOGGER.log(Level.SEVERE, "[UserDAO] Lỗi khi đăng ký tài khoản", e);
+            throw new DatabaseException(ErrorCode.DB_QUERY_ERROR, "Lỗi cơ sở dữ liệu khi đăng ký!", e);
         }
     }
 
@@ -78,7 +84,8 @@ public class UserDAO {
             }
 
         } catch (SQLException e) {
-            System.err.println("[UserDAO] Lỗi khi thực hiện đăng nhập: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[UserDAO] Lỗi khi thực hiện đăng nhập", e);
+            throw new DatabaseException(ErrorCode.DB_QUERY_ERROR, "Lỗi cơ sở dữ liệu khi đăng nhập!", e);
         }
 
         return null;
@@ -107,7 +114,7 @@ public class UserDAO {
             return rowsUpdated > 0;
 
         } catch (SQLException e) {
-            System.err.println("[UserDAO] Lỗi khi cập nhật chỉ số user_stats: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[UserDAO] Lỗi khi cập nhật chỉ số user_stats", e);
             return false;
         }
     }
@@ -157,8 +164,7 @@ public class UserDAO {
             }
 
         } catch (SQLException e) {
-            System.err.println("[UserDAO] Lỗi khi lấy Top 10 Leaderboard: " + e.getMessage());
-            e.printStackTrace();
+            LOGGER.log(Level.SEVERE, "[UserDAO] Lỗi khi lấy Top 10 Leaderboard", e);
         }
 
         return leaderboard;
@@ -178,8 +184,8 @@ public class UserDAO {
             }
 
         } catch (SQLException e) {
-            System.err.println("[UserDAO] Lỗi khi kiểm tra username tồn tại: " + e.getMessage());
-            return true;
+            LOGGER.log(Level.SEVERE, "[UserDAO] Lỗi khi kiểm tra username tồn tại", e);
+            throw new DatabaseException(ErrorCode.DB_QUERY_ERROR, "Lỗi kiểm tra tài khoản tồn tại!", e);
         }
     }
 }

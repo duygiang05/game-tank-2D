@@ -22,12 +22,17 @@ import javafx.scene.control.OverrunStyle;
 import javafx.scene.layout.HBox;
 import javafx.stage.Stage;
 
+import com.tank2d.common.exception.GameNetworkException;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class LeaderboardController {
+
+    private static final Logger LOGGER = Logger.getLogger(LeaderboardController.class.getName());
 
     @FXML
     private ListView<LeaderboardDTO> leaderboardListView;
@@ -148,9 +153,12 @@ public class LeaderboardController {
             Packet request = new Packet(PacketType.LEADERBOARD_REQ, "");
             clientSocket.sendPacket(request);
             statusLabel.setText("Đang tải bảng xếp hạng...");
+        } catch (GameNetworkException e) {
+            statusLabel.setText(e.getMessage());
+            LOGGER.log(Level.WARNING, "[Leaderboard] Lỗi nghiệp vụ khi tải bảng xếp hạng", e);
         } catch (IOException e) {
             statusLabel.setText("Không thể kết nối tới Server!");
-            System.err.println("[Leaderboard] Lỗi gửi request: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Leaderboard] Lỗi gửi request", e);
         }
     }
 
@@ -180,7 +188,7 @@ public class LeaderboardController {
             });
 
         } catch (Exception e) {
-            System.err.println("[Leaderboard] Lỗi xử lý dữ liệu: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Leaderboard] Lỗi xử lý dữ liệu", e);
         }
     }
 
@@ -197,7 +205,7 @@ public class LeaderboardController {
             stage.setTitle("Tank 2D Online - Lobby");
             stage.show();
         } catch (IOException e) {
-            System.err.println("[Leaderboard] Không thể quay lại Lobby: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Leaderboard] Không thể quay lại Lobby", e);
         }
     }
 }

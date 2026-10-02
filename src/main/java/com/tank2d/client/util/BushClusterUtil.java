@@ -77,9 +77,6 @@ public final class BushClusterUtil {
     }
 
     /**
-     * Các cụm bụi đang chứa từ 2 xe còn sống trở lên (tính theo tâm xe).
-     */
-    /**
      * Các cụm bụi đang chứa ít nhất minTanks xe còn sống (tính theo tâm xe).
      */
     public static Set<Integer> findClustersWithTanks(int[][] clusterIds,

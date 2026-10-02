@@ -6,6 +6,9 @@ import com.tank2d.common.dto.LoginRequest;
 import com.tank2d.common.dto.LoginResponse;
 import com.tank2d.common.dto.RegisterResponse;
 import com.tank2d.common.dto.game.PlayerShootRequestDTO;
+import com.tank2d.common.dto.game.TankPlayerDTO;
+import com.tank2d.common.exception.ErrorCode;
+import com.tank2d.common.exception.GameNetworkException;
 import com.tank2d.common.model.User;
 import com.tank2d.common.protocol.NetworkUtil;
 import com.tank2d.common.protocol.Packet;
@@ -19,11 +22,6 @@ import com.tank2d.server.model.BulletEntity;
 import com.tank2d.server.model.TankEntity;
 import com.tank2d.server.room.Room;
 import com.tank2d.server.room.RoomManager;
-import com.tank2d.common.dto.game.TankPlayerDTO;
-import com.tank2d.server.dao.MatchDAO;
-import com.tank2d.server.model.BulletEntity;
-import java.util.ArrayList;
-import java.util.List;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -37,9 +35,12 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class ClientHandler implements Runnable {
 
+    private static final Logger LOGGER = Logger.getLogger(ClientHandler.class.getName());
     private static final Set<ClientHandler> connectedClients = ConcurrentHashMap.newKeySet();
     private static final ExecutorService networkBroadcastPool = Executors.newCachedThreadPool();
 
@@ -70,7 +71,7 @@ public class ClientHandler implements Runnable {
     @Override
     public void run() {
         String clientAddress = socket.getRemoteSocketAddress().toString();
-        System.out.println("[ClientHandler] Khởi tạo phiên làm việc với Client: " + clientAddress);
+        LOGGER.info("[ClientHandler] Khởi tạo phiên làm việc với Client: " + clientAddress);
 
         try {
             dis = new DataInputStream(socket.getInputStream());
@@ -82,7 +83,7 @@ public class ClientHandler implements Runnable {
                 Packet packet = NetworkUtil.readPacket(dis);
 
                 if (packet == null) {
-                    System.out.println("[ClientHandler] Client ngắt kết nối: " + clientAddress);
+                    LOGGER.info("[ClientHandler] Client ngắt kết nối: " + clientAddress);
                     break;
                 }
 
@@ -90,7 +91,7 @@ public class ClientHandler implements Runnable {
             }
 
         } catch (IOException e) {
-            System.err.println("[ClientHandler] Lỗi kết nối (" + clientAddress + "): " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[ClientHandler] Lỗi kết nối (" + clientAddress + ")", e);
         } finally {
             closeConnection();
         }
@@ -116,7 +117,7 @@ public class ClientHandler implements Runnable {
             case TANK_PLAYER_INFO_REQ -> handleTankPlayerInfo();
             case PLAYER_INPUT -> handlePlayerInput(packet.getData());
             case PLAYER_SHOOT_REQ -> handlePlayerShoot(packet.getData());
-            default -> System.out.println("[ClientHandler] Nhận packet chưa hỗ trợ: " + packet.getType());
+            default -> LOGGER.info("[ClientHandler] Nhận packet chưa hỗ trợ: " + packet.getType());
         }
     }
 
@@ -140,7 +141,7 @@ public class ClientHandler implements Runnable {
                 NetworkUtil.sendPacket(dos, response);
             }
         } catch (Exception e) {
-            System.err.println("[Game] Lỗi gửi Tank Player Info: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Game] Lỗi gửi Tank Player Info", e);
         }
     }
 
@@ -157,9 +158,9 @@ public class ClientHandler implements Runnable {
             }
 
             currentUser = null;
-            System.out.println("[ClientHandler] Client đăng xuất thành công.");
+            LOGGER.info("[ClientHandler] Client đăng xuất thành công.");
         } catch (Exception e) {
-            System.err.println("[ClientHandler] Lỗi khi đăng xuất: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[ClientHandler] Lỗi khi đăng xuất", e);
         }
     }
 
@@ -180,17 +181,19 @@ public class ClientHandler implements Runnable {
                 }
 
                 if (isAlreadyLoggedIn) {
-                    System.out.println("[Auth] Chặn đăng nhập trùng lặp cho User: " + user.getUsername());
-                    res = new LoginResponse(false, -1, "", "Tài khoản đang đăng nhập ở thiết bị/cửa sổ khác!");
+                    LOGGER.info("[Auth] Chặn đăng nhập trùng lặp cho User: " + user.getUsername());
+                    res = new LoginResponse(false, -1, "", ErrorCode.AUTH_USER_ALREADY_LOGGED_IN.getDefaultMessage());
                 } else {
                     this.currentUser = user;
                     res = new LoginResponse(true, user.getId(), user.getUsername(), "Đăng nhập thành công!");
                 }
             } else {
-                res = new LoginResponse(false, -1, "", "Sai tên tài khoản hoặc mật khẩu!");
+                res = new LoginResponse(false, -1, "", ErrorCode.AUTH_INVALID_CREDENTIALS.getDefaultMessage());
             }
+        } catch (GameNetworkException e) {
+            res = new LoginResponse(false, -1, "", e.getMessage());
         } catch (Exception e) {
-            res = new LoginResponse(false, -1, "", "Lỗi định dạng dữ liệu đăng nhập!");
+            res = new LoginResponse(false, -1, "", ErrorCode.AUTH_INVALID_INPUT.getDefaultMessage());
         }
 
         try {
@@ -204,9 +207,11 @@ public class ClientHandler implements Runnable {
             LoginRequest req = gson.fromJson(rawJson, LoginRequest.class);
             boolean isSuccess = userDAO.register(req.getUsername(), req.getPassword());
             res = isSuccess ? new RegisterResponse(true, "Đăng ký thành công!")
-                    : new RegisterResponse(false, "Đăng ký thất bại! Tài khoản đã tồn tại.");
+                    : new RegisterResponse(false, ErrorCode.AUTH_USERNAME_TAKEN.getDefaultMessage());
+        } catch (GameNetworkException e) {
+            res = new RegisterResponse(false, e.getMessage());
         } catch (Exception e) {
-            res = new RegisterResponse(false, "Lỗi định dạng dữ liệu đăng ký!");
+            res = new RegisterResponse(false, ErrorCode.AUTH_INVALID_INPUT.getDefaultMessage());
         }
 
         try {
@@ -220,7 +225,7 @@ public class ClientHandler implements Runnable {
             Packet response = new Packet(PacketType.LEADERBOARD_RES, gson.toJson(leaderboard));
             NetworkUtil.sendPacket(dos, response);
         } catch (IOException e) {
-            System.err.println("[Leaderboard] Lỗi gửi bảng xếp hạng: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Leaderboard] Lỗi gửi bảng xếp hạng", e);
         }
     }
 
@@ -258,7 +263,7 @@ public class ClientHandler implements Runnable {
             } else {
                 // JOIN THẤT BẠI: KHÔNG gửi ROOM_STATE_UPDATE!
                 // Chỉ gửi cập nhật danh sách sảnh để Client thấy trạng thái phòng mới nhất
-                System.out.println("[Room] Từ chối " + currentUser.getUsername() + " vào phòng " + roomId);
+                LOGGER.info("[Room] Từ chối " + currentUser.getUsername() + " vào phòng " + roomId);
                 Packet packet = new Packet(PacketType.ROOM_LIST_UPDATE, gson.toJson(roomManager.getAllRooms()));
                 NetworkUtil.sendPacket(dos, packet);
             }
@@ -308,7 +313,7 @@ public class ClientHandler implements Runnable {
             if (room == null || !room.isHost(currentUser.getId())) return;
 
             if (room.getCurrentPlayers() < 2 || !room.areAllPlayersReady()) {
-                System.out.println("[Game] Chưa đủ điều kiện: Người = " + room.getCurrentPlayers() + ", Ready = " + room.areAllPlayersReady());
+                LOGGER.info("[Game] Chưa đủ điều kiện: Người = " + room.getCurrentPlayers() + ", Ready = " + room.areAllPlayersReady());
                 return;
             }
 
@@ -328,7 +333,7 @@ public class ClientHandler implements Runnable {
             try {
                 gameLoop.setGameMap(MapLoader.loadFromFile("config/maps/map_default.json"));
             } catch (Exception e) {
-                System.err.println("[Game] Lỗi nạp map: " + e.getMessage());
+                LOGGER.log(Level.SEVERE, "[Game] Lỗi nạp map", e);
             }
 
             double matchDuration = room.getDuration();
@@ -417,95 +422,48 @@ public class ClientHandler implements Runnable {
             loopThread.start();
 
         } catch (Exception e) {
-            System.err.println("[Game] Lỗi xử lý ROOM_START_REQ: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Game] Lỗi xử lý ROOM_START_REQ", e);
         }
     }
 
      // ROOM DURATION
 // =========================================================
     private void handleRoomDuration(String rawJson) {
-
         try {
-
             if (currentUser == null) {
-
-                System.out.println(
-                        "[Room] Client chưa đăng nhập."
-                );
-
+                LOGGER.info("[Room] Client chưa đăng nhập.");
                 return;
             }
 
             if (currentRoomId == -1) {
-
-                System.out.println(
-                        "[Room] Client chưa ở trong phòng."
-                );
-
+                LOGGER.info("[Room] Client chưa ở trong phòng.");
                 return;
             }
 
-            Room room
-                    = roomManager.getRoom(
-                            currentRoomId
-                    );
-
+            Room room = roomManager.getRoom(currentRoomId);
             if (room == null) {
-
-                System.out.println(
-                        "[Room] Không tìm thấy phòng."
-                );
-
+                LOGGER.info("[Room] Không tìm thấy phòng.");
                 return;
             }
 
             // Chỉ Host được thay đổi thời lượng
-            if (!room.isHost(
-                    currentUser.getId())) {
-
-                System.out.println(
-                        "[Room] User "
-                        + currentUser.getUsername()
-                        + " không phải Host."
-                );
-
+            if (!room.isHost(currentUser.getId())) {
+                LOGGER.info("[Room] User " + currentUser.getUsername() + " không phải Host.");
                 return;
             }
 
-            int duration
-                    = gson.fromJson(
-                            rawJson,
-                            Integer.class
-                    );
+            int duration = gson.fromJson(rawJson, Integer.class);
 
             // Chỉ chấp nhận 45 / 60 / 90 giây
-            if (duration != 45
-                    && duration != 60
-                    && duration != 90) {
-
-                System.out.println(
-                        "[Room] Thời lượng không hợp lệ: "
-                        + duration
-                );
-
+            if (duration != 45 && duration != 60 && duration != 90) {
+                LOGGER.info("[Room] Thời lượng không hợp lệ: " + duration);
                 return;
             }
 
-            boolean success
-                    = roomManager.setRoomDuration(
-                            currentRoomId,
-                            duration
-                    );
+            boolean success = roomManager.setRoomDuration(currentRoomId, duration);
 
             if (success) {
-
-                System.out.println(
-                        "[Room] Host "
-                        + currentUser.getUsername()
-                        + " chọn "
-                        + duration
-                        + " giây."
-                );
+                LOGGER.info("[Room] Host " + currentUser.getUsername() + " chọn " + duration + " giây.");
 
                 // Đồng bộ duration cho tất cả người trong phòng
                 broadcastRoomState();
@@ -513,11 +471,7 @@ public class ClientHandler implements Runnable {
             }
 
         } catch (Exception e) {
-
-            System.err.println(
-                    "[Room] Lỗi xử lý ROOM_DURATION_REQ: "
-                    + e.getMessage()
-            );
+            LOGGER.log(Level.SEVERE, "[Room] Lỗi xử lý ROOM_DURATION_REQ", e);
         }
     }
     private void handlePlayerInput(String rawJson) {
@@ -573,14 +527,14 @@ public class ClientHandler implements Runnable {
             int userId = currentUser.getId();
 
             if (roomManager.leaveRoom(roomId, userId)) {
-                System.out.println("[Room] User " + currentUser.getUsername() + " đã thoát phòng " + roomId);
+                LOGGER.info("[Room] User " + currentUser.getUsername() + " đã thoát phòng " + roomId);
                 currentRoomId = -1;
                 broadcastRoomStateForRoom(roomId);
                 broadcastLobbyRooms();
             }
 
         } catch (Exception e) {
-            System.err.println("[Room] Lỗi xử lý ROOM_LEAVE_REQ: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Room] Lỗi xử lý ROOM_LEAVE_REQ", e);
         }
     }
 

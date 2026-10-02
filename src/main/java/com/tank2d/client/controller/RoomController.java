@@ -18,12 +18,17 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.stage.Stage;
 
+import com.tank2d.common.exception.GameNetworkException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class RoomController {
+
+    private static final Logger LOGGER = Logger.getLogger(RoomController.class.getName());
 
     @FXML
     private Label roomNameLabel;
@@ -239,10 +244,13 @@ public class RoomController {
 
             Packet request = new Packet(PacketType.ROOM_DURATION_REQ, String.valueOf(duration));
             clientSocket.sendPacket(request);
-            System.out.println("[Room] Host chọn thời lượng: " + duration + " giây");
+            LOGGER.info("[Room] Host chọn thời lượng: " + duration + " giây");
 
+        } catch (GameNetworkException e) {
+            roomStatusLabel.setText(e.getMessage());
+            LOGGER.log(Level.WARNING, "[Room] Lỗi nghiệp vụ khi gửi duration", e);
         } catch (IOException e) {
-            System.err.println("[Room] Lỗi gửi duration: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Room] Lỗi gửi duration", e);
         }
     }
 
@@ -331,7 +339,7 @@ public class RoomController {
             currentRoom = room;
             updateRoomUI(room);
         } catch (Exception e) {
-            System.err.println("[Room] Lỗi xử lý ROOM_STATE_UPDATE: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Room] Lỗi xử lý ROOM_STATE_UPDATE", e);
         }
     }
 
@@ -360,11 +368,14 @@ public class RoomController {
 
             Packet request = new Packet(PacketType.ROOM_READY_REQ, String.valueOf(ready));
             clientSocket.sendPacket(request);
-            System.out.println("[Room] Đã gửi READY: " + ready);
+            LOGGER.info("[Room] Đã gửi READY: " + ready);
 
+        } catch (GameNetworkException e) {
+            roomStatusLabel.setText(e.getMessage());
+            LOGGER.log(Level.WARNING, "[Room] Lỗi nghiệp vụ Ready: " + e.getErrorCode(), e);
         } catch (IOException e) {
             roomStatusLabel.setText("Không thể gửi trạng thái Ready!");
-            System.err.println("[Room] Lỗi Ready: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Room] Lỗi Ready", e);
         }
     }
 
@@ -395,16 +406,19 @@ public class RoomController {
             Packet request = new Packet(PacketType.ROOM_START_REQ, "");
             clientSocket.sendPacket(request);
             readyButton.setDisable(true);
-            System.out.println("[Room] Host đã gửi ROOM_START_REQ.");
+            LOGGER.info("[Room] Host đã gửi ROOM_START_REQ.");
 
+        } catch (GameNetworkException e) {
+            roomStatusLabel.setText(e.getMessage());
+            LOGGER.log(Level.WARNING, "[Room] Lỗi nghiệp vụ Start: " + e.getErrorCode(), e);
         } catch (IOException e) {
             roomStatusLabel.setText("Không thể bắt đầu trận!");
-            System.err.println("[Room] Lỗi Start: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Room] Lỗi Start", e);
         }
     }
 
     private void handleGameStart(String rawJson) {
-        System.out.println("[Room] Nhận GAME_START_NOTIFY!");
+        LOGGER.info("[Room] Nhận GAME_START_NOTIFY!");
         removePacketListener();
 
         Platform.runLater(() -> {
@@ -431,10 +445,10 @@ public class RoomController {
                 stage.setResizable(false);
                 stage.centerOnScreen();
                 stage.show();
-                System.out.println("[Game] Đã chuyển sang màn hình Game chuẩn 600x600!");
+                LOGGER.info("[Game] Đã chuyển sang màn hình Game chuẩn 600x600!");
 
             } catch (Exception e) {
-                System.err.println("[Game] Không thể mở màn hình Game: " + e.getMessage());
+                LOGGER.log(Level.SEVERE, "[Game] Không thể mở màn hình Game", e);
             }
         });
     }
@@ -445,10 +459,12 @@ public class RoomController {
             ClientSocket clientSocket = session.getClientSocket();
             if (clientSocket != null && clientSocket.isConnected()) {
                 clientSocket.sendPacket(new Packet(PacketType.ROOM_LEAVE_REQ, ""));
-                System.out.println("[Room] Đã gửi yêu cầu rời phòng.");
+                LOGGER.info("[Room] Đã gửi yêu cầu rời phòng.");
             }
+        } catch (GameNetworkException e) {
+            LOGGER.log(Level.WARNING, "[Room] Lỗi nghiệp vụ khi rời phòng: " + e.getErrorCode(), e);
         } catch (IOException e) {
-            System.err.println("[Room] Lỗi khi rời phòng: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Room] Lỗi khi rời phòng", e);
         }
 
         removePacketListener();
@@ -464,10 +480,10 @@ public class RoomController {
                 stage.setScene(lobbyScene);
                 stage.setTitle("Tank 2D Online - Lobby");
                 stage.show();
-                System.out.println("[Room] Đã quay lại Lobby.");
+                LOGGER.info("[Room] Đã quay lại Lobby.");
 
             } catch (IOException e) {
-                System.err.println("[Room] Không thể quay lại Lobby: " + e.getMessage());
+                LOGGER.log(Level.SEVERE, "[Room] Không thể quay lại Lobby", e);
             }
         });
     }
@@ -476,7 +492,7 @@ public class RoomController {
         if (listenerRegistered) {
             session.removePacketListener(packetListener);
             listenerRegistered = false;
-            System.out.println("[Room] Đã xóa Room Packet Listener.");
+            LOGGER.info("[Room] Đã xóa Room Packet Listener.");
         }
     }
 }

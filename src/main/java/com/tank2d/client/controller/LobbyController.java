@@ -23,13 +23,18 @@ import javafx.scene.control.ListView;
 import javafx.scene.layout.HBox;
 import javafx.stage.Stage;
 
+import com.tank2d.common.exception.GameNetworkException;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class LobbyController {
+
+    private static final Logger LOGGER = Logger.getLogger(LobbyController.class.getName());
 
     @FXML
     private ListView<RoomDTO> roomListView;
@@ -145,9 +150,12 @@ public class LobbyController {
             Packet request = new Packet(PacketType.LOBBY_GET_ROOMS_REQ, "");
             clientSocket.sendPacket(request);
 
+        } catch (GameNetworkException e) {
+            showError(e.getMessage());
+            LOGGER.log(Level.WARNING, "[Lobby] Lỗi mạng khi tải phòng: " + e.getErrorCode(), e);
         } catch (IOException e) {
             showError("Không thể kết nối tới Server!");
-            System.err.println("[Lobby] Lỗi tải phòng: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Lobby] Lỗi tải phòng", e);
         }
     }
 
@@ -165,9 +173,12 @@ public class LobbyController {
             Packet request = new Packet(PacketType.ROOM_CREATE_REQ, "");
             clientSocket.sendPacket(request);
 
+        } catch (GameNetworkException e) {
+            showError(e.getMessage());
+            LOGGER.log(Level.WARNING, "[Lobby] Lỗi mạng khi tạo phòng: " + e.getErrorCode(), e);
         } catch (IOException e) {
             showError("Không thể kết nối tới Server!");
-            System.err.println("[Lobby] Lỗi tạo phòng: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Lobby] Lỗi tạo phòng", e);
         }
     }
 
@@ -196,9 +207,12 @@ public class LobbyController {
             );
             clientSocket.sendPacket(request);
 
+        } catch (GameNetworkException e) {
+            showError(e.getMessage());
+            LOGGER.log(Level.WARNING, "[Lobby] Lỗi mạng khi vào phòng: " + e.getErrorCode(), e);
         } catch (IOException e) {
             showError("Không thể kết nối tới Server!");
-            System.err.println("[Lobby] Lỗi vào phòng: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Lobby] Lỗi vào phòng", e);
         }
     }
 
@@ -237,7 +251,7 @@ public class LobbyController {
             });
 
         } catch (Exception e) {
-            System.err.println("[Lobby] Lỗi cập nhật danh sách phòng: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Lobby] Lỗi cập nhật danh sách phòng", e);
         }
     }
 
@@ -283,16 +297,16 @@ public class LobbyController {
                     && room.getPlayerNames().contains(currentUser.getUsername());
 
             if (isJoined) {
-                System.out.println("[Lobby] Vào phòng thành công: " + room.getRoomName());
+                LOGGER.info("[Lobby] Vào phòng thành công: " + room.getRoomName());
                 openRoom(room);
             } else {
                 // Nếu mình không có trong phòng (do phòng đang chơi hoặc đã đầy bị Server từ chối)
-                System.out.println("[Lobby] Không thể vào phòng (bị Server từ chối): " + room.getRoomName());
+                LOGGER.warning("[Lobby] Không thể vào phòng (bị Server từ chối): " + room.getRoomName());
                 showError("Không thể vào phòng! Phòng đang chiến đấu hoặc đã đầy.");
             }
 
         } catch (Exception e) {
-            System.err.println("[Lobby] Lỗi xử lý ROOM_STATE_UPDATE: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Lobby] Lỗi xử lý ROOM_STATE_UPDATE", e);
             showError("Không thể xử lý thông tin phòng!");
         }
     }
@@ -319,7 +333,7 @@ public class LobbyController {
             } catch (IOException e) {
                 // Nếu load thất bại thì hồi phục listener
                 session.addPacketListener(packetListener);
-                System.err.println("[Lobby] Không thể mở Room: " + e.getMessage());
+                LOGGER.log(Level.SEVERE, "[Lobby] Không thể mở Room", e);
                 showError("Không thể mở giao diện phòng!");
             }
         });
@@ -348,7 +362,7 @@ public class LobbyController {
             stage.show();
 
         } catch (IOException e) {
-            System.err.println("[Lobby] Lỗi Logout: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Lobby] Lỗi Logout", e);
             showError("Không thể đăng xuất!");
         }
     }
@@ -371,7 +385,7 @@ public class LobbyController {
 
         } catch (IOException e) {
             session.addPacketListener(packetListener);
-            System.err.println("[Lobby] Không thể mở Leaderboard: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Lobby] Không thể mở Leaderboard", e);
             showError("Không thể mở bảng xếp hạng!");
         }
     }

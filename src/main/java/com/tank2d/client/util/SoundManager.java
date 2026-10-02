@@ -1,17 +1,22 @@
 package com.tank2d.client.util;
 
+import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
 import javax.sound.sampled.FloatControl;
+import javax.sound.sampled.LineEvent;
 import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class SoundManager {
 
+    private static final Logger LOGGER = Logger.getLogger(SoundManager.class.getName());
     private static final Map<String, URL> soundResourceCache = new HashMap<>();
     private static Clip bgmClip;
     private static boolean isMuted = false;
@@ -38,11 +43,30 @@ public class SoundManager {
             if (url != null) {
                 soundResourceCache.put(key, url);
             } else {
-                System.err.println("[SoundManager] Không tìm thấy file âm thanh: " + path);
+                LOGGER.warning("[SoundManager] Không tìm thấy file âm thanh: " + path);
             }
         } catch (Exception e) {
-            System.err.println("[SoundManager] Lỗi load sound " + key + ": " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[SoundManager] Lỗi load sound " + key, e);
         }
+    }
+
+    private static AudioInputStream convertToSupportedFormat(AudioInputStream audioStream) {
+        AudioFormat baseFormat = audioStream.getFormat();
+        if (baseFormat.getEncoding() != AudioFormat.Encoding.PCM_SIGNED) {
+            AudioFormat targetFormat = new AudioFormat(
+                AudioFormat.Encoding.PCM_SIGNED,
+                baseFormat.getSampleRate(),
+                16,
+                baseFormat.getChannels(),
+                baseFormat.getChannels() * 2,
+                baseFormat.getSampleRate(),
+                false
+            );
+            if (AudioSystem.isConversionSupported(targetFormat, baseFormat)) {
+                return AudioSystem.getAudioInputStream(targetFormat, audioStream);
+            }
+        }
+        return audioStream;
     }
 
     // Phát hiệu ứng âm thanh (SFX) đa luồng không gây giật lag
@@ -56,7 +80,8 @@ public class SoundManager {
         new Thread(() -> {
             try (InputStream is = url.openStream();
                  InputStream bufferedIn = new BufferedInputStream(is);
-                 AudioInputStream audioStream = AudioSystem.getAudioInputStream(bufferedIn)) {
+                 AudioInputStream rawStream = AudioSystem.getAudioInputStream(bufferedIn);
+                 AudioInputStream audioStream = convertToSupportedFormat(rawStream)) {
 
                 Clip clip = AudioSystem.getClip();
                 clip.open(audioStream);
@@ -67,12 +92,17 @@ public class SoundManager {
                     gainControl.setValue(sfxVolumeGain);
                 }
 
+                // Tự động giải phóng tài nguyên khi phát xong hoàn toàn
+                clip.addLineListener(event -> {
+                    if (event.getType() == LineEvent.Type.STOP) {
+                        clip.close();
+                    }
+                });
+
                 clip.start();
-                // Tự động giải phóng tài nguyên khi phát xong
-                clip.drain();
 
             } catch (Exception e) {
-                System.err.println("[SoundManager] Lỗi phát âm thanh " + key + ": " + e.getMessage());
+                LOGGER.log(Level.SEVERE, "[SoundManager] Lỗi phát âm thanh " + key, e);
             }
         }).start();
     }
@@ -89,7 +119,8 @@ public class SoundManager {
 
                 InputStream is = url.openStream();
                 InputStream bufferedIn = new BufferedInputStream(is);
-                AudioInputStream audioStream = AudioSystem.getAudioInputStream(bufferedIn);
+                AudioInputStream rawStream = AudioSystem.getAudioInputStream(bufferedIn);
+                AudioInputStream audioStream = convertToSupportedFormat(rawStream);
 
                 bgmClip = AudioSystem.getClip();
                 bgmClip.open(audioStream);
@@ -98,7 +129,7 @@ public class SoundManager {
                 bgmClip.loop(Clip.LOOP_CONTINUOUSLY);
                 bgmClip.start();
             } catch (Exception e) {
-                System.err.println("[SoundManager] Lỗi phát BGM: " + e.getMessage());
+                LOGGER.log(Level.SEVERE, "[SoundManager] Lỗi phát BGM", e);
             }
         }).start();
     }

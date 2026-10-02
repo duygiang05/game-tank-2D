@@ -7,11 +7,13 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
 public class RoomManager {
 
+    private static final Logger LOGGER = Logger.getLogger(RoomManager.class.getName());
+
     private final Map<Integer, Room> rooms;
-    private int nextRoomId = 1;
 
     public RoomManager() {
         rooms = new LinkedHashMap<>();
@@ -39,7 +41,7 @@ public class RoomManager {
         room.addPlayer(creator);
         rooms.put(roomId, room);
 
-        System.out.println(
+        LOGGER.info(
                 "[RoomManager] Tạo phòng: "
                 + room.getRoomName()
                 + " | Host: "
@@ -62,22 +64,27 @@ public class RoomManager {
             return false;
         }
 
-        // Chặn vào phòng đang chơi
+        // Nếu người chơi ĐÃ Ở TRONG PHÒNG rồi -> Trả về true để đồng bộ state, không báo lỗi giả
+        if (room.hasPlayer(user.getId())) {
+            return true;
+        }
+
+        // Chặn người chơi MỚI vào phòng đang chơi
         if ("Playing".equalsIgnoreCase(room.getStatus())) {
-            System.out.println("[RoomManager] Từ chối vào phòng " + roomId + ": Trận đấu đang diễn ra.");
+            LOGGER.info("[RoomManager] Từ chối vào phòng " + roomId + ": Trận đấu đang diễn ra.");
             return false;
         }
 
         // Chặn vào phòng đã đủ người
         if (room.getCurrentPlayers() >= room.getMaxPlayers()) {
-            System.out.println("[RoomManager] Từ chối vào phòng " + roomId + ": Phòng đã đầy.");
+            LOGGER.info("[RoomManager] Từ chối vào phòng " + roomId + ": Phòng đã đầy.");
             return false;
         }
 
         boolean success = room.addPlayer(user);
 
         if (success) {
-            System.out.println(
+            LOGGER.info(
                     "[RoomManager] "
                     + user.getUsername()
                     + " vào "
@@ -113,7 +120,7 @@ public class RoomManager {
         // Không còn ai -> Xóa phòng triệt để khỏi bộ nhớ Server
         if (room.getCurrentPlayers() <= 0) {
             rooms.remove(roomId);
-            System.out.println(
+            LOGGER.info(
                     "[RoomManager] Phòng "
                     + roomId
                     + " đã được xóa vì không còn người chơi."
@@ -124,7 +131,7 @@ public class RoomManager {
         // Nếu Host rời -> chuyển quyền Host cho người kế tiếp
         if (wasHost) {
             room.transferHostRandom();
-            System.out.println(
+            LOGGER.info(
                     "[RoomManager] Host cũ đã rời phòng "
                     + roomId
                     + ". Đã chuyển quyền Host sang ID: "
@@ -189,7 +196,7 @@ public class RoomManager {
         }
 
         room.setDuration(duration);
-        System.out.println(
+        LOGGER.info(
                 "[RoomManager] "
                 + room.getRoomName()
                 + " chọn thời lượng: "
@@ -240,7 +247,7 @@ public class RoomManager {
         Room room = rooms.get(roomId);
         if (room != null) {
             room.resetReadyStatesForNewGame(); // GỌI TRỰC TIẾP HÀM CÓ SẴN TRONG Room.java
-            System.out.println("[RoomManager] Đã kích hoạt resetReadyStatesForNewGame() cho phòng " + roomId);
+            LOGGER.info("[RoomManager] Đã kích hoạt resetReadyStatesForNewGame() cho phòng " + roomId);
         }
     }
 }

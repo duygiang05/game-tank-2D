@@ -13,9 +13,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class ConfigLoader {
 
+    private static final Logger LOGGER = Logger.getLogger(ConfigLoader.class.getName());
     private static Dotenv dotenv;
     private static JsonObject statsConfig;
     private static Map<String, Object> gameRulesConfig;
@@ -27,14 +30,14 @@ public class ConfigLoader {
         try {
             dotenv = Dotenv.configure().ignoreIfMissing().load();
         } catch (Exception e) {
-            System.err.println("[ConfigLoader] Không tìm thấy file .env, dùng fallback mặc định!");
+            LOGGER.warning("[ConfigLoader] Không tìm thấy file .env, dùng fallback mặc định!");
         }
 
         // 2. Nạp config/stats.json
         try (FileReader reader = new FileReader("config/stats.json", StandardCharsets.UTF_8)) {
             statsConfig = gson.fromJson(reader, JsonObject.class);
         } catch (IOException e) {
-            System.err.println("[ConfigLoader] Không thể đọc config/stats.json: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[ConfigLoader] Không thể đọc config/stats.json", e);
         }
 
         // 3. Nạp config/game_rules.yml bằng SnakeYAML
@@ -42,7 +45,7 @@ public class ConfigLoader {
             Yaml yaml = new Yaml();
             gameRulesConfig = yaml.load(input);
         } catch (IOException e) {
-            System.err.println("[ConfigLoader] Không thể đọc config/game_rules.yml: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[ConfigLoader] Không thể đọc config/game_rules.yml", e);
         }
 
         // 4. Nạp map JSON mặc định (map_default.json)
@@ -52,9 +55,9 @@ public class ConfigLoader {
     public static void loadMapConfig(String mapPath) {
         try (FileReader reader = new FileReader(mapPath, StandardCharsets.UTF_8)) {
             currentMapConfig = gson.fromJson(reader, JsonObject.class);
-            System.out.println("[ConfigLoader] Đã tải cấu hình bản đồ từ: " + mapPath);
+            LOGGER.info("[ConfigLoader] Đã tải cấu hình bản đồ từ: " + mapPath);
         } catch (IOException e) {
-            System.err.println("[ConfigLoader] Không thể đọc file map: " + mapPath + " - " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[ConfigLoader] Không thể đọc file map: " + mapPath, e);
         }
     }
 

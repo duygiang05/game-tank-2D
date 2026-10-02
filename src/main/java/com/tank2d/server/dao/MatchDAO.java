@@ -1,5 +1,7 @@
 package com.tank2d.server.dao;
 
+import com.tank2d.common.exception.DatabaseException;
+import com.tank2d.common.exception.ErrorCode;
 import com.tank2d.server.db.DatabaseConnection;
 import com.tank2d.server.game.PlayerCombatState;
 
@@ -10,8 +12,12 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class MatchDAO {
+
+    private static final Logger LOGGER = Logger.getLogger(MatchDAO.class.getName());
 
     /**
      * Khớp chính xác với cấu trúc bảng match_history và match_participants trong phpMyAdmin.
@@ -64,13 +70,12 @@ public class MatchDAO {
             }
 
             conn.commit();
-            System.out.println("[MatchDAO] Đã lưu thành công trận đấu Match ID = " + matchId);
+            LOGGER.info("[MatchDAO] Đã lưu thành công trận đấu Match ID = " + matchId);
             return matchId;
 
         } catch (SQLException e) {
-            System.err.println("[MatchDAO] Lỗi khi lưu kết quả trận đấu: " + e.getMessage());
-            e.printStackTrace();
-            return -1;
+            LOGGER.log(Level.SEVERE, "[MatchDAO] Lỗi khi lưu kết quả trận đấu", e);
+            throw new DatabaseException(ErrorCode.DB_QUERY_ERROR, "Lỗi khi lưu kết quả trận đấu!", e);
         }
     }
 }

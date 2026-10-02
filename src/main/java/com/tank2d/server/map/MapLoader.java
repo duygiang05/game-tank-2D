@@ -2,6 +2,8 @@ package com.tank2d.server.map;
 
 import com.google.gson.Gson;
 import com.tank2d.common.config.ConfigLoader;
+import com.tank2d.common.exception.ConfigException;
+import com.tank2d.common.exception.ErrorCode;
 
 import java.io.FileReader;
 import java.io.IOException;
@@ -11,7 +13,6 @@ public class MapLoader {
 
     // DTO nội bộ chỉ để Gson parse file JSON, không dùng để gửi qua mạng nên không đặt trong common.dto
     private static class MapFileFormat {
-        String map_name;
         int width;
         int height;
         int[][] matrix;
@@ -22,7 +23,7 @@ public class MapLoader {
         try (FileReader reader = new FileReader(path, StandardCharsets.UTF_8)) {
             MapFileFormat raw = gson.fromJson(reader, MapFileFormat.class);
             if (raw == null || raw.matrix == null) {
-                throw new IllegalStateException("File map rỗng hoặc sai định dạng: " + path);
+                throw new ConfigException(ErrorCode.MAP_LOAD_ERROR, "File map rỗng hoặc sai định dạng: " + path);
             }
 
             int tileSize = ConfigLoader.getPhysicsStats().has("tile_size")
@@ -32,7 +33,7 @@ public class MapLoader {
 
             return new GameMap(raw.width, raw.height, tileSize, raw.matrix, brickMaxHits);
         } catch (IOException e) {
-            throw new RuntimeException("[MapLoader] Không thể đọc file bản đồ: " + path, e);
+            throw new ConfigException(ErrorCode.MAP_LOAD_ERROR, "[MapLoader] Không thể đọc file bản đồ: " + path, e);
         }
     }
 }

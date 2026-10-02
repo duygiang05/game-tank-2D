@@ -224,22 +224,6 @@ public class GameLoop implements Runnable {
             for (Integer viewerId : tanks.keySet()) {
                 perViewer.put(viewerId, buildSnapshotFor(viewerId));
             }
-            // ===== DEBUG TẠM — test xong thì xóa =====
-if (tickCount % 30 == 0 && gameMap != null) {
-    for (TankEntity t : tanks.values()) {
-        int cid = gameMap.getBushClusterIdAt(t.getX(), t.getY());
-        if (cid != GameMap.NO_CLUSTER) {
-            System.out.println("[DEBUG BUSH] tank=" + t.getId()
-                    + " x=" + (int) t.getX() + " y=" + (int) t.getY()
-                    + " cluster=" + cid);
-        }
-    }
-    for (Map.Entry<Integer, GameSnapshotDTO> e : perViewer.entrySet()) {
-        System.out.println("[DEBUG BUSH] viewer=" + e.getKey()
-                + " sees " + e.getValue().getTanks().size() + "/" + tanks.size());
-    }
-}
-// ===== HẾT DEBUG =====
             snapshotListener.onSnapshotReady(perViewer);
         }
     }

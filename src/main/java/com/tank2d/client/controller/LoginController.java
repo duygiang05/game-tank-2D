@@ -24,10 +24,16 @@ import javafx.stage.Popup;
 import javafx.stage.Window;
 import javafx.util.Duration;
 
+import com.tank2d.client.util.ToastUtil;
+import com.tank2d.common.exception.GameNetworkException;
 import java.io.IOException;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class LoginController {
+
+    private static final Logger LOGGER = Logger.getLogger(LoginController.class.getName());
 
     // ==========================================
     // LOGIN FORM
@@ -174,12 +180,16 @@ public class LoginController {
                 Packet packet = new Packet(PacketType.AUTH_LOGIN_REQ, requestJson);
 
                 clientSocket.sendPacket(packet);
-                System.out.println("[Login] Đã gửi yêu cầu đăng nhập: " + username);
+                LOGGER.info("[Login] Đã gửi yêu cầu đăng nhập: " + username);
 
+            } catch (GameNetworkException e) {
+                session.removePacketListener(packetListener);
+                showToast(e.getMessage(), false);
+                LOGGER.log(Level.WARNING, "[Login] Lỗi nghiệp vụ mạng: " + e.getErrorCode(), e);
             } catch (IOException e) {
                 session.removePacketListener(packetListener);
                 showToast("Không thể kết nối tới Server!\nVui lòng kiểm tra Server đang chạy.", false);
-                System.err.println("[Login] Lỗi kết nối: " + e.getMessage());
+                LOGGER.log(Level.SEVERE, "[Login] Lỗi kết nối", e);
             }
         });
 
@@ -199,7 +209,7 @@ public class LoginController {
             return;
         }
 
-        System.out.println("[Login] Nhận AUTH_LOGIN_RES từ Server.");
+        LOGGER.info("[Login] Nhận AUTH_LOGIN_RES từ Server.");
 
         try {
             LoginResponse response = gson.fromJson(packet.getData(), LoginResponse.class);
@@ -208,7 +218,7 @@ public class LoginController {
             Platform.runLater(() -> {
                 if (response.isSuccess()) {
                     session.setCurrentUser(new User(response.getUserId(), response.getUsername()));
-                    System.out.println("[Login] Đăng nhập thành công: " + response.getUsername());
+                    LOGGER.info("[Login] Đăng nhập thành công: " + response.getUsername());
 
                     showToast("Đăng nhập thành công! Đang vào sảnh...", true);
 
@@ -223,7 +233,7 @@ public class LoginController {
 
         } catch (Exception e) {
             session.removePacketListener(packetListener);
-            System.err.println("[Login] Lỗi xử lý AUTH_LOGIN_RES: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "[Login] Lỗi xử lý AUTH_LOGIN_RES", e);
             showToast("Không thể xử lý phản hồi đăng nhập!", false);
         }
     }
@@ -280,9 +290,12 @@ public class LoginController {
                     }
                 });
 
+            } catch (GameNetworkException e) {
+                showToast(e.getMessage(), false);
+                LOGGER.log(Level.WARNING, "[Register] Lỗi nghiệp vụ mạng: " + e.getErrorCode(), e);
             } catch (IOException e) {
                 showToast("Không thể kết nối tới Server để đăng ký!", false);
-                System.err.println("[Register] Lỗi kết nối: " + e.getMessage());
+                LOGGER.log(Level.SEVERE, "[Register] Lỗi kết nối", e);
             } finally {
                 clientSocket.close();
             }
@@ -329,7 +342,7 @@ public class LoginController {
             stage.setTitle("Tank 2D Online - Lobby");
 
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.log(Level.SEVERE, "[Login] Không thể mở màn hình Lobby", e);
             showToast("Không thể mở màn hình Lobby!", false);
         }
     }
@@ -338,51 +351,7 @@ public class LoginController {
     // TOAST NOTIFICATION (TỰ TẮT SAU 5 GIÂY)
     // ==========================================
     private void showToast(String message, boolean isSuccess) {
-        Platform.runLater(() -> {
-            try {
-                Window window = usernameField.getScene() != null ? usernameField.getScene().getWindow() : null;
-                if (window == null) return;
-
-                Popup popup = new Popup();
-                popup.setAutoFix(true);
-
-                Label label = new Label(message);
-                label.setWrapText(true);
-                label.setMaxWidth(350);
-
-                String bgColor = isSuccess ? "rgba(22, 101, 52, 0.95)" : "rgba(185, 28, 28, 0.95)";
-                String borderColor = isSuccess ? "#4ade80" : "#f87171";
-
-                label.setStyle(
-                        "-fx-background-color: " + bgColor + ";"
-                        + "-fx-text-fill: white;"
-                        + "-fx-font-size: 13.5px;"
-                        + "-fx-font-weight: bold;"
-                        + "-fx-padding: 10px 18px;"
-                        + "-fx-background-radius: 8px;"
-                        + "-fx-border-color: " + borderColor + ";"
-                        + "-fx-border-width: 1.5px;"
-                        + "-fx-border-radius: 8px;"
-                        + "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.35), 10, 0, 0, 4);"
-                );
-
-                popup.getContent().add(label);
-
-                popup.show(window);
-                popup.setX(window.getX() + (window.getWidth() - label.getWidth()) / 2.0);
-                popup.setY(window.getY() + 65.0);
-
-                PauseTransition visiblePause = new PauseTransition(Duration.seconds(4.5));
-                visiblePause.setOnFinished(e -> {
-                    FadeTransition fade = new FadeTransition(Duration.millis(500), label);
-                    fade.setFromValue(1.0);
-                    fade.setToValue(0.0);
-                    fade.setOnFinished(f -> popup.hide());
-                    fade.play();
-                });
-                visiblePause.play();
-
-            } catch (Exception ignored) {}
-        });
+        Window window = usernameField.getScene() != null ? usernameField.getScene().getWindow() : null;
+        ToastUtil.showToast(window, message, isSuccess);
     }
 }

@@ -47,9 +47,13 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javafx.scene.effect.DropShadow;
 
 public class GameCanvasApp extends Application {
+
+    private static final Logger LOGGER = Logger.getLogger(GameCanvasApp.class.getName());
 
     // --- CẤU HÌNH BẢN ĐỒ VÀ THÔNG SỐ VẬT LÝ ---
     private int canvasWidth;
@@ -84,7 +88,6 @@ public class GameCanvasApp extends Application {
     private final Map<Integer, TankSnapshotDTO> displayTanks = new ConcurrentHashMap<>();
     private final Map<Integer, TankSnapshotDTO> targetTanks = new ConcurrentHashMap<>();
     private final List<BulletSnapshotDTO> bullets = new CopyOnWriteArrayList<>();
-    private final List<ExplosionEffect> explosions = new CopyOnWriteArrayList<>();
     private final List<TankPlayerDTO> tankPlayers = new CopyOnWriteArrayList<>();
     private final Map<Integer, TankSnapshotDTO> globalPlayerStates = new ConcurrentHashMap<>();
     private final List<ItemSnapshotDTO> items = new CopyOnWriteArrayList<>();
@@ -95,7 +98,8 @@ public class GameCanvasApp extends Application {
     private int[][] bushClusterIds;
     private int matchRemainingTime = 60;
 
-    private final List<ExplosionEffect> activeExplosions = new ArrayList<>();
+    private final List<ExplosionEffect> activeExplosions = new CopyOnWriteArrayList<>();
+    private final List<ItemPickupEffect> itemPickupEffects = new CopyOnWriteArrayList<>();
     private final ExplosionPool explosionPool = new ExplosionPool(30);
 
     // Quản lý hiệu ứng vụ nổ
@@ -124,12 +128,84 @@ public class GameCanvasApp extends Application {
             if (finished) {
                 return;
             }
+            gc.save();
             gc.setFill(Color.ORANGE);
             gc.fillOval(x - radius, y - radius, radius * 2, radius * 2);
             gc.setFill(Color.RED);
             gc.fillOval(x - (radius / 2.0), y - (radius / 2.0), radius, radius);
             gc.setFill(Color.YELLOW);
             gc.fillOval(x - (radius / 4.0), y - (radius / 4.0), radius / 2.0, radius / 2.0);
+            gc.restore();
+        }
+    }
+
+    // Quản lý hiệu ứng khi nhặt vật phẩm
+    private static class ItemPickupEffect {
+
+        double x, y;
+        double radius = 10;
+        double maxRadius = 36;
+        double alpha = 1.0;
+        Color color;
+        String label;
+        boolean finished = false;
+
+        ItemPickupEffect(double x, double y, String itemType) {
+            this.x = x;
+            this.y = y;
+            String type = itemType != null ? itemType.toUpperCase() : "";
+            switch (type) {
+                case "HEALTH_PACK" -> {
+                    this.color = Color.rgb(34, 197, 94);
+                    this.label = "+50 HP";
+                }
+                case "SHIELD" -> {
+                    this.color = Color.rgb(6, 182, 212);
+                    this.label = "SHIELD ON!";
+                }
+                case "NITRO" -> {
+                    this.color = Color.rgb(249, 115, 22);
+                    this.label = "NITRO BOOST!";
+                }
+                case "ROCKET_AMMO" -> {
+                    this.color = Color.rgb(239, 68, 68);
+                    this.label = "ROCKET READY!";
+                }
+                default -> {
+                    this.color = Color.rgb(250, 204, 21);
+                    this.label = "BUFF ACQUIRED!";
+                }
+            }
+        }
+
+        boolean update() {
+            radius += 1.8;
+            y -= 0.9;
+            alpha -= 0.025;
+            if (alpha <= 0 || radius > maxRadius) {
+                finished = true;
+            }
+            return !finished;
+        }
+
+        void render(GraphicsContext gc) {
+            if (finished || alpha <= 0) return;
+            gc.save();
+            gc.setGlobalAlpha(Math.max(0, Math.min(1.0, alpha)));
+
+            // Vòng hào quang sáng lan tỏa
+            gc.setStroke(color);
+            gc.setLineWidth(2.5);
+            gc.strokeOval(x - radius, y - radius + 15, radius * 2, radius * 2);
+
+            // Chữ nổi hiển thị buff
+            gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
+            gc.setFill(Color.BLACK);
+            gc.fillText(label, x - (label.length() * 4.0) + 1, y - 10 + 1);
+            gc.setFill(color);
+            gc.fillText(label, x - (label.length() * 4.0), y - 10);
+
+            gc.restore();
         }
     }
 
@@ -162,6 +238,10 @@ public class GameCanvasApp extends Application {
     private void addExplosion(double x, double y) {
         ExplosionEffect exp = explosionPool.obtain(x, y);
         activeExplosions.add(exp);
+    }
+
+    private void addItemPickupEffect(double x, double y, String itemType) {
+        itemPickupEffects.add(new ItemPickupEffect(x, y, itemType));
     }
 
     private static class FireworkParticle {
@@ -445,8 +525,9 @@ public class GameCanvasApp extends Application {
                     addExplosion(effect.getX(), effect.getY());
                     SoundManager.playSound("wall_break");
                 } else if (eventType.startsWith("ITEM_PICKUP")) {
-                    addExplosion(effect.getX(), effect.getY());
                     String itemType = eventType.replace("ITEM_PICKUP_", "");
+                    addItemPickupEffect(effect.getX(), effect.getY(), itemType);
+                    addExplosion(effect.getX(), effect.getY());
                     SoundManager.playItemSound(itemType);
                 }
             }
@@ -454,9 +535,6 @@ public class GameCanvasApp extends Application {
             GameOverDTO gameOver = gson.fromJson(packet.getData(), GameOverDTO.class);
             Platform.runLater(() -> {
                 stopAllTimers();
-                SoundManager.stopBGM(); // Tắt nhạc nền
-                SoundManager.playSound("game_over"); // Tiếng kết thúc
-                showGameOverPopup(gameOver);
                 SoundManager.stopBGM(); // Tắt nhạc nền
                 SoundManager.playSound("game_over"); // Tiếng kết thúc
                 showGameOverPopup(gameOver);
@@ -496,6 +574,7 @@ public class GameCanvasApp extends Application {
                 renderBullets();
                 renderTanks();
                 renderExplosions();
+                renderItemPickupEffects();
                 renderBushes();
                 renderHUD();
             }
@@ -532,6 +611,12 @@ public class GameCanvasApp extends Application {
             if (exp.finished) {
                 activeExplosions.remove(i);
                 explosionPool.recycle(exp);
+            }
+        }
+
+        for (int i = itemPickupEffects.size() - 1; i >= 0; i--) {
+            if (!itemPickupEffects.get(i).update()) {
+                itemPickupEffects.remove(i);
             }
         }
     }
@@ -786,8 +871,14 @@ public class GameCanvasApp extends Application {
     }
 
     private void renderExplosions() {
-        for (ExplosionEffect exp : explosions) {
+        for (ExplosionEffect exp : activeExplosions) {
             exp.render(gc);
+        }
+    }
+
+    private void renderItemPickupEffects() {
+        for (ItemPickupEffect effect : itemPickupEffects) {
+            effect.render(gc);
         }
     }
 
@@ -1042,7 +1133,7 @@ public class GameCanvasApp extends Application {
                 primaryStage.centerOnScreen();
                 primaryStage.show();
             } catch (IOException e) {
-                e.printStackTrace();
+                LOGGER.log(Level.SEVERE, "[GameCanvasApp] Không thể quay lại Lobby", e);
             }
         });
     }
@@ -1069,7 +1160,7 @@ public class GameCanvasApp extends Application {
                 primaryStage.centerOnScreen();
                 primaryStage.show();
             } catch (IOException e) {
-                e.printStackTrace();
+                LOGGER.log(Level.SEVERE, "[GameCanvasApp] Không thể quay lại Room", e);
             }
         });
     }
@@ -1082,7 +1173,8 @@ public class GameCanvasApp extends Application {
         displayTanks.clear();
         targetTanks.clear();
         bullets.clear();
-        explosions.clear();
+        activeExplosions.clear();
+        itemPickupEffects.clear();
         items.clear();
         globalPlayerStates.clear();
         myTankId = -1;

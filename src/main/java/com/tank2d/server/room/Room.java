@@ -7,8 +7,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.logging.Logger;
 
 public class Room {
+
+    private static final Logger LOGGER = Logger.getLogger(Room.class.getName());
 
     private final int roomId;
     private final String roomName;
@@ -77,6 +80,13 @@ public class Room {
 
     public synchronized int getCurrentPlayers() {
         return players.size();
+    }
+
+    public synchronized boolean hasPlayer(int userId) {
+        for (User player : players) {
+            if (player.getId() == userId) return true;
+        }
+        return false;
     }
 
     public synchronized boolean addPlayer(User user) {
@@ -158,7 +168,7 @@ public class Room {
             }
         }
         this.status = "Waiting";
-        System.out.println("[Room] Đã reset Ready cho ván mới.");
+        LOGGER.info("[Room] Đã reset Ready cho ván mới.");
     }
 
     // =========================
@@ -175,7 +185,7 @@ public class Room {
         hostId = newHost.getId();
         readyStates.put(newHost.getId(), true);
 
-        System.out.println("[Room] Host mới: " + newHost.getUsername() + " (ID: " + newHost.getId() + ")");
+        LOGGER.info("[Room] Host mới: " + newHost.getUsername() + " (ID: " + newHost.getId() + ")");
     }
 
     // =========================

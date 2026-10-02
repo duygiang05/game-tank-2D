@@ -5,6 +5,7 @@ import com.tank2d.common.config.ConfigLoader;
 import com.tank2d.common.dto.game.GameEventEffectDTO;
 import com.tank2d.common.dto.game.GameOverDTO;
 import com.tank2d.common.dto.game.MapUpdateDTO;
+import com.tank2d.common.exception.GameNetworkException;
 import com.tank2d.common.protocol.NetworkUtil;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
@@ -239,6 +240,8 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
                         false // Thoát giữa chừng tính là Thua (không cộng total_wins)
                 );
                 LOGGER.info("[DB] Đã chốt lưu thành tích cho người chơi thoát: UserID " + leaverState.getUserId());
+            } catch (GameNetworkException e) {
+                LOGGER.severe("[DB] Lỗi cơ sở dữ liệu (" + e.getErrorCode() + ") khi lưu stats người thoát: " + e.getMessage());
             } catch (Exception e) {
                 LOGGER.severe("[DB] Lỗi lưu stats cho người thoát UserID " + leaverState.getUserId() + ": " + e.getMessage());
             }
@@ -332,6 +335,8 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
         // 6. Lưu kết quả vào CSDL (Bọc try-catch để lỗi DB không làm ảnh hưởng game)
         try {
             saveMatchResultToDatabase(winnerTankId, isDraw, players);
+        } catch (GameNetworkException e) {
+            LOGGER.severe("[DB] Lỗi cơ sở dữ liệu (" + e.getErrorCode() + "): " + e.getMessage());
         } catch (Exception e) {
             LOGGER.severe("[DB] Lỗi lưu kết quả trận đấu: " + e.getMessage());
         }

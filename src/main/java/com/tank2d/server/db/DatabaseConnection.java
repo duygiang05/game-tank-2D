@@ -1,11 +1,15 @@
 package com.tank2d.server.db;
 
 import com.tank2d.common.config.ConfigLoader;
+import com.tank2d.common.exception.DatabaseException;
+import com.tank2d.common.exception.ErrorCode;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Quản lý kết nối Cơ sở dữ liệu MySQL sử dụng Connection Pool (HikariCP). Đảm
@@ -13,6 +17,7 @@ import java.sql.SQLException;
  */
 public class DatabaseConnection {
 
+    private static final Logger LOGGER = Logger.getLogger(DatabaseConnection.class.getName());
     private static HikariDataSource dataSource;
 
     static {
@@ -40,10 +45,9 @@ public class DatabaseConnection {
             config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
 
             dataSource = new HikariDataSource(config);
-            System.out.println("[DatabaseConnection] Khởi tạo HikariCP Connection Pool thành công!");
+            LOGGER.info("[DatabaseConnection] Khởi tạo HikariCP Connection Pool thành công!");
         } catch (Exception e) {
-            System.err.println("[DatabaseConnection] Lỗi khởi tạo Connection Pool:");
-            e.printStackTrace();
+            LOGGER.log(Level.SEVERE, "[DatabaseConnection] Lỗi khởi tạo Connection Pool", e);
         }
     }
 
@@ -52,7 +56,7 @@ public class DatabaseConnection {
      */
     public static Connection getConnection() throws SQLException {
         if (dataSource == null) {
-            throw new SQLException("HikariDataSource chưa được khởi tạo!");
+            throw new DatabaseException(ErrorCode.DB_POOL_NOT_INITIALIZED);
         }
         return dataSource.getConnection();
     }

@@ -11,9 +11,12 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class AssetLoader {
 
+    private static final Logger LOGGER = Logger.getLogger(AssetLoader.class.getName());
     private static final Map<String, Image> imageCache = new HashMap<>();
     private static JsonObject colorConfig;
 
@@ -24,10 +27,10 @@ public class AssetLoader {
                 if (is != null) {
                     imageCache.put(path, new Image(is));
                 } else {
-                    System.err.println("[AssetLoader] Không tìm thấy ảnh: " + path);
+                    LOGGER.warning("[AssetLoader] Không tìm thấy ảnh: " + path);
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                LOGGER.log(Level.SEVERE, "[AssetLoader] Lỗi tải ảnh: " + path, e);
             }
         }
         return imageCache.get(path);
@@ -70,7 +73,7 @@ public class AssetLoader {
             String content = new String(Files.readAllBytes(Paths.get(path)), StandardCharsets.UTF_8);
             return new Gson().fromJson(content, JsonObject.class);
         } catch (Exception e) {
-            System.err.println("[AssetLoader] Không thể nạp file bản đồ: " + mapName);
+            LOGGER.warning("[AssetLoader] Không thể nạp file bản đồ: " + mapName);
             return null;
         }
     }
