@@ -41,6 +41,7 @@ import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
+import com.tank2d.client.controller.InterpolationEngine;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.*;
@@ -589,10 +590,9 @@ public class GameCanvasApp extends Application {
             TankSnapshotDTO target = targetTanks.get(tankId);
 
             if (target != null) {
-                double newX = current.getX() + (target.getX() - current.getX()) * lerpFactor;
-                double newY = current.getY() + (target.getY() - current.getY()) * lerpFactor;
-                double diffAngle = (target.getAngle() - current.getAngle() + 540) % 360 - 180;
-                double newAngle = (current.getAngle() + diffAngle * lerpFactor + 360) % 360;
+                double newX = InterpolationEngine.lerp(current.getX(), target.getX(), lerpFactor);
+                double newY = InterpolationEngine.lerp(current.getY(), target.getY(), lerpFactor);
+                double newAngle = (InterpolationEngine.lerpAngle(current.getAngle(), target.getAngle(), lerpFactor) + 360.0) % 360.0;
 
                 current.setX(newX);
                 current.setY(newY);

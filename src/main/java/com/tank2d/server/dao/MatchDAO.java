@@ -26,7 +26,9 @@ public class MatchDAO {
         String insertMatchSql = "INSERT INTO match_history (room_name, winner_id, duration_seconds, played_at) VALUES (?, ?, ?, NOW())";
         String insertParticipantSql = "INSERT INTO match_participants (match_id, user_id, kills, hits, rank_position, points_earned) VALUES (?, ?, ?, ?, ?, ?)";
 
-        try (Connection conn = DatabaseConnection.getConnection()) {
+        Connection conn = null;
+        try {
+            conn = DatabaseConnection.getConnection();
             conn.setAutoCommit(false);
 
             int matchId = -1;
@@ -74,8 +76,23 @@ public class MatchDAO {
             return matchId;
 
         } catch (SQLException e) {
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException ex) {
+                    LOGGER.log(Level.WARNING, "[MatchDAO] Lỗi khi rollback transaction", ex);
+                }
+            }
             LOGGER.log(Level.SEVERE, "[MatchDAO] Lỗi khi lưu kết quả trận đấu", e);
             throw new DatabaseException(ErrorCode.DB_QUERY_ERROR, "Lỗi khi lưu kết quả trận đấu!", e);
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.close();
+                } catch (SQLException ex) {
+                    LOGGER.log(Level.WARNING, "[MatchDAO] Lỗi khi đóng connection", ex);
+                }
+            }
         }
     }
 }

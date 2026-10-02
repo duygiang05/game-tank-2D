@@ -23,18 +23,20 @@ public class NetworkUtil {
      * Gửi chuỗi dữ liệu (JSON) qua luồng ra (DataOutputStream).
      * Hàm được đồng bộ hóa (synchronized) để tránh xung đột khi nhiều luồng cùng gửi dữ liệu qua 1 socket.
      */
-    public static synchronized void send(DataOutputStream out, String payload) throws IOException {
+    public static void send(DataOutputStream out, String payload) throws IOException {
         if (out == null || payload == null) return;
         byte[] bytes = payload.getBytes(StandardCharsets.UTF_8);
         
-        // 1. Ghi 4 byte số nguyên biểu thị độ dài chính xác của dữ liệu
-        out.writeInt(bytes.length);
-        
-        // 2. Ghi toàn bộ dữ liệu byte ra đường ống
-        out.write(bytes);
-        
-        // 3. Đẩy dữ liệu đi ngay lập tức, không cho phép đệm (buffer) giữ lại
-        out.flush();
+        synchronized (out) {
+            // 1. Ghi 4 byte số nguyên biểu thị độ dài chính xác của dữ liệu
+            out.writeInt(bytes.length);
+            
+            // 2. Ghi toàn bộ dữ liệu byte ra đường ống
+            out.write(bytes);
+            
+            // 3. Đẩy dữ liệu đi ngay lập tức, không cho phép đệm (buffer) giữ lại
+            out.flush();
+        }
     }
 
     /**
@@ -71,7 +73,7 @@ public class NetworkUtil {
      * Gửi trực tiếp đối tượng Packet qua socket.
      * Tự động serialize Packet sang JSON và gọi hàm send() chuẩn hóa ở trên.
      */
-    public static synchronized void sendPacket(DataOutputStream out, Packet packet) throws IOException {
+    public static void sendPacket(DataOutputStream out, Packet packet) throws IOException {
         if (out == null || packet == null) return;
         String jsonPayload = gson.toJson(packet);
         send(out, jsonPayload);

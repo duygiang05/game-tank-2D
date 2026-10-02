@@ -29,7 +29,7 @@ public final class ShootingProcessor {
      * @param requestedType loại đạn CLIENT muốn bắn — chỉ thật sự bắn ROCKET nếu tank đang có buff tên lửa còn hiệu lực,
      *                       ngược lại server tự hạ về NORMAL (không tin tưởng client tự xưng có đạn tên lửa).
      */
-    public static ShotResult tryShoot(TankEntity tank, BulletEntity.BulletType requestedType, long nowMillis) {
+    public static ShotResult tryShoot(TankEntity tank, long nowMillis) {
         if (tank == null || !tank.isAlive()) {
             return ShotResult.fail();
         }
@@ -58,5 +58,9 @@ public final class ShootingProcessor {
 
         tank.setLastShotTimeMillis(nowMillis);
         return ShotResult.ok(vx, vy, actualType);
+    }
+
+    public static ShotResult tryShoot(TankEntity tank, BulletEntity.BulletType requestedType, long nowMillis) {
+        return tryShoot(tank, nowMillis);
     }
 }

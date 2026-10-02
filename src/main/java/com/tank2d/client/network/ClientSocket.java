@@ -39,7 +39,7 @@ public class ClientSocket {
         LOGGER.info("[ClientSocket] Đã kết nối tới " + host + ":" + port);
     }
 
-    public void sendPacket(Packet packet) throws IOException {
+    public synchronized void sendPacket(Packet packet) throws IOException {
         if (!isConnected()) {
             throw new NetworkException(ErrorCode.NET_CLIENT_NOT_CONNECTED);
         }

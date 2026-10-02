@@ -9,15 +9,15 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class AssetLoader {
 
     private static final Logger LOGGER = Logger.getLogger(AssetLoader.class.getName());
-    private static final Map<String, Image> imageCache = new HashMap<>();
+    private static final Map<String, Image> imageCache = new ConcurrentHashMap<>();
     private static JsonObject colorConfig;
 
     // Tải ảnh từ thư mục src/main/resources/com/tank2d/client/assets/images/

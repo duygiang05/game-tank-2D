@@ -42,7 +42,12 @@ public class ClientHandler implements Runnable {
 
     private static final Logger LOGGER = Logger.getLogger(ClientHandler.class.getName());
     private static final Set<ClientHandler> connectedClients = ConcurrentHashMap.newKeySet();
-    private static final ExecutorService networkBroadcastPool = Executors.newCachedThreadPool();
+    private static final ExecutorService networkBroadcastPool = Executors.newFixedThreadPool(Math.max(4, Runtime.getRuntime().availableProcessors()));
+    private static final Type INPUT_MAP_TYPE = new com.google.gson.reflect.TypeToken<Map<String, Boolean>>() {}.getType();
+
+    public static void shutdownBroadcastPool() {
+        networkBroadcastPool.shutdown();
+    }
 
     private final Socket socket;
     private final UserDAO userDAO;
@@ -481,8 +486,7 @@ public class ClientHandler implements Runnable {
         if (tank == null || !tank.isAlive()) return;
 
         try {
-            Type type = new com.google.gson.reflect.TypeToken<Map<String, Boolean>>() {}.getType();
-            Map<String, Boolean> input = gson.fromJson(rawJson, type);
+            Map<String, Boolean> input = gson.fromJson(rawJson, INPUT_MAP_TYPE);
 
             if (input != null) {
                 boolean up = input.getOrDefault("up", false);

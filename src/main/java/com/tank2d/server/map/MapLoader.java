@@ -26,8 +26,7 @@ public class MapLoader {
                 throw new ConfigException(ErrorCode.MAP_LOAD_ERROR, "File map rỗng hoặc sai định dạng: " + path);
             }
 
-            int tileSize = ConfigLoader.getPhysicsStats().has("tile_size")
-                    ? ConfigLoader.getPhysicsStats().get("tile_size").getAsInt() : 40;
+            int tileSize = ConfigLoader.getTileSize();
             int brickMaxHits = ConfigLoader.getDamageStats().has("brick_wall_max_hits")
                     ? ConfigLoader.getDamageStats().get("brick_wall_max_hits").getAsInt() : 3;
 

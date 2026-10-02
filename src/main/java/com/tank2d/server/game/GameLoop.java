@@ -58,9 +58,8 @@ public class GameLoop implements Runnable {
         this.tickRate = serverTickRate;
         this.timePerTickNs = 1_000_000_000.0 / this.tickRate;
 
-        var physics = ConfigLoader.getPhysicsStats();
-        this.tankSize = physics.has("tank_size") ? physics.get("tank_size").getAsInt() : 36;
-        this.bulletSize = physics.has("bullet_size") ? physics.get("bullet_size").getAsInt() : 8;
+        this.tankSize = (int) ConfigLoader.getTankSize();
+        this.bulletSize = (int) ConfigLoader.getBulletSize();
 
         var damage = ConfigLoader.getDamageStats();
         this.normalBulletDamage = damage.has("normal_bullet") ? damage.get("normal_bullet").getAsInt() : 1;
@@ -82,13 +81,7 @@ public class GameLoop implements Runnable {
 
     public boolean handleShootRequest(TankEntity tank, BulletEntity.BulletType requestedType) {
         long now = System.currentTimeMillis();
-
-        // Engine tự quyết định loại đạn: Nếu còn hạn buff thì bắn ROCKET, ngược lại bắn NORMAL
-        BulletEntity.BulletType finalType = (now < tank.getRocketBuffActiveUntilMillis())
-                ? BulletEntity.BulletType.ROCKET
-                : BulletEntity.BulletType.NORMAL;
-
-        ShootingProcessor.ShotResult result = ShootingProcessor.tryShoot(tank, finalType, now);
+        ShootingProcessor.ShotResult result = ShootingProcessor.tryShoot(tank, now);
         if (!result.success) return false;
 
         spawnBullet(tank.getId(), tank.getX(), tank.getY(), result.vx, result.vy, result.type);
@@ -220,9 +213,11 @@ public class GameLoop implements Runnable {
 
         // 10. Gửi snapshot — theo từng người xem (bụi cỏ ẩn/hiện khác nhau)
         if (snapshotListener != null) {
+            List<BulletSnapshotDTO> bulletDTOs = buildBulletDTOs();
+            List<ItemSnapshotDTO> itemDTOs = buildItemDTOs();
             Map<Integer, GameSnapshotDTO> perViewer = new HashMap<>();
             for (Integer viewerId : tanks.keySet()) {
-                perViewer.put(viewerId, buildSnapshotFor(viewerId));
+                perViewer.put(viewerId, buildSnapshotFor(viewerId, bulletDTOs, itemDTOs));
             }
             snapshotListener.onSnapshotReady(perViewer);
         }
@@ -231,17 +226,45 @@ public class GameLoop implements Runnable {
     public Map<Integer, TankEntity> getTanks() { return tanks; }
     public long getTickCount() { return tickCount; }
 
+    private List<BulletSnapshotDTO> buildBulletDTOs() {
+        List<BulletSnapshotDTO> bulletDTOs = new ArrayList<>(bullets.size());
+        for (BulletEntity bullet : bullets.values()) {
+            bulletDTOs.add(new BulletSnapshotDTO(
+                bullet.getId(),
+                bullet.getOwnerId(),
+                bullet.getX(),
+                bullet.getY(),
+                bullet.getVx(),
+                bullet.getVy(),
+                bullet.getType() != null ? bullet.getType().name() : "NORMAL"
+            ));
+        }
+        return bulletDTOs;
+    }
+
+    private List<ItemSnapshotDTO> buildItemDTOs() {
+        List<ItemSnapshotDTO> itemDTOs = new ArrayList<>(items.size());
+        for (ItemEntity item : items.values()) {
+            itemDTOs.add(new ItemSnapshotDTO(item.getId(), item.getType().name(), item.getX(), item.getY()));
+        }
+        return itemDTOs;
+    }
+
     /** Snapshot đầy đủ, không lọc bụi cỏ — dùng cho demo/công cụ debug, KHÔNG dùng để gửi client thật. */
     public GameSnapshotDTO buildSnapshot() {
-        return buildInternal(-1, false);
+        return buildInternal(-1, false, buildBulletDTOs(), buildItemDTOs());
     }
 
     /** Snapshot dành riêng cho 1 người xem — xe khác đang nấp bụi (và chưa bắn gần đây) sẽ bị ẩn khỏi danh sách. */
     public GameSnapshotDTO buildSnapshotFor(int viewerTankId) {
-        return buildInternal(viewerTankId, true);
+        return buildSnapshotFor(viewerTankId, buildBulletDTOs(), buildItemDTOs());
     }
 
-    private GameSnapshotDTO buildInternal(int viewerTankId, boolean applyBushStealth) {
+    public GameSnapshotDTO buildSnapshotFor(int viewerTankId, List<BulletSnapshotDTO> bulletDTOs, List<ItemSnapshotDTO> itemDTOs) {
+        return buildInternal(viewerTankId, true, bulletDTOs, itemDTOs);
+    }
+
+    private GameSnapshotDTO buildInternal(int viewerTankId, boolean applyBushStealth, List<BulletSnapshotDTO> bulletDTOs, List<ItemSnapshotDTO> itemDTOs) {
         long now = System.currentTimeMillis();
         long revealWindowMs = (long) (ConfigLoader.getRevealDurationSeconds() * 1000);
         TankEntity viewerTank = tanks.get(viewerTankId);
@@ -268,24 +291,6 @@ public class GameLoop implements Runnable {
                 hasShield,
                 hasNitro
             ));
-        }
-
-        List<BulletSnapshotDTO> bulletDTOs = new ArrayList<>();
-        for (BulletEntity bullet : bullets.values()) {
-            bulletDTOs.add(new BulletSnapshotDTO(
-                bullet.getId(),
-                bullet.getOwnerId(),
-                bullet.getX(),
-                bullet.getY(),
-                bullet.getVx(),
-                bullet.getVy(),
-                bullet.getType() != null ? bullet.getType().name() : "NORMAL"
-            ));
-        }
-
-        List<ItemSnapshotDTO> itemDTOs = new ArrayList<>();
-        for (ItemEntity item : items.values()) {
-            itemDTOs.add(new ItemSnapshotDTO(item.getId(), item.getType().name(), item.getX(), item.getY()));
         }
 
         return new GameSnapshotDTO(tickCount, tankDTOs, bulletDTOs, itemDTOs);

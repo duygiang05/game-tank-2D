@@ -10,17 +10,14 @@ import com.tank2d.common.model.User;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
 
-import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
-import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
-import javafx.stage.Popup;
 import javafx.stage.Window;
 import javafx.util.Duration;
 

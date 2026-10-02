@@ -195,19 +195,11 @@ public class Room {
         return duration;
     }
 
-    public synchronized double getMatchDuration() {
-        return (double) duration;
-    }
-
     public synchronized boolean setDuration(int duration) {
         if (duration != 45 && duration != 60 && duration != 90) {
             return false;
         }
         this.duration = duration;
         return true;
-    }
-
-    public synchronized void setMatchDuration(double matchDuration) {
-        this.duration = (int) matchDuration;
     }
 }

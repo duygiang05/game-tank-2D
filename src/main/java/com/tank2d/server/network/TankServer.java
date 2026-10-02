@@ -99,6 +99,7 @@ public class TankServer {
             LOGGER.log(Level.SEVERE, "[Server] Lỗi đóng ServerSocket", e);
         }
 
+        ClientHandler.shutdownBroadcastPool();
         threadPool.shutdown();
         DatabaseConnection.closePool();
 

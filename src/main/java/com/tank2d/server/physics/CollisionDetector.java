@@ -50,7 +50,10 @@ public final class CollisionDetector {
 
     // ============ XE - XE (không đổi) ============
     public static void resolveTankTankCollision(Collection<TankEntity> tanks, int tankSize, Map<Integer, double[]> prevPositions) {
-        List<TankEntity> aliveTanks = tanks.stream().filter(TankEntity::isAlive).toList();
+        List<TankEntity> aliveTanks = new ArrayList<>(tanks.size());
+        for (TankEntity t : tanks) {
+            if (t.isAlive()) aliveTanks.add(t);
+        }
         for (int i = 0; i < aliveTanks.size(); i++) {
             for (int j = i + 1; j < aliveTanks.size(); j++) {
                 TankEntity a = aliveTanks.get(i);

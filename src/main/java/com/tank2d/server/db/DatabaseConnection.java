@@ -67,7 +67,7 @@ public class DatabaseConnection {
     public static void closePool() {
         if (dataSource != null && !dataSource.isClosed()) {
             dataSource.close();
-            System.out.println("[DatabaseConnection] Đã đóng HikariCP Connection Pool.");
+            LOGGER.info("[DatabaseConnection] Đã đóng HikariCP Connection Pool.");
         }
     }
 }

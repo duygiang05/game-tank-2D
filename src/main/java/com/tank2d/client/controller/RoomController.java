@@ -85,7 +85,7 @@ public class RoomController {
         if (!listenerRegistered) {
             session.addPacketListener(packetListener);
             listenerRegistered = true;
-            System.out.println("[Room] Đã đăng ký Room Packet Listener.");
+            LOGGER.info("[Room] Đã đăng ký Room Packet Listener.");
         }
 
         // Xin Server dữ liệu Room mới nhất ngay khi mở lại phòng
