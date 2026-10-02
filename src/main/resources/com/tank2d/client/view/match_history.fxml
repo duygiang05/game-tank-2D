@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane fx:id="rootStackPane"
+           xmlns="http://javafx.com/javafx/21"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="com.tank2d.client.controller.MatchHistoryController"
+           stylesheets="@lobby.css"
+           prefWidth="800.0"
+           prefHeight="600.0">
+
+    <!-- ============================================== -->
+    <!-- LỚP 1: GIAO DIỆN CHÍNH (MAIN CONTENT PANE)      -->
+    <!-- ============================================== -->
+    <BorderPane fx:id="mainContentPane"
+                prefWidth="800.0"
+                prefHeight="600.0"
+                style="-fx-background-color: #f1f5f9;">
+
+        <!-- TOP: LOGO & TIÊU ĐỀ LỊCH SỬ ĐẤU -->
+        <top>
+            <VBox alignment="CENTER" spacing="3.0">
+                <padding>
+                    <Insets top="14.0" bottom="6.0"/>
+                </padding>
+
+                <ImageView fitWidth="50.0" fitHeight="32.0" preserveRatio="true">
+                    <image>
+                        <Image url="@tank-logo_1.png"/>
+                    </image>
+                </ImageView>
+
+                <Label text="TANK 2D ONLINE"
+                       style="-fx-text-fill: #1d4ed8; -fx-font-size: 18px; -fx-font-weight: bold;"/>
+
+                <Label text="📜 LỊCH SỬ THI ĐẤU CÁ NHÂN"
+                       style="-fx-text-fill: #0f172a; -fx-font-size: 16.5px; -fx-font-weight: bold;"/>
+            </VBox>
+        </top>
+
+        <!-- CENTER: BẢNG LỊCH SỬ ĐẤU THIẾT KẾ HIỆN ĐẠI -->
+        <center>
+            <VBox spacing="6.0">
+                <padding>
+                    <Insets top="2.0" right="35.0" bottom="4.0" left="35.0"/>
+                </padding>
+
+                <VBox style="-fx-background-color: white; -fx-background-radius: 14px; -fx-border-color: #e2e8f0; -fx-border-width: 1px; -fx-border-radius: 14px; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.06), 14, 0, 0, 3);"
+                      VBox.vgrow="ALWAYS">
+
+                    <!-- Header chia 5 cột chuẩn xác: 135 + 175 + 145 + 110 + 95 = 660px -->
+                    <HBox alignment="CENTER_LEFT"
+                          style="-fx-background-color: #f8fafc; -fx-padding: 10px 16px; -fx-background-radius: 13px 13px 0 0; -fx-border-color: #e2e8f0; -fx-border-width: 0 0 1px 0;">
+
+                        <Label text="KẾT QUẢ &amp; HẠNG" prefWidth="135.0" alignment="CENTER_LEFT"
+                               style="-fx-font-size: 12.5px; -fx-font-weight: bold; -fx-text-fill: #64748b;"/>
+
+                        <Label text="PHÒNG ĐẤU" prefWidth="175.0" alignment="CENTER_LEFT"
+                               style="-fx-font-size: 12.5px; -fx-font-weight: bold; -fx-text-fill: #64748b;"/>
+
+                        <Label text="THỜI GIAN" prefWidth="145.0" alignment="CENTER_LEFT"
+                               style="-fx-font-size: 12.5px; -fx-font-weight: bold; -fx-text-fill: #64748b;"/>
+
+                        <Label text="KILLS / TRÚNG" prefWidth="110.0" alignment="CENTER_RIGHT"
+                               style="-fx-font-size: 12.5px; -fx-font-weight: bold; -fx-text-fill: #64748b;"/>
+
+                        <Label text="ĐIỂM NHẬN" prefWidth="95.0" alignment="CENTER_RIGHT"
+                               style="-fx-font-size: 12.5px; -fx-font-weight: bold; -fx-text-fill: #64748b;"/>
+                    </HBox>
+
+                    <!-- ListView chứa danh sách trận đấu -->
+                    <ListView fx:id="matchHistoryListView"
+                              VBox.vgrow="ALWAYS"
+                              prefHeight="310.0"
+                              style="-fx-background-color: transparent; -fx-border-width: 0; -fx-padding: 4px;"/>
+                </VBox>
+
+                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                    <Label fx:id="statusLabel"
+                           text="Đang tải lịch sử thi đấu..."
+                           style="-fx-text-fill: #64748b; -fx-font-size: 12.5px; -fx-padding: 0 4px;"/>
+                    <HBox HBox.hgrow="ALWAYS"/>
+                    <Label text="💡 Nhấp vào trận đấu để xem chi tiết tất cả người chơi"
+                           style="-fx-text-fill: #3b82f6; -fx-font-size: 12px; -fx-font-weight: bold;"/>
+                </HBox>
+            </VBox>
+        </center>
+
+        <!-- BOTTOM: NÚT QUAY LẠI LOBBY -->
+        <bottom>
+            <HBox alignment="CENTER">
+                <padding>
+                    <Insets top="4.0" bottom="18.0"/>
+                </padding>
+
+                <Button fx:id="backButton"
+                        text="← Quay lại sảnh"
+                        prefWidth="190.0"
+                        prefHeight="40.0"
+                        style="-fx-background-color: white; -fx-text-fill: #1e293b; -fx-font-weight: bold; -fx-font-size: 13.5px; -fx-border-color: #cbd5e1; -fx-border-width: 1.5px; -fx-border-radius: 8px; -fx-background-radius: 8px; -fx-cursor: hand;"
+                        onAction="#handleBack"/>
+            </HBox>
+        </bottom>
+    </BorderPane>
+
+    <!-- ============================================== -->
+    <!-- LỚP 2: POPUP OVERLAY CHI TIẾT TRẬN ĐẤU         -->
+    <!-- Mờ nền xung quanh, click ra ngoài để đóng      -->
+    <!-- ============================================== -->
+    <StackPane fx:id="detailOverlay" visible="false"
+               style="-fx-background-color: rgba(10, 15, 29, 0.78);"
+               onMouseClicked="#handleOverlayClicked">
+
+        <VBox fx:id="detailCard" alignment="TOP_CENTER" spacing="14.0"
+              prefWidth="680.0" maxWidth="680.0" maxHeight="490.0"
+              style="-fx-background-color: white; -fx-background-radius: 18px; -fx-padding: 20px 24px; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.5), 30, 0, 0, 10); -fx-border-color: #e2e8f0; -fx-border-width: 1.2px; -fx-border-radius: 18px;">
+
+            <!-- Header Popup: Tiêu đề & Nút X đóng -->
+            <HBox alignment="CENTER_LEFT">
+                <VBox spacing="3.0" HBox.hgrow="ALWAYS">
+                    <Label text="CHI TIẾT TRẬN ĐẤU"
+                           style="-fx-text-fill: #0f172a; -fx-font-size: 18px; -fx-font-weight: bold;"/>
+                    <Label fx:id="detailRoomTimeLabel"
+                           text="Phòng: Room #01 • 60s • 03/10/2026 15:30"
+                           style="-fx-text-fill: #64748b; -fx-font-size: 12.5px; -fx-font-weight: bold;"/>
+                </VBox>
+
+                <!-- Nút X đóng popup -->
+                <Button text="✕"
+                        prefWidth="32.0" prefHeight="32.0"
+                        style="-fx-background-color: #f1f5f9; -fx-text-fill: #64748b; -fx-font-size: 14px; -fx-font-weight: bold; -fx-background-radius: 16px; -fx-cursor: hand;"
+                        onAction="#handleCloseDetail"/>
+            </HBox>
+
+            <!-- Banner người chiến thắng hoặc hòa -->
+            <HBox fx:id="winnerBanner" alignment="CENTER_LEFT" spacing="8.0"
+                  style="-fx-background-color: #eff6ff; -fx-padding: 8px 14px; -fx-background-radius: 10px; -fx-border-color: #bfdbfe; -fx-border-radius: 10px;">
+                <Label text="👑" style="-fx-font-size: 15px;"/>
+                <Label fx:id="winnerTextLabel"
+                       text="Người chiến thắng: PlayerOne"
+                       style="-fx-text-fill: #1d4ed8; -fx-font-size: 13px; -fx-font-weight: bold;"/>
+            </HBox>
+
+            <!-- Bảng danh sách tất cả người chơi trong trận đấu -->
+            <VBox style="-fx-background-color: #f8fafc; -fx-background-radius: 12px; -fx-border-color: #e2e8f0; -fx-border-width: 1px; -fx-border-radius: 12px;"
+                  VBox.vgrow="ALWAYS">
+
+                <!-- Header danh sách người chơi: 70 + 190 + 85 + 95 + 95 = 535px, padding 16px mỗi bên -->
+                <HBox alignment="CENTER_LEFT"
+                      style="-fx-background-color: #f1f5f9; -fx-padding: 9px 16px; -fx-background-radius: 11px 11px 0 0; -fx-border-color: #e2e8f0; -fx-border-width: 0 0 1px 0;">
+                    <Label text="HẠNG" prefWidth="70.0" alignment="CENTER_LEFT"
+                           style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #64748b;"/>
+                    <Label text="NGƯỜI CHƠI" prefWidth="190.0" alignment="CENTER_LEFT"
+                           style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #64748b;"/>
+                    <Label text="KILLS" prefWidth="85.0" alignment="CENTER_RIGHT"
+                           style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #64748b;"/>
+                    <Label text="TRÚNG ĐÍCH" prefWidth="95.0" alignment="CENTER_RIGHT"
+                           style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #64748b;"/>
+                    <Label text="ĐIỂM NHẬN" prefWidth="95.0" alignment="CENTER_RIGHT"
+                           style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #64748b;"/>
+                </HBox>
+
+                <ListView fx:id="participantListView"
+                          VBox.vgrow="ALWAYS"
+                          prefHeight="190.0"
+                          style="-fx-background-color: transparent; -fx-border-width: 0; -fx-padding: 2px;"/>
+            </VBox>
+
+            <!-- Nút đóng dưới cùng -->
+            <HBox alignment="CENTER">
+                <Button text="Đóng chi tiết"
+                        prefWidth="150.0" prefHeight="36.0"
+                        style="-fx-background-color: #f1f5f9; -fx-text-fill: #334155; -fx-font-weight: bold; -fx-font-size: 13px; -fx-background-radius: 8px; -fx-cursor: hand;"
+                        onAction="#handleCloseDetail"/>
+            </HBox>
+        </VBox>
+    </StackPane>
+
+</StackPane>

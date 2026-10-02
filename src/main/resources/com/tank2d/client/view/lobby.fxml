@@ -9,130 +9,223 @@
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.shape.Circle?>
+<?import javafx.scene.shape.SVGPath?>
 
-<BorderPane xmlns="http://javafx.com/javafx/21"
-            xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.tank2d.client.controller.LobbyController"
-            stylesheets="@lobby.css"
-            prefWidth="800.0"
-            prefHeight="600.0">
+<StackPane fx:id="rootStackPane"
+           xmlns="http://javafx.com/javafx/21"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="com.tank2d.client.controller.LobbyController"
+           stylesheets="@lobby.css"
+           prefWidth="800.0"
+           prefHeight="600.0">
 
     <!-- ============================================== -->
-    <!-- TOP: THANH THÔNG TIN NGƯỜI CHƠI & LOGO         -->
+    <!-- LỚP 1: GIAO DIỆN CHÍNH SẢNH (MAIN CONTENT)     -->
     <!-- ============================================== -->
-    <top>
-        <VBox spacing="8.0">
-            <padding>
-                <Insets top="14.0" right="35.0" bottom="6.0" left="35.0"/>
-            </padding>
+    <BorderPane fx:id="mainContentPane"
+                prefWidth="800.0"
+                prefHeight="600.0"
+                style="-fx-background-color: #f8fafc;">
 
-            <HBox alignment="CENTER_LEFT" styleClass="top-bar-card">
-                <HBox alignment="CENTER_LEFT" spacing="12.0">
-                    <ImageView fitWidth="50.0" fitHeight="32.0" preserveRatio="true">
-                        <image>
-                            <Image url="@tank-logo_1.png"/>
-                        </image>
-                    </ImageView>
-                    <Label text="TANK 2D ONLINE"
-                           style="-fx-text-fill: #1d4ed8; -fx-font-size: 19px; -fx-font-weight: bold;"/>
-                </HBox>
+        <!-- TOP: THANH THÔNG TIN NGƯỜI CHƠI & LOGO -->
+        <top>
+            <VBox spacing="8.0">
+                <padding>
+                    <Insets top="14.0" right="35.0" bottom="6.0" left="35.0"/>
+                </padding>
 
-                <HBox HBox.hgrow="ALWAYS"/>
-
-                <HBox alignment="CENTER_RIGHT" spacing="12.0">
-                    <HBox alignment="CENTER" spacing="6.0"
-                          style="-fx-background-color: #eff6ff; -fx-background-radius: 20px; -fx-padding: 4px 14px; -fx-border-color: #bfdbfe; -fx-border-radius: 20px;">
-                        <Label text="👤" style="-fx-font-size: 13px;"/>
-                        <Label fx:id="usernameLabel" text="Player"
-                               style="-fx-text-fill: #1e40af; -fx-font-size: 13.5px; -fx-font-weight: bold;"/>
+                <HBox alignment="CENTER_LEFT" styleClass="top-bar-card">
+                    <HBox alignment="CENTER_LEFT" spacing="12.0">
+                        <ImageView fitWidth="50.0" fitHeight="32.0" preserveRatio="true">
+                            <image>
+                                <Image url="@tank-logo_1.png"/>
+                            </image>
+                        </ImageView>
+                        <Label text="TANK 2D ONLINE"
+                               style="-fx-text-fill: #1d4ed8; -fx-font-size: 19px; -fx-font-weight: bold;"/>
                     </HBox>
-
-                    <Button fx:id="logoutButton"
-                            text="Đăng xuất"
-                            prefHeight="30.0"
-                            styleClass="btn-logout"
-                            onAction="#handleLogout"/>
-                </HBox>
-            </HBox>
-        </VBox>
-    </top>
-
-    <!-- ============================================== -->
-    <!-- CENTER: BẢNG DANH SÁCH PHÒNG                   -->
-    <!-- ============================================== -->
-    <center>
-        <VBox spacing="8.0">
-            <padding>
-                <Insets top="4.0" right="35.0" bottom="8.0" left="35.0"/>
-            </padding>
-
-            <VBox styleClass="lobby-table-card" VBox.vgrow="ALWAYS">
-                <!-- Thanh công cụ: Tiêu đề sảnh & Bộ lọc -->
-                <HBox alignment="CENTER_LEFT" style="-fx-padding: 12px 18px; -fx-border-color: #e2e8f0; -fx-border-width: 0 0 1px 0;">
-                    <Label text="DANH SÁCH PHÒNG CHỜ"
-                           style="-fx-text-fill: #0f172a; -fx-font-size: 16px; -fx-font-weight: bold;"/>
 
                     <HBox HBox.hgrow="ALWAYS"/>
 
-                    <HBox alignment="CENTER_RIGHT" spacing="8.0">
-                        <Label text="Thời gian trận:" style="-fx-text-fill: #64748b; -fx-font-size: 13px; -fx-font-weight: bold;"/>
-                        <ComboBox fx:id="durationFilterComboBox"
-                                  prefWidth="110.0"
-                                  prefHeight="32.0"/>
+                    <HBox alignment="CENTER_RIGHT" spacing="12.0">
+                        <HBox alignment="CENTER" spacing="6.0"
+                              style="-fx-background-color: #eff6ff; -fx-background-radius: 20px; -fx-padding: 4px 14px; -fx-border-color: #bfdbfe; -fx-border-radius: 20px;">
+                            <Label text="👤" style="-fx-font-size: 13px;"/>
+                            <Label fx:id="usernameLabel" text="Player"
+                                   style="-fx-text-fill: #1e40af; -fx-font-size: 13.5px; -fx-font-weight: bold;"/>
+                        </HBox>
+
+                        <Button fx:id="logoutButton"
+                                text="Đăng xuất"
+                                prefHeight="30.0"
+                                styleClass="btn-logout"
+                                onAction="#handleLogout"/>
                     </HBox>
                 </HBox>
+            </VBox>
+        </top>
 
-                <!-- Thanh Header chia cột vừa in 670px không bao giờ bị cuộn ngang -->
-                <HBox alignment="CENTER_LEFT" styleClass="table-header">
-                    <Label text="TÊN PHÒNG" prefWidth="260.0" styleClass="table-header-label"/>
-                    <Label text="SỐ NGƯỜI" prefWidth="110.0" alignment="CENTER" styleClass="table-header-label"/>
-                    <Label text="THỜI LƯỢNG" prefWidth="120.0" alignment="CENTER" styleClass="table-header-label"/>
-                    <Label text="TRẠNG THÁI" prefWidth="140.0" alignment="CENTER_RIGHT" styleClass="table-header-label"/>
-                </HBox>
+        <!-- CENTER: BẢNG DANH SÁCH PHÒNG -->
+        <center>
+            <VBox spacing="8.0">
+                <padding>
+                    <Insets top="4.0" right="35.0" bottom="8.0" left="35.0"/>
+                </padding>
 
-                <!-- ListView chứa các dòng phòng -->
-                <ListView fx:id="roomListView" VBox.vgrow="ALWAYS" prefHeight="260.0"/>
+                <VBox styleClass="lobby-table-card" VBox.vgrow="ALWAYS">
+                    <!-- Thanh công cụ: Tiêu đề sảnh & Bộ lọc -->
+                    <HBox alignment="CENTER_LEFT" style="-fx-padding: 12px 18px; -fx-border-color: #e2e8f0; -fx-border-width: 0 0 1px 0;">
+                        <Label text="DANH SÁCH PHÒNG CHỜ"
+                               style="-fx-text-fill: #0f172a; -fx-font-size: 16px; -fx-font-weight: bold;"/>
+
+                        <HBox HBox.hgrow="ALWAYS"/>
+
+                        <HBox alignment="CENTER_RIGHT" spacing="8.0">
+                            <Label text="Thời gian trận:" style="-fx-text-fill: #64748b; -fx-font-size: 13px; -fx-font-weight: bold;"/>
+                            <ComboBox fx:id="durationFilterComboBox"
+                                      prefWidth="110.0"
+                                      prefHeight="32.0"/>
+                        </HBox>
+                    </HBox>
+
+                    <!-- Thanh Header chia cột vừa in 670px không bao giờ bị cuộn ngang -->
+                    <HBox alignment="CENTER_LEFT" styleClass="table-header">
+                        <Label text="TÊN PHÒNG" prefWidth="260.0" styleClass="table-header-label"/>
+                        <Label text="SỐ NGƯỜI" prefWidth="110.0" alignment="CENTER" styleClass="table-header-label"/>
+                        <Label text="THỜI LƯỢNG" prefWidth="120.0" alignment="CENTER" styleClass="table-header-label"/>
+                        <Label text="TRẠNG THÁI" prefWidth="140.0" alignment="CENTER_RIGHT" styleClass="table-header-label"/>
+                    </HBox>
+
+                    <!-- ListView chứa các dòng phòng -->
+                    <ListView fx:id="roomListView" VBox.vgrow="ALWAYS" prefHeight="260.0"/>
+                </VBox>
+
+                <Label fx:id="statusLabel"
+                       text="Đang tải danh sách phòng..."
+                       style="-fx-text-fill: #64748b; -fx-font-size: 13px; -fx-padding: 0 4px;"/>
+            </VBox>
+        </center>
+
+        <!-- BOTTOM: CÁC NÚT ĐIỀU KHIỂN -->
+        <bottom>
+            <HBox alignment="CENTER" spacing="16.0">
+                <padding>
+                    <Insets top="4.0" right="35.0" bottom="18.0" left="35.0"/>
+                </padding>
+
+                <Button fx:id="leaderboardButton"
+                        text="🏆  Bảng xếp hạng"
+                        prefWidth="165.0"
+                        prefHeight="42.0"
+                        styleClass="btn-leaderboard"
+                        onAction="#handleLeaderboard"/>
+
+                <Button fx:id="matchHistoryButton"
+                        text="📜  Lịch sử đấu"
+                        prefWidth="150.0"
+                        prefHeight="42.0"
+                        styleClass="btn-match-history"
+                        onAction="#handleMatchHistory"/>
+
+                <HBox HBox.hgrow="ALWAYS"/>
+
+                <Button fx:id="createRoomButton"
+                        text="+  Tạo phòng"
+                        prefWidth="165.0"
+                        prefHeight="42.0"
+                        styleClass="btn-create-room"
+                        onAction="#handleCreateRoom"/>
+
+                <Button fx:id="joinRoomButton"
+                        text="Vào phòng  ➜"
+                        prefWidth="165.0"
+                        prefHeight="42.0"
+                        styleClass="btn-join-room"
+                        onAction="#handleJoinRoom"/>
+            </HBox>
+        </bottom>
+    </BorderPane>
+
+    <!-- ============================================== -->
+    <!-- LỚP 2: OVERLAY HÌNH PHẠT THOÁT TRẬN            -->
+    <!-- Mờ đen toàn màn hình, chỉ có thể đăng xuất      -->
+    <!-- ============================================== -->
+    <StackPane fx:id="penaltyOverlay" visible="false"
+               style="-fx-background-color: rgba(10, 15, 29, 0.88);">
+        <VBox alignment="CENTER" spacing="18.0" maxWidth="480.0" maxHeight="330.0"
+              style="-fx-background-color: white; -fx-background-radius: 20px; -fx-padding: 32px 36px; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.5), 30, 0, 0, 10); -fx-border-color: #fecaca; -fx-border-width: 1.5px; -fx-border-radius: 20px;">
+            
+            <!-- Icon cảnh báo hình khiên tròn đỏ -->
+            <StackPane prefWidth="64.0" prefHeight="64.0">
+                <Circle radius="32.0" fill="#fee2e2" stroke="#fca5a5" strokeWidth="1.5"/>
+                <SVGPath content="M 12 2 C 6.48 2 2 6.48 2 12 s 4.48 10 10 10 s 10 -4.48 10 -10 S 17.52 2 12 2 z M 4 12 c 0 -4.42 3.58 -8 8 -8 c 1.85 0 3.55 0.63 4.9 1.69 L 5.69 16.9 C 4.63 15.55 4 13.85 4 12 z M 12 20 c -1.85 0 -3.55 -0.63 -4.9 -1.69 L 18.31 7.1 C 19.37 8.45 20 10.15 20 12 c 0 4.42 -3.58 8 -8 8 z"
+                         fill="#dc2626" scaleX="1.3" scaleY="1.3"/>
+            </StackPane>
+
+            <!-- Tiêu đề & Thông báo phạt chính giữa -->
+            <VBox alignment="CENTER" spacing="8.0">
+                <Label text="TÀI KHOẢN ĐANG BỊ PHẠT"
+                       style="-fx-text-fill: #dc2626; -fx-font-size: 19px; -fx-font-weight: bold;"/>
+                <Label text="Bạn bị phạt do thoát trận giữa chừng!"
+                       style="-fx-text-fill: #1e293b; -fx-font-size: 14.5px; -fx-font-weight: bold;"/>
+                <Label text="Vui lòng đợi đến khi trận đấu hiện tại kết thúc để tiếp tục tham gia hoặc tạo phòng mới."
+                       wrapText="true" textAlignment="CENTER"
+                       style="-fx-text-fill: #64748b; -fx-font-size: 13px; -fx-line-spacing: 2px;"/>
             </VBox>
 
-            <Label fx:id="statusLabel"
-                   text="Đang tải danh sách phòng..."
-                   style="-fx-text-fill: #64748b; -fx-font-size: 13px; -fx-padding: 0 4px;"/>
+            <!-- Nút đăng xuất duy nhất -->
+            <Button text="Đăng xuất tài khoản"
+                    prefWidth="220.0" prefHeight="40.0"
+                    style="-fx-background-color: linear-gradient(to bottom, #ef4444, #dc2626); -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 13.5px; -fx-background-radius: 9px; -fx-cursor: hand; -fx-effect: dropshadow(three-pass-box, rgba(220,38,38,0.35), 8, 0, 0, 3);"
+                    onAction="#handleLogout"/>
         </VBox>
-    </center>
+    </StackPane>
 
     <!-- ============================================== -->
-    <!-- BOTTOM: CÁC NÚT ĐIỀU KHIỂN                      -->
+    <!-- LỚP 3: OVERLAY RECONNECT (TRẬN ĐẤU DỞ DANG)    -->
+    <!-- Hộp thoại xác nhận vào lại gắn liền màn hình   -->
     <!-- ============================================== -->
-    <bottom>
-        <HBox alignment="CENTER" spacing="16.0">
-            <padding>
-                <Insets top="4.0" right="35.0" bottom="18.0" left="35.0"/>
-            </padding>
+    <StackPane fx:id="reconnectOverlay" visible="false"
+               style="-fx-background-color: rgba(10, 15, 29, 0.75);">
+        <VBox alignment="CENTER" spacing="18.0" maxWidth="500.0" maxHeight="350.0"
+              style="-fx-background-color: white; -fx-background-radius: 20px; -fx-padding: 30px 36px; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.45), 30, 0, 0, 10); -fx-border-color: #fed7aa; -fx-border-width: 1.5px; -fx-border-radius: 20px;">
+            
+            <!-- Icon chiến đấu cam nổi bật dạng SVG vector -->
+            <StackPane prefWidth="64.0" prefHeight="64.0">
+                <Circle radius="32.0" fill="#ffedd5" stroke="#fdba74" strokeWidth="1.5"/>
+                <SVGPath content="M 2.47 19.03 l 2.5 2.5 c 0.59 0.59 1.54 0.59 2.12 0 l 2.47 -2.47 l 1.41 1.41 l 1.41 -1.41 l -1.41 -1.41 l 6.94 -6.94 l 2.83 2.83 l 1.41 -1.41 l -2.83 -2.83 l 4.24 -4.24 c 0.59 -0.59 0.59 -1.54 0 -2.12 l -2.5 -2.5 c -0.59 -0.59 -1.54 -0.59 -2.12 0 l -4.24 4.24 l -2.83 -2.83 l -1.41 1.41 l 2.83 2.83 l -6.94 6.94 l -1.41 -1.41 l -1.41 1.41 l 1.41 1.41 l -2.47 2.47 c -0.58 0.59 -0.58 1.54 0 2.12 z M 21.53 19.03 l -2.5 2.5 c -0.59 0.59 -1.54 0.59 -2.12 0 l -2.47 -2.47 l -1.41 1.41 l -1.41 -1.41 l 1.41 -1.41 l -6.94 -6.94 l -2.83 2.83 l -1.41 -1.41 l 2.83 -2.83 l -4.24 -4.24 c -0.59 -0.59 -0.59 -1.54 0 -2.12 l 2.5 -2.5 c 0.59 -0.59 1.54 -0.59 2.12 0 l 4.24 4.24 l 2.83 -2.83 l 1.41 1.41 l -2.83 2.83 l 6.94 6.94 l 1.41 -1.41 l 1.41 1.41 l -1.41 1.41 l 2.47 2.47 c 0.58 0.59 0.58 1.54 0 2.12 z"
+                         fill="#ea580c" scaleX="1.25" scaleY="1.25"/>
+            </StackPane>
 
-            <Button fx:id="leaderboardButton"
-                    text="🏆  Bảng xếp hạng"
-                    prefWidth="180.0"
-                    prefHeight="42.0"
-                    styleClass="btn-leaderboard"
-                    onAction="#handleLeaderboard"/>
+            <!-- Tiêu đề & Thông tin trận đấu -->
+            <VBox alignment="CENTER" spacing="8.0">
+                <Label text="PHÁT HIỆN TRẬN ĐẤU DỞ DANG"
+                       style="-fx-text-fill: #ea580c; -fx-font-size: 18.5px; -fx-font-weight: bold;"/>
+                <Label fx:id="reconnectRoomLabel" text="Phòng đấu: Room #01"
+                       style="-fx-text-fill: #0f172a; -fx-font-size: 15px; -fx-font-weight: bold;"/>
+                <Label fx:id="reconnectTimeLabel" text="Thời gian còn lại: 02:15"
+                       style="-fx-text-fill: #2563eb; -fx-font-size: 13.5px; -fx-font-weight: bold;"/>
+                <Label text="Xe tăng của bạn đang chờ trên bản đồ. Hãy vào lại ngay để tiếp tục chiến đấu cùng mọi người!"
+                       wrapText="true" textAlignment="CENTER"
+                       style="-fx-text-fill: #64748b; -fx-font-size: 12.5px; -fx-line-spacing: 2px;"/>
+            </VBox>
 
-            <HBox HBox.hgrow="ALWAYS"/>
+            <!-- 2 Nút: Vào lại trận đấu & Bỏ qua -->
+            <HBox alignment="CENTER" spacing="14.0">
+                <Button fx:id="skipReconnectButton" text="Bỏ qua (Xem sảnh)"
+                        prefWidth="145.0" prefHeight="40.0"
+                        style="-fx-background-color: #f1f5f9; -fx-text-fill: #475569; -fx-font-weight: bold; -fx-font-size: 13px; -fx-background-radius: 9px; -fx-cursor: hand;"
+                        onAction="#handleSkipReconnect"/>
 
-            <Button fx:id="createRoomButton"
-                    text="+  Tạo phòng"
-                    prefWidth="165.0"
-                    prefHeight="42.0"
-                    styleClass="btn-create-room"
-                    onAction="#handleCreateRoom"/>
+                <Button fx:id="confirmReconnectButton" text="VÀO LẠI TRẬN ĐẤU ➜"
+                        prefWidth="220.0" prefHeight="40.0"
+                        style="-fx-background-color: linear-gradient(to bottom, #f97316, #ea580c); -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 13.5px; -fx-background-radius: 9px; -fx-cursor: hand; -fx-effect: dropshadow(three-pass-box, rgba(234,88,12,0.4), 8, 0, 0, 3);"
+                        onAction="#handleConfirmReconnect"/>
+            </HBox>
+        </VBox>
+    </StackPane>
 
-            <Button fx:id="joinRoomButton"
-                    text="Vào phòng  ➜"
-                    prefWidth="165.0"
-                    prefHeight="42.0"
-                    styleClass="btn-join-room"
-                    onAction="#handleJoinRoom"/>
-        </HBox>
-    </bottom>
-
-</BorderPane>
+</StackPane>

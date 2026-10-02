@@ -6,6 +6,8 @@ import com.tank2d.common.dto.LoginRequest;
 import com.tank2d.common.dto.LoginResponse;
 import com.tank2d.common.dto.RegisterResponse;
 import com.tank2d.common.dto.game.PlayerShootRequestDTO;
+import com.tank2d.common.dto.game.ReconnectPromptDTO;
+import com.tank2d.common.dto.game.ReconnectResponseDTO;
 import com.tank2d.common.dto.game.TankPlayerDTO;
 import com.tank2d.common.exception.ErrorCode;
 import com.tank2d.common.exception.GameNetworkException;
@@ -96,7 +98,11 @@ public class ClientHandler implements Runnable {
             }
 
         } catch (IOException e) {
-            LOGGER.log(Level.SEVERE, "[ClientHandler] Lỗi kết nối (" + clientAddress + ")", e);
+            if (e instanceof java.net.SocketException || e instanceof java.io.EOFException) {
+                LOGGER.info("[ClientHandler] Client ngắt kết nối (" + clientAddress + "): " + e.getMessage());
+            } else {
+                LOGGER.log(Level.WARNING, "[ClientHandler] Lỗi kết nối (" + clientAddress + ")", e);
+            }
         } finally {
             closeConnection();
         }
@@ -111,6 +117,8 @@ public class ClientHandler implements Runnable {
             case AUTH_LOGIN_REQ -> handleLogin(packet.getData());
             case AUTH_REGISTER_REQ -> handleRegister(packet.getData());
             case LEADERBOARD_REQ -> handleLeaderboard();
+            case MATCH_HISTORY_REQ -> handleMatchHistory();
+            case MATCH_DETAIL_REQ -> handleMatchDetail(packet.getData());
             case LOGOUT_REQ -> handleLogout();
             case LOBBY_GET_ROOMS_REQ -> handleGetRooms();
             case ROOM_CREATE_REQ -> handleCreateRoom();
@@ -119,6 +127,7 @@ public class ClientHandler implements Runnable {
             case ROOM_DURATION_REQ -> handleRoomDuration(packet.getData());
             case ROOM_START_REQ -> handleStartGame();
             case ROOM_LEAVE_REQ -> handleLeaveRoom();
+            case GAME_RECONNECT_REQ -> handleReconnectGame();
             case TANK_PLAYER_INFO_REQ -> handleTankPlayerInfo();
             case PLAYER_INPUT -> handlePlayerInput(packet.getData());
             case PLAYER_SHOOT_REQ -> handlePlayerShoot(packet.getData());
@@ -203,7 +212,37 @@ public class ClientHandler implements Runnable {
 
         try {
             NetworkUtil.sendPacket(dos, new Packet(PacketType.AUTH_LOGIN_RES, gson.toJson(res)));
+
+            // Kiểm tra trạng thái trận đấu cũ hoặc án phạt sau khi đăng nhập thành công
+            if (currentUser != null) {
+                if (!checkUserPenalized()) {
+                    Room playingRoom = roomManager.getPlayingRoomByUserId(currentUser.getId());
+                    if (playingRoom != null && playingRoom.getGameStateManager() != null && !playingRoom.getGameStateManager().isGameOver()) {
+                        double remain = playingRoom.getGameStateManager().getMatchRemainingTime();
+                        ReconnectPromptDTO promptDTO = new ReconnectPromptDTO(playingRoom.getRoomId(), playingRoom.getRoomName(), remain);
+                        NetworkUtil.sendPacket(dos, new Packet(PacketType.GAME_RECONNECT_PROMPT, gson.toJson(promptDTO)));
+                    }
+                }
+            }
         } catch (IOException ignored) {}
+    }
+
+    private boolean checkUserPenalized() throws IOException {
+        if (currentUser == null) return false;
+        if (roomManager.isPenalized(currentUser.getId())) {
+            Integer penRoomId = roomManager.getPenalizedRoomId(currentUser.getId());
+            Room penRoom = (penRoomId != null) ? roomManager.getRoom(penRoomId) : null;
+            if (penRoom != null && "Playing".equalsIgnoreCase(penRoom.getStatus())) {
+                NetworkUtil.sendPacket(dos, new Packet(PacketType.GAME_PENALTY_NOTIFY,
+                        "PENALTY_ACTIVE:" + penRoomId));
+                return true;
+            } else {
+                roomManager.removePenalty(currentUser.getId());
+                NetworkUtil.sendPacket(dos, new Packet(PacketType.GAME_PENALTY_NOTIFY, "PENALTY_LIFTED"));
+                return false;
+            }
+        }
+        return false;
     }
 
     private void handleRegister(String rawJson) {
@@ -234,16 +273,63 @@ public class ClientHandler implements Runnable {
         }
     }
 
+    private void handleMatchHistory() {
+        try {
+            if (currentUser == null) return;
+            List<com.tank2d.common.dto.UserMatchHistoryDTO> history = matchDAO.getMatchHistoryByUserId(currentUser.getId());
+            Packet response = new Packet(PacketType.MATCH_HISTORY_RES, gson.toJson(history));
+            NetworkUtil.sendPacket(dos, response);
+        } catch (IOException e) {
+            LOGGER.log(Level.SEVERE, "[MatchHistory] Lỗi gửi lịch sử đấu", e);
+        }
+    }
+
+    private void handleMatchDetail(String rawJson) {
+        try {
+            int matchId = gson.fromJson(rawJson, Integer.class);
+            com.tank2d.common.dto.MatchDetailDTO detail = matchDAO.getMatchDetail(matchId);
+            if (detail != null) {
+                Packet response = new Packet(PacketType.MATCH_DETAIL_RES, gson.toJson(detail));
+                NetworkUtil.sendPacket(dos, response);
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "[MatchHistory] Lỗi gửi chi tiết trận đấu", e);
+        }
+    }
+
     private void handleGetRooms() {
         try {
             Packet response = new Packet(PacketType.LOBBY_ROOMS_RES, gson.toJson(roomManager.getAllRooms()));
             NetworkUtil.sendPacket(dos, response);
+
+            if (currentUser != null) {
+                if (!checkUserPenalized()) {
+                    Room playingRoom = roomManager.getPlayingRoomByUserId(currentUser.getId());
+                    if (playingRoom != null && playingRoom.getGameStateManager() != null && !playingRoom.getGameStateManager().isGameOver()) {
+                        double remain = playingRoom.getGameStateManager().getMatchRemainingTime();
+                        ReconnectPromptDTO promptDTO = new ReconnectPromptDTO(playingRoom.getRoomId(), playingRoom.getRoomName(), remain);
+                        NetworkUtil.sendPacket(dos, new Packet(PacketType.GAME_RECONNECT_PROMPT, gson.toJson(promptDTO)));
+                    }
+                }
+            }
         } catch (IOException ignored) {}
     }
 
     private void handleCreateRoom() {
         try {
             if (currentUser == null) return;
+
+            if (checkUserPenalized()) {
+                return;
+            }
+
+            Room playingRoom = roomManager.getPlayingRoomByUserId(currentUser.getId());
+            if (playingRoom != null && playingRoom.getGameStateManager() != null && !playingRoom.getGameStateManager().isGameOver()) {
+                double remain = playingRoom.getGameStateManager().getMatchRemainingTime();
+                NetworkUtil.sendPacket(dos, new Packet(PacketType.GAME_RECONNECT_PROMPT,
+                        gson.toJson(new ReconnectPromptDTO(playingRoom.getRoomId(), playingRoom.getRoomName(), remain))));
+                return;
+            }
 
             Room room = roomManager.createRoom(currentUser);
             currentRoomId = room.getRoomId();
@@ -258,6 +344,20 @@ public class ClientHandler implements Runnable {
 
     private void handleJoinRoom(String rawJson) {
         try {
+            if (currentUser == null) return;
+
+            if (checkUserPenalized()) {
+                return;
+            }
+
+            Room playingRoom = roomManager.getPlayingRoomByUserId(currentUser.getId());
+            if (playingRoom != null && playingRoom.getGameStateManager() != null && !playingRoom.getGameStateManager().isGameOver()) {
+                double remain = playingRoom.getGameStateManager().getMatchRemainingTime();
+                NetworkUtil.sendPacket(dos, new Packet(PacketType.GAME_RECONNECT_PROMPT,
+                        gson.toJson(new ReconnectPromptDTO(playingRoom.getRoomId(), playingRoom.getRoomName(), remain))));
+                return;
+            }
+
             int roomId = gson.fromJson(rawJson, Integer.class);
             boolean success = roomManager.joinRoom(roomId, currentUser);
 
@@ -266,8 +366,6 @@ public class ClientHandler implements Runnable {
                 broadcastRoomState(); // Gửi ROOM_STATE_UPDATE cho các thành viên TRONG phòng
                 broadcastLobbyRooms();
             } else {
-                // JOIN THẤT BẠI: KHÔNG gửi ROOM_STATE_UPDATE!
-                // Chỉ gửi cập nhật danh sách sảnh để Client thấy trạng thái phòng mới nhất
                 LOGGER.info("[Room] Từ chối " + currentUser.getUsername() + " vào phòng " + roomId);
                 Packet packet = new Packet(PacketType.ROOM_LIST_UPDATE, gson.toJson(roomManager.getAllRooms()));
                 NetworkUtil.sendPacket(dos, packet);
@@ -346,17 +444,25 @@ public class ClientHandler implements Runnable {
             gameLoop.setStateManager(stateManager);
             gameLoop.setMapChangeListener(stateManager);
             gameLoop.setItemEventListener(stateManager);
+
+            // Lưu GameLoop và GameStateManager vào Room để hỗ trợ Reconnect
+            room.setGameLoop(gameLoop);
+            room.setGameStateManager(stateManager);
+            room.getUserTankMappings().clear();
             
             /// GẮN CALLBACK ĐỂ KHI TRẬN ĐẤU KẾT THÚC THÌ RESET PHÒNG VỀ "Waiting"
             int targetRoomId = currentRoomId;
             stateManager.setOnGameOverCallback(() -> {
-                // 1. Reset phòng và ép toàn bộ khách về Chưa sẵn sàng
+                // 1. Gỡ phạt cho những người chơi đã thoát trước đó trong phòng này
+                liftPenaltiesForRoom(targetRoomId);
+
+                // 2. Reset phòng và ép toàn bộ khách về Chưa sẵn sàng
                 roomManager.resetRoomAfterMatch(targetRoomId);
 
-                // 2. Broadcast RoomDTO mới nhất (ready = false) cho những người còn lại trong phòng
+                // 3. Broadcast RoomDTO mới nhất (ready = false) cho những người còn lại trong phòng
                 broadcastRoomStateForRoom(targetRoomId);
 
-                // 3. Broadcast ra sảnh để cập nhật trạng thái phòng thành "Đang chờ"
+                // 4. Broadcast ra sảnh để cập nhật trạng thái phòng thành "Đang chờ"
                 broadcastLobbyRooms();
             });
 
@@ -365,7 +471,7 @@ public class ClientHandler implements Runnable {
 
             int tankIndex = 1;
             for (ClientHandler client : connectedClients) {
-                if (client.currentRoomId == currentRoomId) {
+                if (client.currentRoomId == currentRoomId && client.currentUser != null) {
                     // Lấy tọa độ và góc xoay chuẩn 100% từ file Map JSON qua ConfigLoader:
                     double startX = ConfigLoader.getSpawnX(tankIndex, 15.0);
                     double startY = ConfigLoader.getSpawnY(tankIndex, 15.0);
@@ -379,6 +485,10 @@ public class ClientHandler implements Runnable {
                     client.myTankId = tankIndex;
                     client.currentGameLoop = gameLoop;
                     client.currentGameStateManager = stateManager;
+
+                    // Lưu mapping userId -> tankId vào Room để phục vụ Reconnect
+                    room.getUserTankMappings().put(client.currentUser.getId(), tankIndex);
+
                     tankIndex++;
                 }
             }
@@ -459,8 +569,8 @@ public class ClientHandler implements Runnable {
 
             int duration = gson.fromJson(rawJson, Integer.class);
 
-            // Chỉ chấp nhận 45 / 60 / 90 giây
-            if (duration != 45 && duration != 60 && duration != 90) {
+            // Chỉ chấp nhận 45 / 60 / 90 / 180 giây
+            if (duration != 45 && duration != 60 && duration != 90 && duration != 180) {
                 LOGGER.info("[Room] Thời lượng không hợp lệ: " + duration);
                 return;
             }
@@ -513,18 +623,59 @@ public class ClientHandler implements Runnable {
         } catch (Exception ignored) {}
     }
 
+    private void liftPenaltiesForRoom(int roomId) {
+        List<Integer> penalizedUsers = roomManager.getPenalizedUserIdsForRoom(roomId);
+        roomManager.removePenaltiesForRoom(roomId);
+        for (ClientHandler client : connectedClients) {
+            if (client.currentUser != null && penalizedUsers.contains(client.currentUser.getId())) {
+                try {
+                    NetworkUtil.sendPacket(client.dos, new Packet(PacketType.GAME_PENALTY_NOTIFY, "PENALTY_LIFTED"));
+                    LOGGER.info("[Penalty] Đã gửi thông báo gỡ phạt cho user " + client.currentUser.getUsername());
+                } catch (IOException ignored) {}
+            }
+        }
+    }
+
     private void handleLeaveRoom() {
         try {
             if (currentUser == null || currentRoomId == -1) return;
 
             if (currentGameStateManager != null && myTankId != -1) {
-                currentGameStateManager.handlePlayerLeave(myTankId);
-                if (currentGameLoop != null) {
-                    currentGameLoop.getTanks().remove(myTankId);
-                }
+                // TH1: Người chơi chủ động bấm nút Thoát giữa trận
+                int leaverUserId = currentUser.getId();
+                int leaverRoomId = currentRoomId;
+
+                // Kích hoạt xử thua / loại bỏ xe đầu hàng
+                currentGameStateManager.handlePlayerSurrender(myTankId);
+
                 this.currentGameLoop = null;
                 this.currentGameStateManager = null;
                 this.myTankId = -1;
+
+                if (roomManager.leaveRoom(leaverRoomId, leaverUserId)) {
+                    LOGGER.info("[Room] User " + currentUser.getUsername() + " đã chủ động thoát trận và rời phòng " + leaverRoomId);
+                    currentRoomId = -1;
+                    broadcastRoomStateForRoom(leaverRoomId);
+                    broadcastLobbyRooms();
+                }
+
+                Room targetRoom = roomManager.getRoom(leaverRoomId);
+                if (targetRoom != null && "Playing".equalsIgnoreCase(targetRoom.getStatus())) {
+                    // Trận đấu vẫn đang diễn ra (trận 3-4 người) -> Phạt cho tới khi trận kết thúc
+                    roomManager.addPenalty(leaverUserId, leaverRoomId);
+                    try {
+                        NetworkUtil.sendPacket(dos, new Packet(PacketType.GAME_PENALTY_NOTIFY,
+                                "PENALTY_ACTIVE:" + leaverRoomId));
+                    } catch (IOException ignored) {}
+                } else {
+                    // Trận đấu đã kết thúc ngay lập tức (trận 2 người hoặc phòng hủy) -> Không phạt
+                    roomManager.removePenalty(leaverUserId);
+                    try {
+                        NetworkUtil.sendPacket(dos, new Packet(PacketType.GAME_PENALTY_NOTIFY, "PENALTY_LIFTED"));
+                    } catch (IOException ignored) {}
+                }
+
+                return;
             }
 
             int roomId = currentRoomId;
@@ -533,6 +684,9 @@ public class ClientHandler implements Runnable {
             if (roomManager.leaveRoom(roomId, userId)) {
                 LOGGER.info("[Room] User " + currentUser.getUsername() + " đã thoát phòng " + roomId);
                 currentRoomId = -1;
+                if (roomManager.getRoom(roomId) == null) {
+                    liftPenaltiesForRoom(roomId);
+                }
                 broadcastRoomStateForRoom(roomId);
                 broadcastLobbyRooms();
             }
@@ -542,12 +696,77 @@ public class ClientHandler implements Runnable {
         }
     }
 
+    private void handleReconnectGame() {
+        try {
+            if (currentUser == null) return;
+
+            Room playingRoom = roomManager.getPlayingRoomByUserId(currentUser.getId());
+            if (playingRoom == null || playingRoom.getGameStateManager() == null || playingRoom.getGameStateManager().isGameOver()) {
+                NetworkUtil.sendPacket(dos, new Packet(PacketType.GAME_PENALTY_NOTIFY, "Trận đấu đã kết thúc!"));
+                return;
+            }
+
+            Integer tankId = playingRoom.getUserTankMappings().get(currentUser.getId());
+            if (tankId == null) {
+                LOGGER.warning("[Reconnect] Không tìm thấy tankId cho user " + currentUser.getUsername());
+                return;
+            }
+
+            this.currentRoomId = playingRoom.getRoomId();
+            this.myTankId = tankId;
+            this.currentGameLoop = playingRoom.getGameLoop();
+            this.currentGameStateManager = playingRoom.getGameStateManager();
+
+            boolean reconnected = currentGameStateManager.reconnectPlayer(tankId, this.dos);
+            if (reconnected) {
+                LOGGER.info("[Reconnect] User " + currentUser.getUsername() + " đã reconnect thành công vào xe Tank " + tankId + " tại phòng " + currentRoomId);
+
+                // 1. Gửi phản hồi RECONNECT_RES
+                ReconnectResponseDTO resDTO = new ReconnectResponseDTO(
+                        roomManager.getRoomDTO(currentRoomId),
+                        tankId,
+                        currentGameStateManager.getMatchRemainingTime()
+                );
+                NetworkUtil.sendPacket(dos, new Packet(PacketType.GAME_RECONNECT_RES, gson.toJson(resDTO)));
+
+                // 2. Gửi mapping Tank -> Username
+                List<TankPlayerDTO> tankPlayers = new ArrayList<>();
+                for (Map.Entry<Integer, Integer> entry : playingRoom.getUserTankMappings().entrySet()) {
+                    int uId = entry.getKey();
+                    int tId = entry.getValue();
+                    for (User u : playingRoom.getPlayers()) {
+                        if (u.getId() == uId) {
+                            tankPlayers.add(new TankPlayerDTO(tId, u.getUsername()));
+                            break;
+                        }
+                    }
+                }
+                NetworkUtil.sendPacket(dos, new Packet(PacketType.TANK_PLAYER_INFO, gson.toJson(tankPlayers)));
+            } else {
+                NetworkUtil.sendPacket(dos, new Packet(PacketType.GAME_PENALTY_NOTIFY, "Không thể kết nối lại vào trận đấu!"));
+            }
+
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "[Reconnect] Lỗi xử lý GAME_RECONNECT_REQ", e);
+        }
+    }
+
     public void closeConnection() {
         isRunning = false;
         connectedClients.remove(this);
 
         if (currentUser != null) {
-            if (currentRoomId != -1) {
+            if (currentGameStateManager != null && myTankId != -1) {
+                // TH2: Ngắt kết nối đột ngột trong trận -> chuyển xe sang AFK, giữ nguyên phòng để chờ Reconnect
+                LOGGER.info("[ClientHandler] User " + currentUser.getUsername() + " (Tank " + myTankId + ") ngắt kết nối đột ngột trong trận. Kích hoạt chế độ AFK.");
+                currentGameStateManager.handlePlayerDisconnected(myTankId);
+                // KHÔNG gọi roomManager.leaveRoom()!
+                this.currentGameStateManager = null;
+                this.currentGameLoop = null;
+                this.currentRoomId = -1;
+                this.myTankId = -1;
+            } else if (currentRoomId != -1) {
+                // Đang ở phòng chờ bình thường thì leaveRoom
                 handleLeaveRoom();
             }
             // Giải phóng user khi đóng kết nối để có thể đăng nhập lại bình thường

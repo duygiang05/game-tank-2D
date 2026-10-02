@@ -5,12 +5,18 @@ import com.tank2d.common.exception.ErrorCode;
 import com.tank2d.server.db.DatabaseConnection;
 import com.tank2d.server.game.PlayerCombatState;
 
+import com.tank2d.common.dto.MatchDetailDTO;
+import com.tank2d.common.dto.MatchParticipantDTO;
+import com.tank2d.common.dto.UserMatchHistoryDTO;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.sql.Types;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -93,6 +99,141 @@ public class MatchDAO {
                     LOGGER.log(Level.WARNING, "[MatchDAO] Lỗi khi đóng connection", ex);
                 }
             }
+        }
+    }
+
+    /**
+     * Lấy danh sách lịch sử thi đấu của người chơi (tối đa 30 trận gần nhất)
+     */
+    public List<UserMatchHistoryDTO> getMatchHistoryByUserId(int userId) {
+        String sql = "SELECT "
+                   + "    m.id AS match_id, "
+                   + "    m.room_name, "
+                   + "    m.winner_id, "
+                   + "    m.duration_seconds, "
+                   + "    m.played_at, "
+                   + "    p.kills, "
+                   + "    p.hits, "
+                   + "    p.rank_position, "
+                   + "    p.points_earned "
+                   + "FROM match_participants p "
+                   + "JOIN match_history m ON p.match_id = m.id "
+                   + "WHERE p.user_id = ? "
+                   + "ORDER BY m.played_at DESC "
+                   + "LIMIT 30";
+
+        List<UserMatchHistoryDTO> historyList = new ArrayList<>();
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    int matchId = rs.getInt("match_id");
+                    String roomName = rs.getString("room_name");
+                    Integer winnerId = (Integer) rs.getObject("winner_id");
+                    int durationSeconds = rs.getInt("duration_seconds");
+                    java.sql.Timestamp playedAtTs = rs.getTimestamp("played_at");
+                    String playedAtStr = (playedAtTs != null) ? sdf.format(playedAtTs) : "";
+
+                    int kills = rs.getInt("kills");
+                    int hits = rs.getInt("hits");
+                    int rankPosition = rs.getInt("rank_position");
+                    int pointsEarned = rs.getInt("points_earned");
+
+                    String result;
+                    if (winnerId == null) {
+                        result = "DRAW";
+                    } else if (winnerId == userId) {
+                        result = "VICTORY";
+                    } else {
+                        result = "DEFEAT";
+                    }
+
+                    historyList.add(new UserMatchHistoryDTO(
+                            matchId,
+                            roomName,
+                            result,
+                            rankPosition,
+                            kills,
+                            hits,
+                            pointsEarned,
+                            durationSeconds,
+                            playedAtStr
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "[MatchDAO] Lỗi khi lấy lịch sử đấu của user " + userId, e);
+            throw new DatabaseException(ErrorCode.DB_QUERY_ERROR, "Lỗi khi lấy lịch sử đấu!", e);
+        }
+
+        return historyList;
+    }
+
+    /**
+     * Lấy chi tiết toàn bộ trận đấu bao gồm tất cả người chơi và thông số của họ
+     */
+    public MatchDetailDTO getMatchDetail(int matchId) {
+        String matchSql = "SELECT m.id, m.room_name, m.winner_id, m.duration_seconds, m.played_at, u.username AS winner_name "
+                        + "FROM match_history m "
+                        + "LEFT JOIN users u ON m.winner_id = u.id "
+                        + "WHERE m.id = ?";
+
+        String partSql = "SELECT p.user_id, u.username, p.kills, p.hits, p.rank_position, p.points_earned "
+                       + "FROM match_participants p "
+                       + "JOIN users u ON p.user_id = u.id "
+                       + "WHERE p.match_id = ? "
+                       + "ORDER BY p.rank_position ASC, p.points_earned DESC";
+
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+        MatchDetailDTO detail = null;
+
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            Integer winnerId = null;
+            try (PreparedStatement psMatch = conn.prepareStatement(matchSql)) {
+                psMatch.setInt(1, matchId);
+                try (ResultSet rs = psMatch.executeQuery()) {
+                    if (rs.next()) {
+                        String roomName = rs.getString("room_name");
+                        winnerId = (Integer) rs.getObject("winner_id");
+                        int duration = rs.getInt("duration_seconds");
+                        Timestamp ts = rs.getTimestamp("played_at");
+                        String playedAt = (ts != null) ? sdf.format(ts) : "";
+                        String winnerName = rs.getString("winner_name");
+
+                        detail = new MatchDetailDTO(matchId, roomName, duration, playedAt, winnerName, new ArrayList<>());
+                    }
+                }
+            }
+
+            if (detail == null) {
+                return null;
+            }
+
+            try (PreparedStatement psPart = conn.prepareStatement(partSql)) {
+                psPart.setInt(1, matchId);
+                try (ResultSet rs = psPart.executeQuery()) {
+                    while (rs.next()) {
+                        int userId = rs.getInt("user_id");
+                        String username = rs.getString("username");
+                        int kills = rs.getInt("kills");
+                        int hits = rs.getInt("hits");
+                        int rank = rs.getInt("rank_position");
+                        int points = rs.getInt("points_earned");
+                        boolean isWinner = (winnerId != null && winnerId == userId);
+
+                        detail.getParticipants().add(new MatchParticipantDTO(userId, username, rank, kills, hits, points, isWinner));
+                    }
+                }
+            }
+
+            return detail;
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "[MatchDAO] Lỗi khi lấy chi tiết trận đấu " + matchId, e);
+            throw new DatabaseException(ErrorCode.DB_QUERY_ERROR, "Lỗi khi lấy chi tiết trận đấu!", e);
         }
     }
 }

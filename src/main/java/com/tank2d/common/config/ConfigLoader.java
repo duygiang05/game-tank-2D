@@ -200,6 +200,11 @@ public class ConfigLoader {
         return val instanceof Number ? ((Number) val).doubleValue() : 7.0;
     }
 
+    public static double getRespawnTime180s() {
+        Object val = getRespawnRules().get("match_180s");
+        return val instanceof Number ? ((Number) val).doubleValue() : 9.0;
+    }
+
     public static int getPointsPerHit() {
         Object val = getScoringRules().get("points_per_hit");
         return val instanceof Number ? ((Number) val).intValue() : 10;

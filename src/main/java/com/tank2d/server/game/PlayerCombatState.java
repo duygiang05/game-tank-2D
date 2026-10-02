@@ -64,4 +64,13 @@ public class PlayerCombatState {
     public void reduceInvulnerableTimer(double dt) {
         this.invulnerableTimer = Math.max(0, this.invulnerableTimer - dt);
     }
+
+    private boolean disconnected = false;
+    private boolean eliminated = false;
+
+    public boolean isDisconnected() { return disconnected; }
+    public void setDisconnected(boolean disconnected) { this.disconnected = disconnected; }
+
+    public boolean isEliminated() { return eliminated; }
+    public void setEliminated(boolean eliminated) { this.eliminated = eliminated; }
 }

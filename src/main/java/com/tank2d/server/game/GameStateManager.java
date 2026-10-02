@@ -88,8 +88,10 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
             this.respawnDelay = ConfigLoader.getRespawnTime45s();   // 3.0s
         } else if (this.matchRemainingTime <= 60.0) {
             this.respawnDelay = ConfigLoader.getRespawnTime60s();   // 5.0s
-        } else {
+        } else if (this.matchRemainingTime <= 90.0) {
             this.respawnDelay = ConfigLoader.getRespawnTime90s();   // 7.0s
+        } else {
+            this.respawnDelay = ConfigLoader.getRespawnTime180s();  // 9.0s
         }
 
         // 4. Nạp 4 điểm Spawn từ Map JSON
@@ -220,44 +222,77 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
         LOGGER.info("[Combat] Tank " + tank.getId() + " hồi sinh tại góc P" + tank.getId() + " (" + sp.x + ", " + sp.y + ") với bảo hộ " + protectionDuration + "s!");
     }
 
-    // Xử lý khi người chơi bấm nút Thoát giữa trận (ROOM_LEAVE_REQ) hoặc rớt mạng
-    public void handlePlayerLeave(int tankId) {
+    // TH1: Xử lý khi người chơi bấm nút Thoát giữa trận (chủ động đầu hàng)
+    public synchronized void handlePlayerSurrender(int tankId) {
         TankEntity tank = gameLoop.getTank(tankId);
         if (tank != null) {
+            broadcastEffect(new GameEventEffectDTO("EXPLOSION", tank.getX(), tank.getY(), tankId));
             tank.setAlive(false);
             tank.setHp(0);
         }
 
-        // 1. Chốt lưu dữ liệu (Kills, Hits, Score) của người thoát vào MySQL trước khi xóa khỏi RAM
-        PlayerCombatState leaverState = playerStates.get(tankId);
-        if (leaverState != null && userDAO != null) {
-            try {
-                userDAO.updateMatchStats(
-                        leaverState.getUserId(),
-                        leaverState.getScore(),
-                        leaverState.getKills(),
-                        leaverState.getHits(),
-                        false // Thoát giữa chừng tính là Thua (không cộng total_wins)
-                );
-                LOGGER.info("[DB] Đã chốt lưu thành tích cho người chơi thoát: UserID " + leaverState.getUserId());
-            } catch (GameNetworkException e) {
-                LOGGER.severe("[DB] Lỗi cơ sở dữ liệu (" + e.getErrorCode() + ") khi lưu stats người thoát: " + e.getMessage());
-            } catch (Exception e) {
-                LOGGER.severe("[DB] Lỗi lưu stats cho người thoát UserID " + leaverState.getUserId() + ": " + e.getMessage());
-            }
+        PlayerCombatState state = playerStates.get(tankId);
+        if (state != null) {
+            state.setEliminated(true);
+            state.setRespawnTimer(0);
         }
 
-        // 2. Dọn sạch trạng thái và Socket của người này khỏi GameStateManager
-        unregisterPlayer(tankId);
-        LOGGER.info("[Room] Tank " + tankId + " đã dọn dẹp state và thoát trận an toàn.");
+        playerSockets.remove(tankId);
+        LOGGER.info("[Room] Tank " + tankId + " đã chủ động thoát trận và bị loại khỏi cuộc chơi.");
 
-        // 3. Nếu phòng chỉ còn lại 1 người duy nhất -> Kết thúc trận sớm, trao giải cho người ở lại
-        if (playerStates.size() <= 1 && !isGameOver) {
+        // Kiểm tra số người chơi còn lại chưa bị loại
+        long activeCount = playerStates.values().stream()
+                .filter(s -> !s.isEliminated())
+                .count();
+
+        // Nếu chỉ còn <= 1 người chưa bị loại -> Kết thúc trận sớm, trao giải cho người ở lại
+        if (activeCount <= 1 && !isGameOver) {
             triggerGameOver("PLAYER_LEFT");
         }
     }
 
-    //hàm xử lí khi người chơi out trận 
+    // TH2: Xử lý khi người chơi ngắt kết nối đột ngột (mất mạng, tắt app 'X')
+    public synchronized void handlePlayerDisconnected(int tankId) {
+        TankEntity tank = gameLoop.getTank(tankId);
+        if (tank != null) {
+            // Cho xe dừng mọi di chuyển, biến thành xe AFK
+            tank.setMoveState(TankEntity.MoveState.NONE);
+            tank.setRotateState(TankEntity.RotateState.NONE);
+        }
+
+        PlayerCombatState state = playerStates.get(tankId);
+        if (state != null) {
+            state.setDisconnected(true);
+        }
+
+        playerSockets.remove(tankId);
+        LOGGER.info("[Room] Tank " + tankId + " mất kết nối đột ngột -> chuyển sang chế độ AFK, xe vẫn ở lại trận đấu.");
+    }
+
+    // Reconnect vào lại trận đấu
+    public synchronized boolean reconnectPlayer(int tankId, DataOutputStream newDos) {
+        PlayerCombatState state = playerStates.get(tankId);
+        if (state != null && !state.isEliminated() && !isGameOver) {
+            state.setDisconnected(false);
+            if (newDos != null) {
+                playerSockets.put(tankId, newDos);
+            }
+            LOGGER.info("[Combat] Tank " + tankId + " đã reconnect thành công vào trận đấu!");
+            return true;
+        }
+        return false;
+    }
+
+    public void handlePlayerLeave(int tankId) {
+        handlePlayerSurrender(tankId);
+    }
+
+    public boolean isPlayerDisconnected(int tankId) {
+        PlayerCombatState state = playerStates.get(tankId);
+        return state != null && state.isDisconnected();
+    }
+
+    // Hàm dọn dẹp player socket khi cần
     public void unregisterPlayer(int tankId) {
         playerStates.remove(tankId);
         playerSockets.remove(tankId);
@@ -282,12 +317,21 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
 
         if ("PLAYER_LEFT".equals(reason) && !players.isEmpty()) {
             // 2. NHÁNH ĐẶC BIỆT: Đối thủ thoát giữa chừng -> Người ở lại duy nhất THẮNG NGAY LẬP TỨC
-            PlayerCombatState survivor = players.get(0);
-            winnerTankId = survivor.getTankId();
-            survivor.addBonusScore(pointsWinBonus); // Cộng ngay +50 điểm cho người ở lại
+            List<PlayerCombatState> activeSurvivors = players.stream()
+                    .filter(p -> !p.isEliminated())
+                    .toList();
+            if (!activeSurvivors.isEmpty()) {
+                PlayerCombatState survivor = activeSurvivors.get(0);
+                winnerTankId = survivor.getTankId();
+                survivor.addBonusScore(pointsWinBonus); // Cộng ngay +50 điểm cho người ở lại
+            }
         } else if (!isDraw && !players.isEmpty()) {
-            // 3. NHÁNH HẾT GIỜ CÓ GIAO TRANH: Xếp hạng theo 4 tiêu chí
+            // 3. NHÁNH HẾT GIỜ CÓ GIAO TRANH: Xếp hạng theo các tiêu chí (người bị loại luôn xếp sau)
             players.sort((p1, p2) -> {
+                if (p1.isEliminated() != p2.isEliminated()) {
+                    return p1.isEliminated() ? 1 : -1;
+                }
+
                 // Tiêu chí 1: Số mạng hạ gục (Kill) - Giảm dần
                 if (p2.getKills() != p1.getKills()) {
                     return Integer.compare(p2.getKills(), p1.getKills());
@@ -307,12 +351,14 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
                 return Long.compare(p1.getFirstHitTimeMillis(), p2.getFirstHitTimeMillis());
             });
 
-            // Xác định người thắng cuộc (Top 1)
-            PlayerCombatState winner = players.get(0);
-            winnerTankId = winner.getTankId();
-
-            // Điểm thưởng thắng trận: +50 điểm duy nhất cho người xếp hạng 1
-            winner.addBonusScore(pointsWinBonus);
+            // Xác định người thắng cuộc (Người đầu tiên chưa bị loại)
+            for (PlayerCombatState candidate : players) {
+                if (!candidate.isEliminated()) {
+                    winnerTankId = candidate.getTankId();
+                    candidate.addBonusScore(pointsWinBonus);
+                    break;
+                }
+            }
         }
 
         // 4. Đóng gói danh sách điểm số, kill, hit cuối cùng
@@ -357,7 +403,7 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
 
         // 1. Cập nhật tích lũy vào user_stats cho những người kết thúc ván đấu
         for (PlayerCombatState state : players) {
-            boolean isWin = (!isDraw && state.getTankId() == winnerTankId);
+            boolean isWin = (!isDraw && !state.isEliminated() && state.getTankId() == winnerTankId);
             if (isWin) {
                 winnerUserId = state.getUserId();
             }

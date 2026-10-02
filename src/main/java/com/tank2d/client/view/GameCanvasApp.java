@@ -283,6 +283,17 @@ public class GameCanvasApp extends Application {
 
     public void setStage(Stage stage) {
         this.primaryStage = stage;
+        if (this.primaryStage != null) {
+            this.primaryStage.setOnCloseRequest(event -> {
+                try {
+                    if (ClientSession.getInstance().getClientSocket() != null) {
+                        ClientSession.getInstance().getClientSocket().close();
+                    }
+                } catch (Exception ignored) {}
+                Platform.exit();
+                System.exit(0);
+            });
+        }
     }
 
     public void setRoom(RoomDTO room) {
@@ -290,6 +301,16 @@ public class GameCanvasApp extends Application {
         if (room != null && room.getDuration() > 0) {
             this.matchRemainingTime = room.getDuration();
         }
+    }
+
+    public void setRemainingTime(int seconds) {
+        if (seconds > 0) {
+            this.matchRemainingTime = seconds;
+        }
+    }
+
+    public void setMyTankId(int tankId) {
+        this.myTankId = tankId;
     }
 
     public Scene createGameScene() {
@@ -476,11 +497,13 @@ public class GameCanvasApp extends Application {
                         if (displayTanks.containsKey(incoming.getId())) {
                             updateTankHpAndStatus(displayTanks.get(incoming.getId()), incoming);
                         } else {
-                            displayTanks.put(incoming.getId(), new TankSnapshotDTO(
+                            TankSnapshotDTO newTank = new TankSnapshotDTO(
                                     incoming.getId(), incoming.getX(), incoming.getY(),
                                     incoming.getAngle(), incoming.getHp(), incoming.isAlive(),
                                     incoming.isGhost(), incoming.hasShield(), incoming.hasNitro()
-                            ));
+                            );
+                            newTank.setDisconnected(incoming.isDisconnected());
+                            displayTanks.put(incoming.getId(), newTank);
                         }
                     }
                     displayTanks.keySet().removeIf(id -> !activeTankIds.contains(id));
@@ -627,6 +650,7 @@ public class GameCanvasApp extends Application {
         dto.setGhost(target.isGhost());
         dto.setShield(target.hasShield());
         dto.setNitro(target.hasNitro());
+        dto.setDisconnected(target.isDisconnected());
     }
 
     private void renderTerrainAndWalls() {
@@ -854,6 +878,28 @@ public class GameCanvasApp extends Application {
                 gc.setFill(Color.WHITE);
                 gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10.5));
                 gc.fillText(username, tank.getX() - (username.length() * 5.5) / 2.0, barY - 4);
+            }
+
+            // ICON CHẤM THAN MÀU VÀNG NHỎ LÊN ĐẦU XE AFK
+            if (tank.isDisconnected()) {
+                gc.save();
+                double iconX = tank.getX();
+                double iconY = (username != null) ? (barY - 17.0) : (barY - 10.0);
+                double badgeRadius = 6.0;
+
+                // Vòng tròn màu vàng tươi viền cam đậm
+                gc.setFill(Color.web("#F59E0B"));
+                gc.fillOval(iconX - badgeRadius, iconY - badgeRadius, badgeRadius * 2, badgeRadius * 2);
+                gc.setStroke(Color.web("#92400E"));
+                gc.setLineWidth(1.0);
+                gc.strokeOval(iconX - badgeRadius, iconY - badgeRadius, badgeRadius * 2, badgeRadius * 2);
+
+                // Dấu chấm than màu đen đậm chính giữa
+                gc.setFill(Color.web("#0F172A"));
+                gc.setFont(Font.font("Segoe UI", FontWeight.EXTRA_BOLD, 9.0));
+                gc.fillText("!", iconX - 2.0, iconY + 3.0);
+
+                gc.restore();
             }
 
             gc.setFill(Color.DARKRED);
@@ -1113,6 +1159,7 @@ public class GameCanvasApp extends Application {
     private void handleExit() {
         SoundManager.stopBGM();
         clearGameState();
+        removeNetworkReceiver();
         try {
             if (clientSocket != null && clientSocket.isConnected()) {
                 clientSocket.sendPacket(new Packet(PacketType.ROOM_LEAVE_REQ, ""));

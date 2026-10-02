@@ -33,8 +33,29 @@ public class Tank2DOnline extends Application {
         // Không cho phép kéo thay đổi kích thước
         stage.setResizable(false);
 
+        stage.setOnCloseRequest(event -> {
+            try {
+                if (com.tank2d.client.ClientSession.getInstance().getClientSocket() != null) {
+                    com.tank2d.client.ClientSession.getInstance().getClientSocket().close();
+                }
+            } catch (Exception ignored) {}
+            javafx.application.Platform.exit();
+            System.exit(0);
+        });
+
         stage.setScene(scene);
         stage.show();
+    }
+
+    @Override
+    public void stop() throws Exception {
+        try {
+            if (com.tank2d.client.ClientSession.getInstance().getClientSocket() != null) {
+                com.tank2d.client.ClientSession.getInstance().getClientSocket().close();
+            }
+        } catch (Exception ignored) {}
+        super.stop();
+        System.exit(0);
     }
 
     public static void main(String[] args) {

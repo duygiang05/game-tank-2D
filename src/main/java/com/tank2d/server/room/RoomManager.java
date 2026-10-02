@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 public class RoomManager {
@@ -14,6 +15,7 @@ public class RoomManager {
     private static final Logger LOGGER = Logger.getLogger(RoomManager.class.getName());
 
     private final Map<Integer, Room> rooms;
+    private final Map<Integer, Integer> penalizedUsers = new ConcurrentHashMap<>(); // userId -> roomId
 
     public RoomManager() {
         rooms = new LinkedHashMap<>();
@@ -191,7 +193,7 @@ public class RoomManager {
             return false;
         }
 
-        if (duration != 45 && duration != 60 && duration != 90) {
+        if (duration != 45 && duration != 60 && duration != 90 && duration != 180) {
             return false;
         }
 
@@ -247,7 +249,57 @@ public class RoomManager {
         Room room = rooms.get(roomId);
         if (room != null) {
             room.resetReadyStatesForNewGame(); // GỌI TRỰC TIẾP HÀM CÓ SẴN TRONG Room.java
+            room.setGameLoop(null);
+            room.setGameStateManager(null);
             LOGGER.info("[RoomManager] Đã kích hoạt resetReadyStatesForNewGame() cho phòng " + roomId);
         }
+        removePenaltiesForRoom(roomId);
+    }
+
+    // =========================================================
+    // PENALTY MANAGEMENT (PHẠT THOÁT GIỮA TRẬN)
+    // =========================================================
+    public void addPenalty(int userId, int roomId) {
+        penalizedUsers.put(userId, roomId);
+        LOGGER.info("[RoomManager] Phạt user ID " + userId + " do thoát trận phòng " + roomId);
+    }
+
+    public void removePenalty(int userId) {
+        penalizedUsers.remove(userId);
+    }
+
+    public void removePenaltiesForRoom(int roomId) {
+        penalizedUsers.entrySet().removeIf(e -> e.getValue() == roomId);
+        LOGGER.info("[RoomManager] Đã xóa toàn bộ hình phạt cho phòng " + roomId);
+    }
+
+    public boolean isPenalized(int userId) {
+        return penalizedUsers.containsKey(userId);
+    }
+
+    public Integer getPenalizedRoomId(int userId) {
+        return penalizedUsers.get(userId);
+    }
+
+    public List<Integer> getPenalizedUserIdsForRoom(int roomId) {
+        List<Integer> userIds = new ArrayList<>();
+        for (Map.Entry<Integer, Integer> entry : penalizedUsers.entrySet()) {
+            if (entry.getValue() != null && entry.getValue() == roomId) {
+                userIds.add(entry.getKey());
+            }
+        }
+        return userIds;
+    }
+
+    // =========================================================
+    // RECONNECT SUPPORT: TÌM PHÒNG ĐANG CHƠI CỦA USER
+    // =========================================================
+    public synchronized Room getPlayingRoomByUserId(int userId) {
+        for (Room room : rooms.values()) {
+            if ("Playing".equalsIgnoreCase(room.getStatus()) && room.hasPlayer(userId)) {
+                return room;
+            }
+        }
+        return null;
     }
 }

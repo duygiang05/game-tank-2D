@@ -19,7 +19,8 @@ public class TankSnapshotDTO {
     private boolean isGhost;      // Trạng thái mờ/bảo hộ sau hồi sinh
     private boolean hasShield;    // Trạng thái khiên bảo vệ
     private boolean hasNitro;     // Trạng thái tăng tốc Nitro
-    
+    private boolean isDisconnected; // Trạng thái ngắt kết nối (AFK)
+
     public TankSnapshotDTO(int id, double x, double y, double angle, int hp, boolean isAlive, 
                            boolean isGhost, boolean hasShield, boolean hasNitro) {
         this.id = id;
@@ -31,6 +32,7 @@ public class TankSnapshotDTO {
         this.isGhost = isGhost;
         this.hasShield = hasShield;
         this.hasNitro = hasNitro;
+        this.isDisconnected = false;
     }
 
     // Constructor cũ 
@@ -48,6 +50,7 @@ public class TankSnapshotDTO {
     public boolean isGhost() { return isGhost; }
     public boolean hasShield() { return hasShield; }
     public boolean hasNitro() { return hasNitro; }
+    public boolean isDisconnected() { return isDisconnected; }
 
     public void setX(double x) { this.x = x; }
     public void setY(double y) { this.y = y; }
@@ -56,6 +59,7 @@ public class TankSnapshotDTO {
     public void setGhost(boolean ghost) { this.isGhost = ghost; }
     public void setShield(boolean shield) { this.hasShield = shield; }
     public void setNitro(boolean nitro) { this.hasNitro = nitro; }
+    public void setDisconnected(boolean disconnected) { this.isDisconnected = disconnected; }
     public void setAlive(boolean isAlive){
         this.isAlive = isAlive;
     }

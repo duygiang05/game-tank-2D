@@ -11,6 +11,10 @@ public enum PacketType {
     AUTH_REGISTER_RES,
     LEADERBOARD_REQ,
     LEADERBOARD_RES,
+    MATCH_HISTORY_REQ,
+    MATCH_HISTORY_RES,
+    MATCH_DETAIL_REQ,
+    MATCH_DETAIL_RES,
     LOGOUT_REQ,
     // =========================
     // LOBBY
@@ -43,5 +47,9 @@ public enum PacketType {
     GAME_SNAPSHOT,
     GAME_EVENT_EFFECT,
     GAME_OVER_NOTIFY,
-    MAP_UPDATE
+    MAP_UPDATE,
+    GAME_RECONNECT_PROMPT,
+    GAME_RECONNECT_REQ,
+    GAME_RECONNECT_RES,
+    GAME_PENALTY_NOTIFY
 }

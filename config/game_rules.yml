@@ -19,12 +19,14 @@ game:
     - 45                       # Trận đấu nhanh: 45 giây
     - 60                       # Trận đấu tiêu chuẩn: 60 giây
     - 90                       # Trận đấu kéo dài: 90 giây
+    - 180                      # Trận đấu đại chiến: 180 giây
 
   # Thời gian chờ hồi sinh tương ứng với từng mốc thời gian trận đấu (giây)
   respawn_times:
     match_45s: 3               # Trận 45s -> Chết chờ 3s mới hồi sinh
     match_60s: 5               # Trận 60s -> Chết chờ 5s mới hồi sinh
     match_90s: 7               # Trận 90s -> Chết chờ 7s mới hồi sinh
+    match_180s: 9              # Trận 180s -> Chết chờ 9s mới hồi sinh
 
   # Cấu hình hệ thống vật phẩm bổ trợ (Power-up Buffs)
   power_up:

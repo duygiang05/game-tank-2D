@@ -279,8 +279,9 @@ public class GameLoop implements Runnable {
             boolean isGhost = tank.isProtected();
             boolean hasShield = now < tank.getShieldActiveUntilMillis();
             boolean hasNitro = now < tank.getNitroActiveUntilMillis();
+            boolean isAfk = (stateManager != null && stateManager.isPlayerDisconnected(tank.getId()));
 
-            tankDTOs.add(new TankSnapshotDTO(
+            TankSnapshotDTO dto = new TankSnapshotDTO(
                 tank.getId(),
                 tank.getX(),
                 tank.getY(),
@@ -290,7 +291,9 @@ public class GameLoop implements Runnable {
                 isGhost,
                 hasShield,
                 hasNitro
-            ));
+            );
+            dto.setDisconnected(isAfk);
+            tankDTOs.add(dto);
         }
 
         return new GameSnapshotDTO(tickCount, tankDTOs, bulletDTOs, itemDTOs);

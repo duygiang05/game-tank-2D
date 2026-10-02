@@ -1,11 +1,14 @@
 package com.tank2d.server.room;
 
 import com.tank2d.common.model.User;
+import com.tank2d.server.game.GameLoop;
+import com.tank2d.server.game.GameStateManager;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Logger;
 
@@ -26,6 +29,10 @@ public class Room {
 
     // Trạng thái: "Waiting", "Full", "Playing"
     private String status;
+
+    private GameLoop gameLoop;
+    private GameStateManager gameStateManager;
+    private final Map<Integer, Integer> userTankMappings = new ConcurrentHashMap<>();
 
     public Room(int roomId, String roomName, int hostId) {
         this.roomId = roomId;
@@ -196,10 +203,30 @@ public class Room {
     }
 
     public synchronized boolean setDuration(int duration) {
-        if (duration != 45 && duration != 60 && duration != 90) {
+        if (duration != 45 && duration != 60 && duration != 90 && duration != 180) {
             return false;
         }
         this.duration = duration;
         return true;
+    }
+
+    public synchronized GameLoop getGameLoop() {
+        return gameLoop;
+    }
+
+    public synchronized void setGameLoop(GameLoop gameLoop) {
+        this.gameLoop = gameLoop;
+    }
+
+    public synchronized GameStateManager getGameStateManager() {
+        return gameStateManager;
+    }
+
+    public synchronized void setGameStateManager(GameStateManager gameStateManager) {
+        this.gameStateManager = gameStateManager;
+    }
+
+    public Map<Integer, Integer> getUserTankMappings() {
+        return userTankMappings;
     }
 }

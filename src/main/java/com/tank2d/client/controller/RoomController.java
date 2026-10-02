@@ -104,7 +104,7 @@ public class RoomController {
         if (durationComboBox == null) return;
 
         if (durationComboBox.getItems().isEmpty()) {
-            durationComboBox.getItems().addAll("45 giây", "60 giây", "90 giây");
+            durationComboBox.getItems().addAll("45 giây", "60 giây", "90 giây", "180 giây");
         }
 
         durationComboBox.setOnAction(event -> handleDurationChanged());
@@ -228,6 +228,7 @@ public class RoomController {
             case "45 giây" -> 45;
             case "60 giây" -> 60;
             case "90 giây" -> 90;
+            case "180 giây" -> 180;
             default -> 60;
         };
 

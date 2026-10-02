@@ -4,7 +4,10 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.tank2d.client.ClientSession;
 import com.tank2d.client.network.ClientSocket;
+import com.tank2d.client.view.GameCanvasApp;
 import com.tank2d.common.dto.RoomDTO;
+import com.tank2d.common.dto.game.ReconnectPromptDTO;
+import com.tank2d.common.dto.game.ReconnectResponseDTO;
 import com.tank2d.common.model.User;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
@@ -20,7 +23,10 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.effect.GaussianBlur;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 
 import com.tank2d.common.exception.GameNetworkException;
@@ -49,6 +55,9 @@ public class LobbyController {
     private Button leaderboardButton;
 
     @FXML
+    private Button matchHistoryButton;
+
+    @FXML
     private Button logoutButton;
 
     @FXML
@@ -60,10 +69,35 @@ public class LobbyController {
     @FXML
     private ComboBox<String> durationFilterComboBox;
 
+    @FXML
+    private BorderPane mainContentPane;
+
+    @FXML
+    private StackPane penaltyOverlay;
+
+    @FXML
+    private StackPane reconnectOverlay;
+
+    @FXML
+    private Label reconnectRoomLabel;
+
+    @FXML
+    private Label reconnectTimeLabel;
+
+    @FXML
+    private Button skipReconnectButton;
+
+    @FXML
+    private Button confirmReconnectButton;
+
     private List<RoomDTO> allRooms = new ArrayList<>();
     private final Gson gson = new Gson();
     private final ClientSession session = ClientSession.getInstance();
     private final Consumer<Packet> packetListener = this::handleServerPacket;
+
+    private ReconnectPromptDTO pendingReconnectMatch = null;
+    private boolean isPenalized = false;
+    private int penalizedRoomId = -1;
 
     @FXML
     private void initialize() {
@@ -71,7 +105,7 @@ public class LobbyController {
         session.addPacketListener(packetListener);
 
         // Cấu hình bộ lọc thời gian
-        durationFilterComboBox.getItems().addAll("Tất cả", "45s", "60s", "90s");
+        durationFilterComboBox.getItems().addAll("Tất cả", "45s", "60s", "90s", "180s");
         durationFilterComboBox.setValue("Tất cả");
         durationFilterComboBox.setOnAction(event -> applyDurationFilter());
 
@@ -161,6 +195,17 @@ public class LobbyController {
 
     @FXML
     private void handleCreateRoom() {
+        if (isPenalized) {
+            penaltyOverlay.setVisible(true);
+            mainContentPane.setEffect(new GaussianBlur(12));
+            return;
+        }
+
+        if (pendingReconnectMatch != null) {
+            showReconnectModal(pendingReconnectMatch);
+            return;
+        }
+
         statusLabel.setText("Đang tạo phòng...");
 
         try {
@@ -184,6 +229,17 @@ public class LobbyController {
 
     @FXML
     private void handleJoinRoom() {
+        if (isPenalized) {
+            penaltyOverlay.setVisible(true);
+            mainContentPane.setEffect(new GaussianBlur(12));
+            return;
+        }
+
+        if (pendingReconnectMatch != null) {
+            showReconnectModal(pendingReconnectMatch);
+            return;
+        }
+
         RoomDTO selectedRoom = roomListView.getSelectionModel().getSelectedItem();
 
         if (selectedRoom == null) {
@@ -231,6 +287,18 @@ public class LobbyController {
                 handleRoomStateUpdate(packet.getData());
                 break;
 
+            case GAME_PENALTY_NOTIFY:
+                handlePenaltyNotify(packet.getData());
+                break;
+
+            case GAME_RECONNECT_PROMPT:
+                handleReconnectPrompt(packet.getData());
+                break;
+
+            case GAME_RECONNECT_RES:
+                handleReconnectResponse(packet.getData());
+                break;
+
             default:
                 break;
         }
@@ -248,6 +316,50 @@ public class LobbyController {
             Platform.runLater(() -> {
                 allRooms = rooms;
                 applyDurationFilter();
+
+                // 1. Kiểm tra tự động gỡ phạt nếu phòng bị phạt đã kết thúc hoặc không còn trong danh sách Playing
+                if (isPenalized && penalizedRoomId != -1) {
+                    boolean penRoomStillPlaying = false;
+                    for (RoomDTO r : rooms) {
+                        if (r.getRoomId() == penalizedRoomId && "Playing".equalsIgnoreCase(r.getStatus())) {
+                            penRoomStillPlaying = true;
+                            break;
+                        }
+                    }
+                    if (!penRoomStillPlaying) {
+                        isPenalized = false;
+                        penalizedRoomId = -1;
+                        if (penaltyOverlay != null) {
+                            penaltyOverlay.setVisible(false);
+                        }
+                        if (mainContentPane != null && (reconnectOverlay == null || !reconnectOverlay.isVisible())) {
+                            mainContentPane.setEffect(null);
+                        }
+                        statusLabel.setText("Trận đấu trước đó đã kết thúc. Hình phạt đã được gỡ bỏ.");
+                        statusLabel.setStyle("-fx-text-fill: #16a34a; -fx-font-weight: bold;");
+                    }
+                }
+
+                // 2. Kiểm tra xem trận đấu dở dang (reconnect) đã kết thúc chưa
+                if (pendingReconnectMatch != null) {
+                    boolean matchStillActive = false;
+                    for (RoomDTO r : rooms) {
+                        if (r.getRoomId() == pendingReconnectMatch.getRoomId() && "Playing".equalsIgnoreCase(r.getStatus())) {
+                            matchStillActive = true;
+                            break;
+                        }
+                    }
+                    if (!matchStillActive) {
+                        pendingReconnectMatch = null;
+                        if (reconnectOverlay != null && reconnectOverlay.isVisible()) {
+                            reconnectOverlay.setVisible(false);
+                        }
+                        if (mainContentPane != null && !isPenalized) {
+                            mainContentPane.setEffect(null);
+                        }
+                        statusLabel.setText("Trận đấu trước đó đã kết thúc.");
+                    }
+                }
             });
 
         } catch (Exception e) {
@@ -322,6 +434,10 @@ public class LobbyController {
                 );
                 Parent root = loader.load();
 
+                if (mainContentPane != null) {
+                    mainContentPane.setEffect(null);
+                }
+
                 RoomController controller = loader.getController();
                 controller.setRoom(room);
 
@@ -342,6 +458,10 @@ public class LobbyController {
     @FXML
     private void handleLogout() {
         try {
+            if (mainContentPane != null) {
+                mainContentPane.setEffect(null);
+            }
+
             ClientSocket clientSocket = session.getClientSocket();
             if (clientSocket != null && clientSocket.isConnected()) {
                 Packet request = new Packet(PacketType.LOGOUT_REQ, "");
@@ -369,6 +489,17 @@ public class LobbyController {
 
     @FXML
     private void handleLeaderboard() {
+        if (isPenalized) {
+            penaltyOverlay.setVisible(true);
+            mainContentPane.setEffect(new GaussianBlur(12));
+            return;
+        }
+
+        if (pendingReconnectMatch != null) {
+            showReconnectModal(pendingReconnectMatch);
+            return;
+        }
+
         try {
             // Gỡ listener của sảnh TRƯỚC để LeaderboardController làm việc chuẩn xác
             session.removePacketListener(packetListener);
@@ -387,6 +518,195 @@ public class LobbyController {
             session.addPacketListener(packetListener);
             LOGGER.log(Level.SEVERE, "[Lobby] Không thể mở Leaderboard", e);
             showError("Không thể mở bảng xếp hạng!");
+        }
+    }
+
+    @FXML
+    private void handleMatchHistory() {
+        if (isPenalized) {
+            penaltyOverlay.setVisible(true);
+            mainContentPane.setEffect(new GaussianBlur(12));
+            return;
+        }
+
+        if (pendingReconnectMatch != null) {
+            showReconnectModal(pendingReconnectMatch);
+            return;
+        }
+
+        try {
+            session.removePacketListener(packetListener);
+
+            FXMLLoader loader = new FXMLLoader(
+                    getClass().getResource("/com/tank2d/client/view/match_history.fxml")
+            );
+            Parent root = loader.load();
+
+            Stage stage = (Stage) matchHistoryButton.getScene().getWindow();
+            stage.setScene(new Scene(root, 800, 600));
+            stage.setTitle("Tank 2D Online - Lịch sử thi đấu");
+            stage.show();
+
+        } catch (IOException e) {
+            session.addPacketListener(packetListener);
+            LOGGER.log(Level.SEVERE, "[Lobby] Không thể mở Lịch sử đấu", e);
+            showError("Không thể mở lịch sử đấu!");
+        }
+    }
+
+    private void handlePenaltyNotify(String message) {
+        Platform.runLater(() -> {
+            if ("PENALTY_LIFTED".equals(message)) {
+                isPenalized = false;
+                penalizedRoomId = -1;
+                if (penaltyOverlay != null) {
+                    penaltyOverlay.setVisible(false);
+                }
+                if (mainContentPane != null && (reconnectOverlay == null || !reconnectOverlay.isVisible())) {
+                    mainContentPane.setEffect(null);
+                }
+                statusLabel.setText("Hình phạt đã kết thúc. Bạn có thể tiếp tục chơi.");
+                statusLabel.setStyle("-fx-text-fill: #16a34a; -fx-font-weight: bold;");
+                return;
+            }
+
+            if (message != null && message.startsWith("PENALTY_ACTIVE:")) {
+                String[] parts = message.split(":", 2);
+                if (parts.length > 1) {
+                    try {
+                        penalizedRoomId = Integer.parseInt(parts[1].trim());
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+
+            isPenalized = true;
+            if (penaltyOverlay != null) {
+                penaltyOverlay.setVisible(true);
+            }
+            if (mainContentPane != null) {
+                mainContentPane.setEffect(new GaussianBlur(12));
+            }
+            statusLabel.setText("Tài khoản đang bị phạt do thoát trận giữa chừng.");
+            statusLabel.setStyle("-fx-text-fill: #dc2626; -fx-font-weight: bold;");
+        });
+    }
+
+    private void handleReconnectPrompt(String rawJson) {
+        try {
+            ReconnectPromptDTO promptDTO = gson.fromJson(rawJson, ReconnectPromptDTO.class);
+            if (promptDTO == null) return;
+            pendingReconnectMatch = promptDTO;
+
+            Platform.runLater(() -> {
+                showReconnectModal(promptDTO);
+            });
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "[Lobby] Lỗi xử lý GAME_RECONNECT_PROMPT", e);
+        }
+    }
+
+    private void showReconnectModal(ReconnectPromptDTO promptDTO) {
+        if (promptDTO == null) return;
+        if (reconnectRoomLabel != null) {
+            reconnectRoomLabel.setText("Phòng đấu: " + promptDTO.getRoomName());
+        }
+        if (reconnectTimeLabel != null) {
+            int remainSec = (int) promptDTO.getRemainingTime();
+            reconnectTimeLabel.setText(String.format("Thời gian còn lại: khoảng %02d:%02d", remainSec / 60, remainSec % 60));
+        }
+        if (reconnectOverlay != null) {
+            reconnectOverlay.setVisible(true);
+        }
+        if (mainContentPane != null) {
+            mainContentPane.setEffect(new GaussianBlur(12));
+        }
+        statusLabel.setText("Bạn đang có một trận đấu dở dang tại " + promptDTO.getRoomName());
+        statusLabel.setStyle("-fx-text-fill: #ea580c; -fx-font-weight: bold;");
+    }
+
+    @FXML
+    private void handleSkipReconnect() {
+        if (reconnectOverlay != null) {
+            reconnectOverlay.setVisible(false);
+        }
+        if (mainContentPane != null && !isPenalized) {
+            mainContentPane.setEffect(null);
+        }
+        statusLabel.setText("Bạn đang có một trận đấu dở dang. Hãy vào lại khi sẵn sàng.");
+        statusLabel.setStyle("-fx-text-fill: #ea580c; -fx-font-weight: bold;");
+    }
+
+    @FXML
+    private void handleConfirmReconnect() {
+        try {
+            statusLabel.setText("Đang kết nối lại vào trận đấu...");
+            statusLabel.setStyle("-fx-text-fill: #2563eb; -fx-font-weight: bold;");
+            if (reconnectOverlay != null) {
+                reconnectOverlay.setVisible(false);
+            }
+            if (mainContentPane != null) {
+                mainContentPane.setEffect(null);
+            }
+
+            ClientSocket clientSocket = session.getClientSocket();
+            if (clientSocket != null && clientSocket.isConnected()) {
+                clientSocket.sendPacket(new Packet(PacketType.GAME_RECONNECT_REQ, ""));
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "[Lobby] Lỗi gửi GAME_RECONNECT_REQ", e);
+        }
+    }
+
+    private void handleReconnectResponse(String rawJson) {
+        try {
+            ReconnectResponseDTO resDTO = gson.fromJson(rawJson, ReconnectResponseDTO.class);
+            if (resDTO == null || resDTO.getRoom() == null) {
+                showError("Không thể khôi phục dữ liệu trận đấu!");
+                return;
+            }
+
+            Platform.runLater(() -> {
+                try {
+                    session.removePacketListener(packetListener);
+                    pendingReconnectMatch = null;
+                    isPenalized = false;
+
+                    if (mainContentPane != null) {
+                        mainContentPane.setEffect(null);
+                    }
+
+                    Stage stage = (Stage) roomListView.getScene().getWindow();
+                    stage.setMinWidth(0);
+                    stage.setMinHeight(0);
+                    stage.setMaxWidth(Double.MAX_VALUE);
+                    stage.setMaxHeight(Double.MAX_VALUE);
+                    stage.setResizable(true);
+
+                    GameCanvasApp gameCanvasApp = new GameCanvasApp();
+                    gameCanvasApp.setStage(stage);
+                    gameCanvasApp.setRoom(resDTO.getRoom());
+                    gameCanvasApp.setRemainingTime((int) resDTO.getRemainingTime());
+                    gameCanvasApp.setMyTankId(resDTO.getMyTankId());
+
+                    Scene gameScene = gameCanvasApp.createGameScene();
+                    stage.setScene(gameScene);
+                    stage.setTitle("Tank 2D - Game (Đã kết nối lại)");
+
+                    stage.sizeToScene();
+                    stage.setResizable(false);
+                    stage.centerOnScreen();
+                    stage.show();
+                    LOGGER.info("[Lobby] Đã Reconnect thành công vào GameCanvasApp!");
+
+                } catch (Exception e) {
+                    session.addPacketListener(packetListener);
+                    LOGGER.log(Level.SEVERE, "[Lobby] Lỗi khi chuyển cảnh vào game sau Reconnect", e);
+                    showError("Không thể vào lại màn hình game!");
+                }
+            });
+
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "[Lobby] Lỗi xử lý GAME_RECONNECT_RES", e);
         }
     }
 
