@@ -36,6 +36,7 @@ public final class ConfigLoader {
     private static final Gson GSON = new Gson();
 
     private static Dotenv dotenv;
+    private static final java.util.Properties APP_PROPERTIES = new java.util.Properties();
     private static JsonObject statsConfig;
     private static Map<String, Object> gameRulesConfig;
     private static JsonObject currentMapConfig;
@@ -105,6 +106,60 @@ public final class ConfigLoader {
         }
 
         loadMapConfig("config/maps/map_default.json");
+        loadAppProperties();
+    }
+
+    private static void loadAppProperties() {
+        File external = new File("config.properties");
+        if (external.exists()) {
+            try (InputStream in = new FileInputStream(external)) {
+                APP_PROPERTIES.load(new InputStreamReader(in, StandardCharsets.UTF_8));
+                LOGGER.info("[ConfigLoader] Đã tải config.properties từ tệp bên ngoài.");
+                return;
+            } catch (IOException e) {
+                LOGGER.log(Level.WARNING, "[ConfigLoader] Lỗi đọc config.properties bên ngoài", e);
+            }
+        }
+
+        try (InputStream in = ConfigLoader.class.getResourceAsStream("/config.properties")) {
+            if (in != null) {
+                APP_PROPERTIES.load(new InputStreamReader(in, StandardCharsets.UTF_8));
+                LOGGER.info("[ConfigLoader] Đã tải config.properties từ classpath.");
+            } else {
+                LOGGER.warning("[ConfigLoader] Không tìm thấy config.properties trong classpath!");
+            }
+        } catch (IOException e) {
+            LOGGER.log(Level.WARNING, "[ConfigLoader] Lỗi khi nạp config.properties từ classpath", e);
+        }
+    }
+
+    /**
+     * Lấy giá trị cấu hình dạng chuỗi từ file config.properties.
+     *
+     * @param key          tên khóa cấu hình
+     * @param defaultValue giá trị mặc định nếu khóa không tồn tại
+     * @return giá trị cấu hình tương ứng
+     */
+    public static String getProperty(String key, String defaultValue) {
+        String val = APP_PROPERTIES.getProperty(key);
+        return (val != null && !val.trim().isEmpty()) ? val.trim() : defaultValue;
+    }
+
+    /**
+     * Lấy giá trị cấu hình dạng số nguyên từ file config.properties.
+     *
+     * @param key          tên khóa cấu hình
+     * @param defaultValue giá trị số nguyên mặc định nếu khóa không tồn tại
+     * @return giá trị số nguyên tương ứng
+     */
+    public static int getPropertyInt(String key, int defaultValue) {
+        String val = getProperty(key, null);
+        if (val == null) return defaultValue;
+        try {
+            return Integer.parseInt(val);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.tank2d.client.network;
 
+import com.tank2d.common.config.ConfigLoader;
 import com.tank2d.common.exception.ErrorCode;
 import com.tank2d.common.exception.NetworkException;
 import com.tank2d.common.protocol.NetworkUtil;
@@ -29,7 +30,10 @@ public class ClientSocket {
     private final int port;
 
     public ClientSocket() {
-        this(DEFAULT_HOST, DEFAULT_PORT);
+        this(
+            ConfigLoader.getProperty("server.host", DEFAULT_HOST),
+            ConfigLoader.getPropertyInt("server.port", DEFAULT_PORT)
+        );
     }
 
     public ClientSocket(String host, int port) {

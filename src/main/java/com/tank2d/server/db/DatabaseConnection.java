@@ -40,6 +40,8 @@ public class DatabaseConnection {
             config.setPassword(pass);
             config.setMaximumPoolSize(maxPoolSize);
             config.setDriverClassName("com.mysql.cj.jdbc.Driver");
+            config.setConnectionTimeout(10000);
+            config.setInitializationFailTimeout(10000);
 
             config.addDataSourceProperty("cachePrepStmts", "true");
             config.addDataSourceProperty("prepStmtCacheSize", "250");

@@ -115,7 +115,8 @@ public class TankServer {
     }
 
     public static void main(String[] args) {
-        int port = ConfigLoader.getEnvInt("SERVER_PORT", DEFAULT_PORT);
+        int defaultPort = ConfigLoader.getEnvInt("SERVER_PORT", DEFAULT_PORT);
+        int port = ConfigLoader.getPropertyInt("server.bind_port", defaultPort);
 
         try {
             DatabaseConnection.getConnection().close();
