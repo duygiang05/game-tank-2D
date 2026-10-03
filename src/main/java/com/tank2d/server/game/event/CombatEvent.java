@@ -1,7 +1,16 @@
 package com.tank2d.server.game.event;
 
+/**
+ * Sự kiện chiến đấu phát sinh từ va chạm đạn trong thế giới game.
+ */
 public class CombatEvent {
-    public enum EventType { BULLET_HIT_TANK, SHIELD_BLOCKED, SHIELD_BROKEN,WALL_HIT }
+
+    public enum EventType {
+        BULLET_HIT_TANK,
+        SHIELD_BLOCKED,
+        SHIELD_BROKEN,
+        WALL_HIT
+    }
 
     private final int bulletId;
     private final int shooterId;

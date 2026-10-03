@@ -1,0 +1,21 @@
+/*
+ * Custom font configuration for Tank2D-Online Javadoc
+ * Replaces DejaVu fonts with Segoe UI and Consolas for optimal Vietnamese Unicode rendering
+ */
+:root {
+    --body-font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+    --block-font-family: 'Segoe UI', Arial, Tahoma, sans-serif;
+    --code-font-family: 'Consolas', 'Courier New', monospace;
+}
+
+body {
+    font-family: var(--body-font-family);
+}
+
+.block, .content, .description, .notes {
+    font-family: var(--block-font-family);
+}
+
+code, kbd, pre, samp {
+    font-family: var(--code-font-family);
+}

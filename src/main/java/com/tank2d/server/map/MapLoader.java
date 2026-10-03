@@ -9,15 +9,29 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * Tiện ích nạp bản đồ trận đấu từ tệp cấu hình JSON.
+ */
 public class MapLoader {
 
-    // DTO nội bộ chỉ để Gson parse file JSON, không dùng để gửi qua mạng nên không đặt trong common.dto
+    private MapLoader() {}
+
+    /**
+     * Cấu trúc dữ liệu nội bộ phục vụ Gson giải mã tệp JSON bản đồ.
+     */
     private static class MapFileFormat {
         int width;
         int height;
         int[][] matrix;
     }
 
+    /**
+     * Nạp đối tượng {@link GameMap} từ đường dẫn tệp JSON.
+     *
+     * @param path đường dẫn tới tệp bản đồ JSON
+     * @return thực thể {@link GameMap} đã được khởi tạo
+     * @throws ConfigException nếu tệp không tồn tại hoặc sai định dạng
+     */
     public static GameMap loadFromFile(String path) {
         Gson gson = new Gson();
         try (FileReader reader = new FileReader(path, StandardCharsets.UTF_8)) {

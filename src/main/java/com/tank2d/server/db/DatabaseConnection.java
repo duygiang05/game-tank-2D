@@ -20,6 +20,8 @@ public class DatabaseConnection {
     private static final Logger LOGGER = Logger.getLogger(DatabaseConnection.class.getName());
     private static HikariDataSource dataSource;
 
+    private DatabaseConnection() {}
+
     static {
         try {
             String host = ConfigLoader.getEnv("DB_HOST", "localhost");
@@ -39,7 +41,6 @@ public class DatabaseConnection {
             config.setMaximumPoolSize(maxPoolSize);
             config.setDriverClassName("com.mysql.cj.jdbc.Driver");
 
-            // Tối ưu hóa hiệu năng cache câu lệnh SQL
             config.addDataSourceProperty("cachePrepStmts", "true");
             config.addDataSourceProperty("prepStmtCacheSize", "250");
             config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
@@ -52,7 +53,11 @@ public class DatabaseConnection {
     }
 
     /**
-     * Lấy một kết nối đang rảnh từ Pool.
+     * Lấy một kết nối rảnh từ Connection Pool.
+     *
+     * @return đối tượng {@link Connection} hợp lệ
+     * @throws SQLException khi gặp lỗi cơ sở dữ liệu
+     * @throws DatabaseException nếu pool chưa được khởi tạo
      */
     public static Connection getConnection() throws SQLException {
         if (dataSource == null) {
@@ -62,7 +67,7 @@ public class DatabaseConnection {
     }
 
     /**
-     * Đóng Connection Pool khi Server tắt.
+     * Đóng HikariCP Connection Pool và giải phóng tất cả kết nối khi dừng Server.
      */
     public static void closePool() {
         if (dataSource != null && !dataSource.isClosed()) {

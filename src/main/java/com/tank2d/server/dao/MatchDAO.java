@@ -21,12 +21,22 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Lớp truy xuất cơ sở dữ liệu đối với lịch sử trận đấu và kết quả thi đấu (Match DAO).
+ */
 public class MatchDAO {
 
     private static final Logger LOGGER = Logger.getLogger(MatchDAO.class.getName());
 
     /**
-     * Khớp chính xác với cấu trúc bảng match_history và match_participants trong phpMyAdmin.
+     * Ghi nhận kết quả trận đấu hoàn tất vào CSDL và lưu chỉ số từng người tham gia.
+     *
+     * @param roomName tên phòng thi đấu
+     * @param winnerUserId mã ID người chiến thắng (null nếu hòa)
+     * @param durationSeconds thời lượng trận đấu tính bằng giây
+     * @param participants danh sách trạng thái người chơi tham gia trận đấu
+     * @return mã ID trận đấu vừa tạo (match_id), hoặc -1 nếu thất bại
+     * @throws DatabaseException khi gặp sự cố ghi dữ liệu vào CSDL
      */
     public int recordMatchResult(String roomName, Integer winnerUserId, int durationSeconds, List<PlayerCombatState> participants) {
         String insertMatchSql = "INSERT INTO match_history (room_name, winner_id, duration_seconds, played_at) VALUES (?, ?, ?, NOW())";
@@ -39,13 +49,12 @@ public class MatchDAO {
 
             int matchId = -1;
 
-            // 1. Ghi vào match_history
             try (PreparedStatement psMatch = conn.prepareStatement(insertMatchSql, Statement.RETURN_GENERATED_KEYS)) {
                 psMatch.setString(1, (roomName != null && !roomName.isEmpty()) ? roomName : "Custom Match");
                 if (winnerUserId != null && winnerUserId > 0) {
                     psMatch.setInt(2, winnerUserId);
                 } else {
-                    psMatch.setNull(2, Types.INTEGER); // Trận hòa: winner_id = NULL
+                    psMatch.setNull(2, Types.INTEGER);
                 }
                 psMatch.setInt(3, durationSeconds);
                 psMatch.executeUpdate();
@@ -62,7 +71,6 @@ public class MatchDAO {
                 return -1;
             }
 
-            // 2. Ghi từng người chơi vào match_participants
             try (PreparedStatement psPart = conn.prepareStatement(insertParticipantSql)) {
                 for (int i = 0; i < participants.size(); i++) {
                     PlayerCombatState p = participants.get(i);
@@ -70,8 +78,8 @@ public class MatchDAO {
                     psPart.setInt(2, p.getUserId());
                     psPart.setInt(3, p.getKills());
                     psPart.setInt(4, p.getHits());
-                    psPart.setInt(5, i + 1); // rank_position: 1, 2, 3...
-                    psPart.setInt(6, p.getScore()); // points_earned
+                    psPart.setInt(5, i + 1);
+                    psPart.setInt(6, p.getScore());
                     psPart.addBatch();
                 }
                 psPart.executeBatch();
@@ -103,7 +111,11 @@ public class MatchDAO {
     }
 
     /**
-     * Lấy danh sách lịch sử thi đấu của người chơi (tối đa 30 trận gần nhất)
+     * Lấy danh sách lịch sử thi đấu của người chơi (tối đa 30 trận gần nhất).
+     *
+     * @param userId mã ID người dùng
+     * @return danh sách các {@link UserMatchHistoryDTO} sắp xếp theo thời gian mới nhất
+     * @throws DatabaseException khi gặp lỗi truy vấn CSDL
      */
     public List<UserMatchHistoryDTO> getMatchHistoryByUserId(int userId) {
         String sql = "SELECT "
@@ -174,7 +186,11 @@ public class MatchDAO {
     }
 
     /**
-     * Lấy chi tiết toàn bộ trận đấu bao gồm tất cả người chơi và thông số của họ
+     * Lấy chi tiết toàn bộ trận đấu bao gồm tất cả người chơi và thông số của họ.
+     *
+     * @param matchId mã ID trận đấu
+     * @return đối tượng {@link MatchDetailDTO} hoặc null nếu không tìm thấy
+     * @throws DatabaseException khi gặp sự cố truy vấn CSDL
      */
     public MatchDetailDTO getMatchDetail(int matchId) {
         String matchSql = "SELECT m.id, m.room_name, m.winner_id, m.duration_seconds, m.played_at, u.username AS winner_name "

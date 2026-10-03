@@ -5,6 +5,7 @@ import com.tank2d.server.dao.MatchDAO;
 import com.tank2d.server.dao.UserDAO;
 import com.tank2d.server.db.DatabaseConnection;
 import com.tank2d.server.room.RoomManager;
+
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -14,11 +15,15 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Lõi Server Socket chạy nền quản lý luồng kết nối đa client bằng ThreadPool.
+ * Máy chủ TCP Socket chính của hệ thống Tank 2D Online.
+ * <p>
+ * Quản lý vòng đời socket, lắng nghe các kết nối TCP từ client và điều phối phiên làm việc
+ * thông qua ThreadPool đa luồng để tối ưu hiệu năng.
  */
 public class TankServer {
 
     private static final Logger LOGGER = Logger.getLogger(TankServer.class.getName());
+    private static final int DEFAULT_PORT = 8888;
 
     private final int port;
     private final ExecutorService threadPool;
@@ -28,6 +33,11 @@ public class TankServer {
     private ServerSocket serverSocket;
     private volatile boolean isRunning;
 
+    /**
+     * Khởi tạo Server với cổng kết nối mạng chỉ định.
+     *
+     * @param port cổng TCP (ví dụ: 8888)
+     */
     public TankServer(int port) {
         this.port = port;
         this.threadPool = Executors.newCachedThreadPool();
@@ -37,6 +47,9 @@ public class TankServer {
         this.isRunning = false;
     }
 
+    /**
+     * Khởi động máy chủ, lắng nghe kết nối socket từ client và phân phối vào thread pool.
+     */
     public void start() {
         try {
             serverSocket = new ServerSocket(port);
@@ -44,22 +57,19 @@ public class TankServer {
 
             LOGGER.info("[TANK2D SERVER] KHỞI ĐỘNG THÀNH CÔNG trên Cổng TCP: " + port);
 
-            Runtime.getRuntime().addShutdownHook(
-                    new Thread(this::stop)
-            );
+            Runtime.getRuntime().addShutdownHook(new Thread(this::stop));
 
             while (isRunning) {
                 try {
                     Socket clientSocket = serverSocket.accept();
-
                     LOGGER.info("[Server] Nhận kết nối mới từ: " + clientSocket.getRemoteSocketAddress());
 
-                    ClientHandler handler
-                            = new ClientHandler(
-                                    clientSocket,
-                                    userDAO,matchDAO,
-                                    roomManager
-                            );
+                    ClientHandler handler = new ClientHandler(
+                            clientSocket,
+                            userDAO,
+                            matchDAO,
+                            roomManager
+                    );
 
                     threadPool.execute(handler);
 
@@ -67,34 +77,32 @@ public class TankServer {
                     if (!isRunning) {
                         break;
                     }
-
                     LOGGER.log(Level.SEVERE, "[Server] Lỗi tiếp nhận client", e);
                 }
             }
 
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "[Server] Không thể bind port " + port, e);
-
         } finally {
             stop();
         }
     }
 
+    /**
+     * Dừng máy chủ an toàn và giải phóng tài nguyên.
+     */
     public synchronized void stop() {
-
         if (!isRunning) {
             return;
         }
 
         isRunning = false;
-
         LOGGER.info("[Server] Đang giải phóng tài nguyên và tắt Server...");
 
         try {
             if (serverSocket != null && !serverSocket.isClosed()) {
                 serverSocket.close();
             }
-
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "[Server] Lỗi đóng ServerSocket", e);
         }
@@ -107,14 +115,11 @@ public class TankServer {
     }
 
     public static void main(String[] args) {
+        int port = ConfigLoader.getEnvInt("SERVER_PORT", DEFAULT_PORT);
 
-        int port = ConfigLoader.getEnvInt("SERVER_PORT", 8888);
-
-        // Kiểm tra kết nối Database trước khi Server bắt đầu
         try {
             DatabaseConnection.getConnection().close();
             LOGGER.info("[Server] Database kết nối thành công!");
-
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "[Server] Database lỗi", e);
         }

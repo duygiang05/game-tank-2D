@@ -37,6 +37,11 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Bộ điều khiển giao diện Lịch sử thi đấu (Match History Controller).
+ * Hiển thị danh sách các trận đấu gần nhất của người chơi và popup chi tiết
+ * thông số tất cả người tham gia trong trận đấu đó.
+ */
 public class MatchHistoryController {
 
     private static final Logger LOGGER = Logger.getLogger(MatchHistoryController.class.getName());
@@ -56,7 +61,6 @@ public class MatchHistoryController {
     @FXML
     private Button backButton;
 
-    // Các thành phần của Popup Modal chi tiết trận đấu
     @FXML
     private StackPane detailOverlay;
 
@@ -79,11 +83,14 @@ public class MatchHistoryController {
     private final Gson gson = new Gson();
     private final Consumer<Packet> packetListener = this::handleServerPacket;
 
+    /**
+     * Khởi tạo giao diện, cấu hình CellFactory hiển thị danh sách lịch sử trận đấu,
+     * sự kiện click xem chi tiết và cấu hình bảng chi tiết thành viên.
+     */
     @FXML
     private void initialize() {
         session.addPacketListener(packetListener);
 
-        // 1. Cấu hình bảng danh sách lịch sử trận đấu (Khớp chính xác từng cột với Header)
         matchHistoryListView.setCellFactory(listView -> new ListCell<UserMatchHistoryDTO>() {
             @Override
             protected void updateItem(UserMatchHistoryDTO match, boolean empty) {
@@ -94,7 +101,6 @@ public class MatchHistoryController {
                     setGraphic(null);
                     setStyle("-fx-background-color: transparent;");
                 } else {
-                    // Cột 1: KẾT QUẢ & HẠNG (135px)
                     HBox resultBox = new HBox(6.0);
                     resultBox.setAlignment(Pos.CENTER_LEFT);
                     resultBox.setPrefWidth(135.0);
@@ -121,7 +127,6 @@ public class MatchHistoryController {
                     }
                     resultBox.getChildren().addAll(badgeLabel, rankLabel);
 
-                    // Cột 2: PHÒNG ĐẤU & THỜI LƯỢNG (175px)
                     VBox roomBox = new VBox(2.0);
                     roomBox.setAlignment(Pos.CENTER_LEFT);
                     roomBox.setPrefWidth(175.0);
@@ -137,21 +142,18 @@ public class MatchHistoryController {
                     durationLabel.setStyle("-fx-text-fill: #64748b; -fx-font-size: 11.5px;");
                     roomBox.getChildren().addAll(roomNameLabel, durationLabel);
 
-                    // Cột 3: THỜI GIAN THI ĐẤU (145px)
                     Label timeLabel = new Label(match.getPlayedAt());
                     timeLabel.setPrefWidth(145.0);
                     timeLabel.setMaxWidth(145.0);
                     timeLabel.setAlignment(Pos.CENTER_LEFT);
                     timeLabel.setStyle("-fx-text-fill: #475569; -fx-font-size: 12.5px; -fx-font-weight: 500;");
 
-                    // Cột 4: KILLS / TRÚNG (110px)
                     Label combatLabel = new Label("🎯 " + match.getKills() + "   💥 " + match.getHits());
                     combatLabel.setPrefWidth(110.0);
                     combatLabel.setMaxWidth(110.0);
                     combatLabel.setAlignment(Pos.CENTER_RIGHT);
                     combatLabel.setStyle("-fx-font-size: 12.5px; -fx-font-weight: bold; -fx-text-fill: #334155;");
 
-                    // Cột 5: ĐIỂM NHẬN (95px)
                     int points = match.getPointsEarned();
                     String pointsStr = (points >= 0 ? "+" : "") + points + " XP";
                     Label pointsLabel = new Label(pointsStr);
@@ -174,7 +176,6 @@ public class MatchHistoryController {
             }
         });
 
-        // 2. Sự kiện khi click chọn 1 dòng trận đấu -> Mở Popup chi tiết
         matchHistoryListView.setOnMouseClicked(event -> {
             UserMatchHistoryDTO selectedMatch = matchHistoryListView.getSelectionModel().getSelectedItem();
             if (selectedMatch != null) {
@@ -182,7 +183,6 @@ public class MatchHistoryController {
             }
         });
 
-        // 3. Cấu hình bảng hiển thị chi tiết tất cả người chơi trong trận đấu
         participantListView.setCellFactory(listView -> new ListCell<MatchParticipantDTO>() {
             @Override
             protected void updateItem(MatchParticipantDTO p, boolean empty) {
@@ -196,7 +196,6 @@ public class MatchHistoryController {
                     int myUserId = (session.getCurrentUser() != null) ? session.getCurrentUser().getId() : -1;
                     boolean isMe = (p.getUserId() == myUserId);
 
-                    // Cột 1: Hạng (70px)
                     Label rankLabel = new Label();
                     rankLabel.setPrefWidth(70.0);
                     rankLabel.setMaxWidth(70.0);
@@ -216,7 +215,6 @@ public class MatchHistoryController {
                         rankLabel.setStyle("-fx-text-fill: #64748b; -fx-font-weight: bold; -fx-font-size: 12.5px;");
                     }
 
-                    // Cột 2: Tên người chơi (190px) - Làm nổi bật nếu là bản thân
                     Label nameLabel = new Label(p.getUsername() + (isMe ? " (Bạn)" : ""));
                     nameLabel.setPrefWidth(190.0);
                     nameLabel.setMaxWidth(190.0);
@@ -228,21 +226,18 @@ public class MatchHistoryController {
                         nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #0f172a;");
                     }
 
-                    // Cột 3: Kills (85px)
                     Label killsLabel = new Label("🎯 " + p.getKills());
                     killsLabel.setPrefWidth(85.0);
                     killsLabel.setMaxWidth(85.0);
                     killsLabel.setAlignment(Pos.CENTER_RIGHT);
                     killsLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 12.5px; -fx-text-fill: #334155;");
 
-                    // Cột 4: Trúng đích (95px)
                     Label hitsLabel = new Label("💥 " + p.getHits());
                     hitsLabel.setPrefWidth(95.0);
                     hitsLabel.setMaxWidth(95.0);
                     hitsLabel.setAlignment(Pos.CENTER_RIGHT);
                     hitsLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 12.5px; -fx-text-fill: #334155;");
 
-                    // Cột 5: Điểm số (95px)
                     int pts = p.getPointsEarned();
                     Label ptsLabel = new Label((pts >= 0 ? "+" : "") + pts + " XP");
                     ptsLabel.setPrefWidth(95.0);
@@ -263,6 +258,9 @@ public class MatchHistoryController {
         loadMatchHistory();
     }
 
+    /**
+     * Gửi yêu cầu lấy danh sách lịch sử thi đấu của người chơi.
+     */
     private void loadMatchHistory() {
         try {
             ClientSocket clientSocket = session.getClientSocket();
@@ -283,6 +281,11 @@ public class MatchHistoryController {
         }
     }
 
+    /**
+     * Gửi yêu cầu lấy chi tiết trận đấu theo mã định danh.
+     *
+     * @param matchId mã ID trận đấu
+     */
     private void requestMatchDetail(int matchId) {
         try {
             ClientSocket clientSocket = session.getClientSocket();
@@ -296,6 +299,11 @@ public class MatchHistoryController {
         }
     }
 
+    /**
+     * Định tuyến gói tin từ Server về hàm xử lý danh sách hoặc chi tiết trận đấu.
+     *
+     * @param packet gói tin nhận được từ máy chủ
+     */
     private void handleServerPacket(Packet packet) {
         if (packet == null || packet.getType() == null) return;
 
@@ -306,6 +314,11 @@ public class MatchHistoryController {
         }
     }
 
+    /**
+     * Hiển thị danh sách lịch sử đấu nhận được lên ListView.
+     *
+     * @param rawJson chuỗi JSON danh sách UserMatchHistoryDTO
+     */
     private void handleMatchHistoryResponse(String rawJson) {
         try {
             Type listType = new TypeToken<List<UserMatchHistoryDTO>>() {}.getType();
@@ -329,16 +342,19 @@ public class MatchHistoryController {
         }
     }
 
+    /**
+     * Hiển thị popup modal chi tiết trận đấu cùng danh sách tất cả người tham gia.
+     *
+     * @param rawJson dữ liệu MatchDetailDTO dạng JSON
+     */
     private void handleMatchDetailResponse(String rawJson) {
         try {
             MatchDetailDTO detail = gson.fromJson(rawJson, MatchDetailDTO.class);
             if (detail == null) return;
 
             Platform.runLater(() -> {
-                // Cập nhật thông tin tiêu đề phòng & thời gian
                 detailRoomTimeLabel.setText("Phòng: " + detail.getRoomName() + " • " + detail.getDurationSeconds() + "s • " + detail.getPlayedAt());
 
-                // Cập nhật Banner người chiến thắng
                 if (detail.getWinnerUsername() != null && !detail.getWinnerUsername().isEmpty()) {
                     winnerTextLabel.setText("Người chiến thắng: " + detail.getWinnerUsername());
                     winnerBanner.setStyle("-fx-background-color: #eff6ff; -fx-padding: 8px 14px; -fx-background-radius: 10px; -fx-border-color: #bfdbfe; -fx-border-radius: 10px;");
@@ -347,10 +363,8 @@ public class MatchHistoryController {
                     winnerBanner.setStyle("-fx-background-color: #fefce8; -fx-padding: 8px 14px; -fx-background-radius: 10px; -fx-border-color: #fef08a; -fx-border-radius: 10px;");
                 }
 
-                // Cập nhật danh sách người chơi
                 participantListView.getItems().setAll(detail.getParticipants());
 
-                // Mở popup modal và kích hoạt hiệu ứng mờ nền toàn màn hình
                 mainContentPane.setEffect(new GaussianBlur(12));
                 detailOverlay.setVisible(true);
             });
@@ -360,20 +374,30 @@ public class MatchHistoryController {
         }
     }
 
+    /**
+     * Đóng modal chi tiết trận đấu và gỡ bỏ hiệu ứng mờ nền.
+     */
     @FXML
     private void handleCloseDetail() {
         detailOverlay.setVisible(false);
         mainContentPane.setEffect(null);
     }
 
+    /**
+     * Xử lý đóng modal khi người dùng click vào vùng backdrop mờ bên ngoài.
+     *
+     * @param event sự kiện chuột
+     */
     @FXML
     private void handleOverlayClicked(MouseEvent event) {
-        // Khi click ra ngoài card popup (vào vùng mờ đen backdrop) thì đóng popup
         if (event.getTarget() == detailOverlay) {
             handleCloseDetail();
         }
     }
 
+    /**
+     * Quay trở về màn hình sảnh chờ (Lobby).
+     */
     @FXML
     private void handleBack() {
         try {
@@ -396,6 +420,11 @@ public class MatchHistoryController {
         }
     }
 
+    /**
+     * Cập nhật thông báo lỗi lên nhãn trạng thái giao diện.
+     *
+     * @param message nội dung thông báo lỗi
+     */
     private void showError(String message) {
         if (statusLabel != null) {
             statusLabel.setText(message);

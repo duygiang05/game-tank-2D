@@ -12,28 +12,40 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Logger;
 
+/**
+ * Quản lý vòng đời và trạng thái của một phòng chơi (Game Room).
+ * <p>
+ * Lưu trữ danh sách người chơi, chủ phòng (Host), trạng thái sẵn sàng (Ready),
+ * cấu hình thời lượng trận đấu và phiên làm việc game engine hiện hành (GameLoop &amp; GameStateManager).
+ */
 public class Room {
 
     private static final Logger LOGGER = Logger.getLogger(Room.class.getName());
+    public static final String STATUS_WAITING = "Waiting";
+    public static final String STATUS_FULL = "Full";
+    public static final String STATUS_PLAYING = "Playing";
 
     private final int roomId;
     private final String roomName;
     private final int maxPlayers;
     private int hostId;
-
-    // Thời lượng trận đấu (đơn vị: giây - mặc định: 60)
     private int duration = 60;
 
     private final List<User> players;
     private final Map<Integer, Boolean> readyStates;
-
-    // Trạng thái: "Waiting", "Full", "Playing"
     private String status;
 
     private GameLoop gameLoop;
     private GameStateManager gameStateManager;
     private final Map<Integer, Integer> userTankMappings = new ConcurrentHashMap<>();
 
+    /**
+     * Khởi tạo phòng chơi mới.
+     *
+     * @param roomId   mã định danh phòng
+     * @param roomName tên hiển thị của phòng
+     * @param hostId   ID tài khoản người tạo phòng (chủ phòng)
+     */
     public Room(int roomId, String roomName, int hostId) {
         this.roomId = roomId;
         this.roomName = roomName;
@@ -41,12 +53,9 @@ public class Room {
         this.maxPlayers = 4;
         this.players = new ArrayList<>();
         this.readyStates = new LinkedHashMap<>();
-        this.status = "Waiting";
+        this.status = STATUS_WAITING;
     }
 
-    // =========================
-    // ROOM INFORMATION
-    // =========================
     public int getRoomId() {
         return roomId;
     }
@@ -67,9 +76,6 @@ public class Room {
         return hostId == userId;
     }
 
-    // =========================
-    // STATUS (GETTER & SETTER)
-    // =========================
     public synchronized String getStatus() {
         return status;
     }
@@ -78,9 +84,6 @@ public class Room {
         this.status = status;
     }
 
-    // =========================
-    // PLAYERS
-    // =========================
     public synchronized List<User> getPlayers() {
         return new ArrayList<>(players);
     }
@@ -91,19 +94,33 @@ public class Room {
 
     public synchronized boolean hasPlayer(int userId) {
         for (User player : players) {
-            if (player.getId() == userId) return true;
+            if (player.getId() == userId) {
+                return true;
+            }
         }
         return false;
     }
 
+    /**
+     * Thêm người chơi vào phòng. Chủ phòng mặc định sẵn sàng.
+     *
+     * @param user tài khoản người chơi cần thêm
+     * @return {@code true} nếu thêm thành công, {@code false} nếu phòng đầy hoặc người chơi đã tồn tại
+     */
     public synchronized boolean addPlayer(User user) {
-        if (user == null) return false;
-
-        for (User player : players) {
-            if (player.getId() == user.getId()) return false;
+        if (user == null) {
+            return false;
         }
 
-        if (players.size() >= maxPlayers) return false;
+        for (User player : players) {
+            if (player.getId() == user.getId()) {
+                return false;
+            }
+        }
+
+        if (players.size() >= maxPlayers) {
+            return false;
+        }
 
         players.add(user);
 
@@ -117,6 +134,12 @@ public class Room {
         return true;
     }
 
+    /**
+     * Xóa người chơi khỏi phòng và cập nhật trạng thái phòng.
+     *
+     * @param userId ID người chơi cần xóa
+     * @return {@code true} nếu xóa thành công
+     */
     public synchronized boolean removePlayer(int userId) {
         boolean removed = players.removeIf(user -> user.getId() == userId);
         if (removed) {
@@ -127,27 +150,25 @@ public class Room {
     }
 
     private void updateStatus() {
-        // Nếu phòng đang trong trận đấu thì không tự động chuyển về Waiting/Full
-        if ("Playing".equalsIgnoreCase(this.status)) {
+        if (STATUS_PLAYING.equalsIgnoreCase(this.status)) {
             return;
         }
 
         if (players.size() >= maxPlayers) {
-            this.status = "Full";
+            this.status = STATUS_FULL;
         } else {
-            this.status = "Waiting";
+            this.status = STATUS_WAITING;
         }
     }
 
-    // =========================
-    // READY STATES
-    // =========================
     public synchronized Map<Integer, Boolean> getReadyStates() {
         return new LinkedHashMap<>(readyStates);
     }
 
     public synchronized boolean setReady(int userId, boolean ready) {
-        if (!readyStates.containsKey(userId)) return false;
+        if (!readyStates.containsKey(userId)) {
+            return false;
+        }
 
         if (userId == hostId) {
             readyStates.put(userId, true);
@@ -162,10 +183,15 @@ public class Room {
     }
 
     public synchronized boolean areAllPlayersReady() {
-        if (players.isEmpty()) return false;
+        if (players.isEmpty()) {
+            return false;
+        }
         return readyStates.values().stream().allMatch(Boolean::booleanValue);
     }
 
+    /**
+     * Đặt lại trạng thái sẵn sàng của tất cả thành viên khi bắt đầu một ván đấu mới.
+     */
     public synchronized void resetReadyStatesForNewGame() {
         for (User player : players) {
             if (player.getId() == hostId) {
@@ -174,13 +200,13 @@ public class Room {
                 readyStates.put(player.getId(), false);
             }
         }
-        this.status = "Waiting";
+        this.status = STATUS_WAITING;
         LOGGER.info("[Room] Đã reset Ready cho ván mới.");
     }
 
-    // =========================
-    // TRANSFER HOST
-    // =========================
+    /**
+     * Chuyển quyền chủ phòng ngẫu nhiên cho một thành viên còn lại trong phòng.
+     */
     public synchronized void transferHostRandom() {
         if (players.isEmpty()) {
             return;
@@ -195,9 +221,6 @@ public class Room {
         LOGGER.info("[Room] Host mới: " + newHost.getUsername() + " (ID: " + newHost.getId() + ")");
     }
 
-    // =========================
-    // MATCH DURATION
-    // =========================
     public synchronized int getDuration() {
         return duration;
     }

@@ -3,6 +3,7 @@ package com.tank2d.client.util;
 import com.tank2d.common.dto.game.TankSnapshotDTO;
 
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
@@ -11,23 +12,26 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Xử lý cụm bụi cỏ phía client: gán nhãn cụm (BFS) và tìm cụm đang có từ 2 xe
- * trở lên.
+ * Tiện ích xử lý cụm bụi cỏ phía Client.
+ * <p>
+ * Phục vụ việc gán nhãn cụm (BFS) và xác định cụm bụi cỏ nào đang có từ 2 xe trở lên
+ * để hiển thị hiệu ứng mờ/trong suốt cho người chơi.
  */
 public final class BushClusterUtil {
 
     public static final int NO_CLUSTER = -1;
-    private static final int BUSH_TILE = 3; // quy ước map: 3 = bụi cỏ
+    private static final int BUSH_TILE = 3;
 
-    private static final int[] DR = {-1, 1, 0, 0};
-    private static final int[] DC = {0, 0, -1, 1};
+    private static final int[] ROW_OFFSETS = {-1, 1, 0, 0};
+    private static final int[] COL_OFFSETS = {0, 0, -1, 1};
 
-    private BushClusterUtil() {
-    }
+    private BushClusterUtil() {}
 
     /**
-     * Trả về ma trận cùng kích thước map; ô bụi mang clusterId, ô khác là
-     * NO_CLUSTER.
+     * Tính toán ma trận định danh cụm bụi cỏ từ ma trận bản đồ gốc bằng thuật toán BFS.
+     *
+     * @param mapMatrix ma trận mã ô bản đồ 2D
+     * @return ma trận số nguyên cùng kích thước; ô bụi cỏ mang clusterId (>=0), ô khác mang NO_CLUSTER (-1)
      */
     public static int[][] computeClusterIds(int[][] mapMatrix) {
         if (mapMatrix == null || mapMatrix.length == 0) {
@@ -38,7 +42,7 @@ public final class BushClusterUtil {
         int cols = mapMatrix[0].length;
         int[][] ids = new int[rows][cols];
         for (int[] row : ids) {
-            java.util.Arrays.fill(row, NO_CLUSTER);
+            Arrays.fill(row, NO_CLUSTER);
         }
 
         int nextId = 0;
@@ -61,8 +65,8 @@ public final class BushClusterUtil {
         while (!queue.isEmpty()) {
             int[] cur = queue.poll();
             for (int i = 0; i < 4; i++) {
-                int nr = cur[0] + DR[i];
-                int nc = cur[1] + DC[i];
+                int nr = cur[0] + ROW_OFFSETS[i];
+                int nc = cur[1] + COL_OFFSETS[i];
                 if (nr < 0 || nr >= map.length || nc < 0 || nc >= map[0].length) {
                     continue;
                 }
@@ -77,14 +81,20 @@ public final class BushClusterUtil {
     }
 
     /**
-     * Các cụm bụi đang chứa ít nhất minTanks xe còn sống (tính theo tâm xe).
+     * Xác định tập hợp các ID cụm bụi cỏ đang chứa ít nhất {@code minTanks} xe tăng còn sống.
+     *
+     * @param clusterIds ma trận nhãn cụm bụi cỏ
+     * @param tanks      tập hợp snapshot xe tăng trong frame
+     * @param tileSize   kích thước mỗi ô vuông bản đồ
+     * @param minTanks   ngưỡng số lượng xe tối thiểu trong cụm
+     * @return tập hợp các mã cụm bụi cỏ thỏa mãn điều kiện
      */
     public static Set<Integer> findClustersWithTanks(int[][] clusterIds,
-            Collection<TankSnapshotDTO> tanks,
-            int tileSize,
-            int minTanks) {
+                                                     Collection<TankSnapshotDTO> tanks,
+                                                     int tileSize,
+                                                     int minTanks) {
         Set<Integer> result = new HashSet<>();
-        if (clusterIds == null || clusterIds.length == 0 || tileSize <= 0) {
+        if (clusterIds == null || clusterIds.length == 0 || tileSize <= 0 || tanks == null) {
             return result;
         }
 

@@ -11,6 +11,12 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Phiên làm việc duy nhất (Singleton Session) phía Client.
+ * <p>
+ * Quản lý kết nối socket, thông tin tài khoản hiện hành, luồng đọc gói tin độc lập (Reader Thread)
+ * và phân phối sự kiện gói tin tới các Controller thông qua danh sách Listener.
+ */
 public class ClientSession {
 
     private static final Logger LOGGER = Logger.getLogger(ClientSession.class.getName());
@@ -18,16 +24,12 @@ public class ClientSession {
 
     private ClientSocket clientSocket;
     private User currentUser;
-
-    // Danh sách các nơi muốn nhận packet từ Server
     private final List<Consumer<Packet>> packetListeners = new CopyOnWriteArrayList<>();
 
-    // Luồng đọc Server duy nhất
     private Thread readerThread;
     private volatile boolean reading = false;
 
-    private ClientSession() {
-    }
+    private ClientSession() {}
 
     public static synchronized ClientSession getInstance() {
         if (instance == null) {
@@ -36,12 +38,16 @@ public class ClientSession {
         return instance;
     }
 
+    /**
+     * Khởi tạo kết nối mạng socket và bắt đầu luồng đọc dữ liệu nền từ máy chủ.
+     *
+     * @throws IOException nếu kết nối không thành công
+     */
     public synchronized void connect() throws IOException {
         if (clientSocket == null || !clientSocket.isConnected()) {
             clientSocket = new ClientSocket();
             clientSocket.connect();
         }
-        // Chỉ tạo một Reader Thread
         if (!reading) {
             startReaderThread();
         }
@@ -64,7 +70,9 @@ public class ClientSession {
     }
 
     /**
-     * Đăng ký nơi nhận packet từ Server
+     * Đăng ký đối tượng nhận gói tin phản hồi từ Server.
+     *
+     * @param listener hàm callback xử lý gói tin
      */
     public void addPacketListener(Consumer<Packet> listener) {
         if (listener != null && !packetListeners.contains(listener)) {
@@ -73,7 +81,9 @@ public class ClientSession {
     }
 
     /**
-     * Hủy đăng ký nhận packet
+     * Hủy đăng ký nhận gói tin.
+     *
+     * @param listener hàm callback đã đăng ký trước đó
      */
     public void removePacketListener(Consumer<Packet> listener) {
         if (listener != null) {
@@ -82,7 +92,7 @@ public class ClientSession {
     }
 
     /**
-     * Reader Thread duy nhất đọc dữ liệu từ Server
+     * Khởi động Reader Thread duy nhất để liên tục đọc gói tin từ máy chủ và phân phối tới listener.
      */
     private void startReaderThread() {
         if (reading) {
@@ -101,7 +111,6 @@ public class ClientSession {
                         break;
                     }
 
-                    // Chuyển packet cho các Controller đã đăng ký
                     for (Consumer<Packet> listener : packetListeners) {
                         try {
                             listener.accept(packet);
@@ -126,7 +135,7 @@ public class ClientSession {
     }
 
     /**
-     * Đóng Session và kết nối Server
+     * Đóng phiên làm việc hiện tại, giải phóng socket và hủy bỏ luồng đọc.
      */
     public synchronized void close() {
         reading = false;

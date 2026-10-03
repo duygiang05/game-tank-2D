@@ -27,19 +27,30 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
+/**
+ * Quản lý trạng thái trận đấu (Game State Manager).
+ * <p>
+ * Đảm nhiệm các chức năng cốt lõi:
+ * <ul>
+ *     <li>Theo dõi thời gian thi đấu đếm ngược và kiểm soát điều kiện kết thúc trận (Game Over).</li>
+ *     <li>Quản lý vòng đời hồi sinh và thời gian bảo hộ bất tử (Ghost) của từng xe tăng.</li>
+ *     <li>Lắng nghe và giải quyết các sự kiện chiến đấu: trúng đạn, phá khiên, hạ gục, bắn trúng tường.</li>
+ *     <li>Xử lý sự kiện thoát trận (chủ động đầu hàng hoặc ngắt kết nối đột ngột/AFK) và cơ chế Reconnect.</li>
+ *     <li>Tổng kết xếp hạng người chơi, phân định thắng/thua/hòa và ghi nhận lịch sử vào cơ sở dữ liệu.</li>
+ * </ul>
+ */
 public class GameStateManager implements CombatEventListener, MapChangeListener, ItemEventListener {
+
     private static final Logger LOGGER = Logger.getLogger(GameStateManager.class.getName());
     private static final Gson GSON = new Gson();
 
     private final GameLoop gameLoop;
     private final UserDAO userDAO;
-    private final MatchDAO matchDAO ;
+    private final MatchDAO matchDAO;
     private final Map<Integer, PlayerCombatState> playerStates = new ConcurrentHashMap<>();
-    // Giữ lại trạng thái của tất cả người chơi trong ván để lưu lịch sử match_participants
     private final List<PlayerCombatState> allMatchParticipants = new ArrayList<>();
     private final Map<Integer, DataOutputStream> playerSockets = new ConcurrentHashMap<>();
 
-    // --- CÁC BIẾN ĐỌC HOÀN TOÀN TỪ CẤU HÌNH (KHÔNG HARDCODE) ---
     private final int pointsPerHit;
     private final int pointsPerKill;
     private final int pointsWinBonus;
@@ -51,15 +62,21 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
     private double matchRemainingTime;
     private boolean isGameOver = false;
 
-    // Tọa độ 4 góc Spawn cấu hình từ file Map JSON
+    /**
+     * Điểm xuất hiện (Spawn Point) trên bản đồ cho từng vị trí xe tăng.
+     */
     private static class SpawnPoint {
-        final double x, y, angle;
+        final double x;
+        final double y;
+        final double angle;
+
         SpawnPoint(double x, double y, double angle) {
             this.x = x;
             this.y = y;
             this.angle = angle;
         }
     }
+
     private final Map<Integer, SpawnPoint> spawnPoints = new HashMap<>();
     private Runnable onGameOverCallback;
 
@@ -67,6 +84,14 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
         this.onGameOverCallback = onGameOverCallback;
     }
 
+    /**
+     * Khởi tạo trình quản lý trận đấu với các tham số cấu hình.
+     *
+     * @param gameLoop             luồng lặp vật lý chính của trận đấu
+     * @param userDAO              đối tượng truy xuất dữ liệu người dùng
+     * @param matchDAO             đối tượng truy xuất và lưu trữ lịch sử trận đấu
+     * @param matchDurationSeconds thời lượng trận đấu tính bằng giây
+     */
     public GameStateManager(GameLoop gameLoop, UserDAO userDAO, MatchDAO matchDAO, double matchDurationSeconds) {
         this.gameLoop = gameLoop;
         this.userDAO = userDAO != null ? userDAO : new UserDAO();
@@ -74,38 +99,37 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
 
         this.matchRemainingTime = matchDurationSeconds > 0 ? matchDurationSeconds : ConfigLoader.getDefaultMatchDuration();
 
-        // 1. Nạp điểm số từ game.scoring (YAML)
-        this.pointsPerHit = ConfigLoader.getPointsPerHit();         // 10
-        this.pointsPerKill = ConfigLoader.getPointsPerKill();       // 30
-        this.pointsWinBonus = ConfigLoader.getPointsWinBonus();     // 50
+        this.pointsPerHit = ConfigLoader.getPointsPerHit();
+        this.pointsPerKill = ConfigLoader.getPointsPerKill();
+        this.pointsWinBonus = ConfigLoader.getPointsWinBonus();
 
-        // 2. Nạp chỉ số xe & thời gian bảo hộ từ game.tank (YAML)
-        this.maxHp = ConfigLoader.getMaxHp();                       // 3
-        this.protectionDuration = ConfigLoader.getGhostDurationSeconds(); // 5.0s
+        this.maxHp = ConfigLoader.getMaxHp();
+        this.protectionDuration = ConfigLoader.getGhostDurationSeconds();
 
-        // 3. Tính thời gian hồi sinh theo mốc trận đấu từ game.respawn_times (YAML)
         if (this.matchRemainingTime <= 45.0) {
-            this.respawnDelay = ConfigLoader.getRespawnTime45s();   // 3.0s
+            this.respawnDelay = ConfigLoader.getRespawnTime45s();
         } else if (this.matchRemainingTime <= 60.0) {
-            this.respawnDelay = ConfigLoader.getRespawnTime60s();   // 5.0s
+            this.respawnDelay = ConfigLoader.getRespawnTime60s();
         } else if (this.matchRemainingTime <= 90.0) {
-            this.respawnDelay = ConfigLoader.getRespawnTime90s();   // 7.0s
+            this.respawnDelay = ConfigLoader.getRespawnTime90s();
         } else {
-            this.respawnDelay = ConfigLoader.getRespawnTime180s();  // 9.0s
+            this.respawnDelay = ConfigLoader.getRespawnTime180s();
         }
 
-        // 4. Nạp 4 điểm Spawn từ Map JSON
         initSpawnPoints();
     }
 
+    /**
+     * Khởi tạo các điểm xuất hiện (Spawn Points) cho 4 góc bản đồ từ cấu hình.
+     */
     private void initSpawnPoints() {
         int tileSize = ConfigLoader.getTileSize();
         int cols = ConfigLoader.getMapCols();
         int rows = ConfigLoader.getMapRows();
 
-        double minCoord = tileSize / 2.0;                          // 15.0 (tâm ô [0,0])
-        double maxCoordX = (cols - 1) * tileSize + tileSize / 2.0; // 585.0 (tâm ô [0,19])
-        double maxCoordY = (rows - 1) * tileSize + tileSize / 2.0; // 585.0 (tâm ô [19,0])
+        double minCoord = tileSize / 2.0;
+        double maxCoordX = (cols - 1) * tileSize + tileSize / 2.0;
+        double maxCoordY = (rows - 1) * tileSize + tileSize / 2.0;
 
         spawnPoints.put(1, new SpawnPoint(ConfigLoader.getSpawnX(1, minCoord),  ConfigLoader.getSpawnY(1, minCoord),  ConfigLoader.getSpawnAngle(1, 135.0)));
         spawnPoints.put(2, new SpawnPoint(ConfigLoader.getSpawnX(2, maxCoordX), ConfigLoader.getSpawnY(2, minCoord),  ConfigLoader.getSpawnAngle(2, 225.0)));
@@ -113,19 +137,32 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
         spawnPoints.put(4, new SpawnPoint(ConfigLoader.getSpawnX(4, maxCoordX), ConfigLoader.getSpawnY(4, maxCoordY), ConfigLoader.getSpawnAngle(4, 315.0)));
     }
 
+    /**
+     * Đăng ký người chơi mới vào trận đấu.
+     *
+     * @param tankId ID xe tăng trong trận
+     * @param userId ID tài khoản người dùng
+     * @param dos    kênh socket gửi dữ liệu tới client
+     */
     public void registerPlayer(int tankId, int userId, DataOutputStream dos) {
         PlayerCombatState state = new PlayerCombatState(tankId, userId);
         playerStates.put(tankId, state);
-        allMatchParticipants.add(state); // Ghi nhớ để lưu lịch sử đầy đủ kể cả khi out game
+        allMatchParticipants.add(state);
         if (dos != null) {
             playerSockets.put(tankId, dos);
         }
     }
 
+    /**
+     * Cập nhật logic tiến trình trận đấu trong mỗi tick vật lý.
+     *
+     * @param deltaTime khoảng thời gian trôi qua giữa 2 tick (giây)
+     */
     public void update(double deltaTime) {
-        if (isGameOver) return;
+        if (isGameOver) {
+            return;
+        }
 
-        // 1. Đếm ngược thời gian trận đấu
         matchRemainingTime -= deltaTime;
         if (matchRemainingTime <= 0.0) {
             matchRemainingTime = 0.0;
@@ -133,12 +170,12 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
             return;
         }
 
-        // 2. Cập nhật vòng đời xe
         for (PlayerCombatState state : playerStates.values()) {
             TankEntity tank = gameLoop.getTank(state.getTankId());
-            if (tank == null) continue;
+            if (tank == null) {
+                continue;
+            }
 
-        //  quản lý xe đang chết: đếm ngược hồi sinh
             if (!tank.isAlive() && state.isWaitingRespawn()) {
                 state.reduceRespawnTimer(deltaTime);
                 if (!state.isWaitingRespawn()) {
@@ -150,44 +187,50 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
 
     @Override
     public void onCombatEvent(CombatEvent event) {
-        if (isGameOver) return;
-        // XỬ LÝ PHÁT BẮN TRÚNG TƯỜNG (CHƯA VỠ HOÀN TOÀN)
+        if (isGameOver) {
+            return;
+        }
+
         if (event.getType() == CombatEvent.EventType.WALL_HIT) {
             int row = event.getTargetTankId() / 10000;
             int col = event.getTargetTankId() % 10000;
             double tileSize = ConfigLoader.getTileSize();
             double cx = col * tileSize + tileSize / 2.0;
             double cy = row * tileSize + tileSize / 2.0;
-            
-            // Broadcast báo cho toàn bộ Client biết ô tường tại (cx, cy) vừa bị bắn trúng
+
             broadcastEffect(new GameEventEffectDTO("WALL_HIT", cx, cy, -1));
             return;
         }
-        if (event.getType() == CombatEvent.EventType.SHIELD_BLOCKED) return;
+
+        if (event.getType() == CombatEvent.EventType.SHIELD_BLOCKED) {
+            return;
+        }
+
         TankEntity targetTank = gameLoop.getTank(event.getTargetTankId());
         TankEntity shooterTank = gameLoop.getTank(event.getShooterId());
         PlayerCombatState targetState = playerStates.get(event.getTargetTankId());
         PlayerCombatState shooterState = playerStates.get(event.getShooterId());
 
-        if (targetTank == null || targetState == null || !targetTank.isAlive()) return;
-        if (event.getType() == CombatEvent.EventType.SHIELD_BROKEN) {
-            targetTank.setShieldActiveUntilMillis(0); // tắt khiên
+        if (targetTank == null || targetState == null || !targetTank.isAlive()) {
+            return;
         }
-        // MIỄN NHIỄM KHI BẢO HỘ: Xe đang bảo hộ không bị nhận damage và không gây damage
+
+        if (event.getType() == CombatEvent.EventType.SHIELD_BROKEN) {
+            targetTank.setShieldActiveUntilMillis(0L);
+        }
+
         if (targetTank.isProtected() || (shooterTank != null && shooterTank.isProtected())) {
             return;
         }
 
-        // Bắn trúng đích -> Cộng điểm hit theo cấu hình
         if (shooterState != null) {
             shooterState.addHit(pointsPerHit);
         }
 
-        // Nếu xe bắn vừa bắn trúng bằng Rocket -> Tiêu hao buff tên lửa ngay lập tức (chỉ 1 phát 3 damage)
-        if (shooterTank != null && shooterTank.getRocketBuffActiveUntilMillis() > 0) {
-            shooterTank.setRocketBuffActiveUntilMillis(0);
+        if (shooterTank != null && shooterTank.getRocketBuffActiveUntilMillis() > 0L) {
+            shooterTank.setRocketBuffActiveUntilMillis(0L);
         }
-        
+
         int newHp = Math.max(0, targetTank.getHp() - event.getDamage());
         targetTank.setHp(newHp);
 
@@ -197,7 +240,6 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
             targetState.addDeath();
             targetState.setRespawnTimer(respawnDelay);
 
-            // Hạ gục đối phương -> Cộng điểm kill theo cấu hình
             if (shooterState != null) {
                 shooterState.addKill(pointsPerKill);
             }
@@ -207,22 +249,31 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
         }
     }
 
+    /**
+     * Hồi sinh xe tăng tại điểm xuất phát tương ứng và cấp thời gian bảo hộ bất tử.
+     *
+     * @param tank  xe tăng hồi sinh
+     * @param state trạng thái thi đấu của người chơi
+     */
     private void respawnTank(TankEntity tank, PlayerCombatState state) {
         tank.setHp(maxHp);
         tank.setAlive(true);
 
-        // Đưa xe về đúng vị trí spawn cấu hình trong Map
         SpawnPoint sp = spawnPoints.getOrDefault(tank.getId(), new SpawnPoint(400.0, 400.0, 0.0));
         tank.setX(sp.x);
         tank.setY(sp.y);
         tank.setAngle(sp.angle);
 
-        // Kích hoạt cờ bảo hộ đọc từ cấu hình
         tank.setProtectionTimer(protectionDuration);
         LOGGER.info("[Combat] Tank " + tank.getId() + " hồi sinh tại góc P" + tank.getId() + " (" + sp.x + ", " + sp.y + ") với bảo hộ " + protectionDuration + "s!");
     }
 
-    // TH1: Xử lý khi người chơi bấm nút Thoát giữa trận (chủ động đầu hàng)
+    /**
+     * Xử lý khi người chơi chủ động bấm nút Thoát giữa trận (đầu hàng).
+     * Xe bị nổ ngay lập tức, bị loại vĩnh viễn khỏi ván đấu hiện tại.
+     *
+     * @param tankId ID xe tăng thoát trận
+     */
     public synchronized void handlePlayerSurrender(int tankId) {
         TankEntity tank = gameLoop.getTank(tankId);
         if (tank != null) {
@@ -234,28 +285,30 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
         PlayerCombatState state = playerStates.get(tankId);
         if (state != null) {
             state.setEliminated(true);
-            state.setRespawnTimer(0);
+            state.setRespawnTimer(0.0);
         }
 
         playerSockets.remove(tankId);
         LOGGER.info("[Room] Tank " + tankId + " đã chủ động thoát trận và bị loại khỏi cuộc chơi.");
 
-        // Kiểm tra số người chơi còn lại chưa bị loại
         long activeCount = playerStates.values().stream()
                 .filter(s -> !s.isEliminated())
                 .count();
 
-        // Nếu chỉ còn <= 1 người chưa bị loại -> Kết thúc trận sớm, trao giải cho người ở lại
         if (activeCount <= 1 && !isGameOver) {
             triggerGameOver("PLAYER_LEFT");
         }
     }
 
-    // TH2: Xử lý khi người chơi ngắt kết nối đột ngột (mất mạng, tắt app 'X')
+    /**
+     * Xử lý khi người chơi mất kết nối mạng đột ngột hoặc tắt app bằng nút 'X'.
+     * Xe sẽ chuyển sang trạng thái AFK đứng yên nhưng vẫn ở lại trong trận để cho phép Reconnect.
+     *
+     * @param tankId ID xe tăng mất kết nối
+     */
     public synchronized void handlePlayerDisconnected(int tankId) {
         TankEntity tank = gameLoop.getTank(tankId);
         if (tank != null) {
-            // Cho xe dừng mọi di chuyển, biến thành xe AFK
             tank.setMoveState(TankEntity.MoveState.NONE);
             tank.setRotateState(TankEntity.RotateState.NONE);
         }
@@ -269,7 +322,13 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
         LOGGER.info("[Room] Tank " + tankId + " mất kết nối đột ngột -> chuyển sang chế độ AFK, xe vẫn ở lại trận đấu.");
     }
 
-    // Reconnect vào lại trận đấu
+    /**
+     * Xử lý tái kết nối (Reconnect) vào trận đấu đang diễn ra.
+     *
+     * @param tankId ID xe tăng cần khôi phục kết nối
+     * @param newDos kênh truyền socket mới của người chơi
+     * @return {@code true} nếu khôi phục thành công, {@code false} nếu người chơi đã bị loại hoặc trận đã kết thúc
+     */
     public synchronized boolean reconnectPlayer(int tankId, DataOutputStream newDos) {
         PlayerCombatState state = playerStates.get(tankId);
         if (state != null && !state.isEliminated() && !isGameOver) {
@@ -283,75 +342,73 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
         return false;
     }
 
-    public void handlePlayerLeave(int tankId) {
-        handlePlayerSurrender(tankId);
-    }
-
+    /**
+     * Kiểm tra xem một người chơi có đang trong trạng thái mất kết nối (AFK) hay không.
+     *
+     * @param tankId mã số xe tăng
+     * @return {@code true} nếu đang mất kết nối
+     */
     public boolean isPlayerDisconnected(int tankId) {
         PlayerCombatState state = playerStates.get(tankId);
         return state != null && state.isDisconnected();
     }
 
-    // Hàm dọn dẹp player socket khi cần
+    /**
+     * Hủy đăng ký người chơi khỏi trận đấu và dọn dẹp kết nối socket.
+     *
+     * @param tankId mã số xe tăng
+     */
     public void unregisterPlayer(int tankId) {
         playerStates.remove(tankId);
         playerSockets.remove(tankId);
     }
 
-    // trigger kết thúc ván đấu
+    /**
+     * Kích hoạt kết thúc trận đấu, tổng kết kết quả, xếp hạng và lưu trữ vào CSDL.
+     *
+     * @param reason lý do kết thúc ("TIMEOUT", "PLAYER_LEFT", ...)
+     */
     private void triggerGameOver(String reason) {
-        if (isGameOver) return; // Chặn trigger lặp lại
+        if (isGameOver) {
+            return;
+        }
         isGameOver = true;
         gameLoop.stopLoop();
 
         List<PlayerCombatState> players = new ArrayList<>(playerStates.values());
 
-        // 1. ĐIỀU KIỆN HÒA:
-        // CHỈ xét Hòa khi trận đấu hết giờ bình thường (TIMEOUT) và TẤT CẢ đều có 0 Kill, 0 Hit.
-        // NẾU LÀ "PLAYER_LEFT" (đối thủ bỏ chạy) THÌ TUYỆT ĐỐI KHÔNG HÒA!
-        boolean isDraw = !"PLAYER_LEFT".equals(reason) 
-                         && !players.isEmpty() 
-                         && players.stream().allMatch(p -> p.getKills() == 0 && p.getHits() == 0);
+        boolean isDraw = !"PLAYER_LEFT".equals(reason)
+                && !players.isEmpty()
+                && players.stream().allMatch(p -> p.getKills() == 0 && p.getHits() == 0);
 
         int winnerTankId = -1;
 
         if ("PLAYER_LEFT".equals(reason) && !players.isEmpty()) {
-            // 2. NHÁNH ĐẶC BIỆT: Đối thủ thoát giữa chừng -> Người ở lại duy nhất THẮNG NGAY LẬP TỨC
             List<PlayerCombatState> activeSurvivors = players.stream()
                     .filter(p -> !p.isEliminated())
                     .toList();
             if (!activeSurvivors.isEmpty()) {
                 PlayerCombatState survivor = activeSurvivors.get(0);
                 winnerTankId = survivor.getTankId();
-                survivor.addBonusScore(pointsWinBonus); // Cộng ngay +50 điểm cho người ở lại
+                survivor.addBonusScore(pointsWinBonus);
             }
         } else if (!isDraw && !players.isEmpty()) {
-            // 3. NHÁNH HẾT GIỜ CÓ GIAO TRANH: Xếp hạng theo các tiêu chí (người bị loại luôn xếp sau)
             players.sort((p1, p2) -> {
                 if (p1.isEliminated() != p2.isEliminated()) {
                     return p1.isEliminated() ? 1 : -1;
                 }
-
-                // Tiêu chí 1: Số mạng hạ gục (Kill) - Giảm dần
                 if (p2.getKills() != p1.getKills()) {
                     return Integer.compare(p2.getKills(), p1.getKills());
                 }
-
-                // Tiêu chí 2: Độ chuẩn xác (Hits) - Giảm dần
                 if (p2.getHits() != p1.getHits()) {
                     return Integer.compare(p2.getHits(), p1.getHits());
                 }
-
-                // Tiêu chí 3: Ghi mạng hạ gục đầu tiên sớm hơn (Earliest First Kill) - Tăng dần
                 if (p1.getKills() > 0 && p1.getFirstKillTimeMillis() != p2.getFirstKillTimeMillis()) {
                     return Long.compare(p1.getFirstKillTimeMillis(), p2.getFirstKillTimeMillis());
                 }
-
-                // Tiêu chí 4: Bắn trúng viên đạn đầu tiên sớm hơn (Earliest First Hit) - Tăng dần
                 return Long.compare(p1.getFirstHitTimeMillis(), p2.getFirstHitTimeMillis());
             });
 
-            // Xác định người thắng cuộc (Người đầu tiên chưa bị loại)
             for (PlayerCombatState candidate : players) {
                 if (!candidate.isEliminated()) {
                     winnerTankId = candidate.getTankId();
@@ -361,7 +418,6 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
             }
         }
 
-        // 4. Đóng gói danh sách điểm số, kill, hit cuối cùng
         Map<Integer, Integer> finalScores = new HashMap<>();
         Map<Integer, Integer> finalKills = new HashMap<>();
         Map<Integer, Integer> finalHits = new HashMap<>();
@@ -372,13 +428,11 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
             finalHits.put(state.getTankId(), state.getHits());
         }
 
-        // 5. ƯU TIÊN GỬI THÔNG BÁO KẾT THÚC TRẬN ĐẦU TIÊN (ĐẢM BẢO CLIENT LUÔN HIỆN POPUP)
         String finalReason = isDraw ? "DRAW" : reason;
         GameOverDTO dto = new GameOverDTO(winnerTankId, finalReason, finalScores, finalKills, finalHits);
         broadcastPacket(new Packet(PacketType.GAME_OVER_NOTIFY, GSON.toJson(dto)));
         LOGGER.info("[Game] Đã broadcast GAME_OVER_NOTIFY thành công tới toàn bộ client!");
 
-        // 6. Lưu kết quả vào CSDL (Bọc try-catch để lỗi DB không làm ảnh hưởng game)
         try {
             saveMatchResultToDatabase(winnerTankId, isDraw, players);
         } catch (GameNetworkException e) {
@@ -387,7 +441,6 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
             LOGGER.severe("[DB] Lỗi lưu kết quả trận đấu: " + e.getMessage());
         }
 
-        // 7. BÁO CHO ROOM BIẾT ĐỂ RESET TRẠNG THÁI (Bọc try-catch độc lập)
         if (onGameOverCallback != null) {
             try {
                 onGameOverCallback.run();
@@ -397,11 +450,17 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
             }
         }
     }
-    
+
+    /**
+     * Ghi nhận kết quả trận đấu, cập nhật thống kê người dùng và lịch sử đối đầu vào CSDL.
+     *
+     * @param winnerTankId mã xe chiến thắng
+     * @param isDraw       kết quả hòa
+     * @param players      danh sách người chơi
+     */
     private void saveMatchResultToDatabase(int winnerTankId, boolean isDraw, List<PlayerCombatState> players) {
         Integer winnerUserId = null;
 
-        // 1. Cập nhật tích lũy vào user_stats cho những người kết thúc ván đấu
         for (PlayerCombatState state : players) {
             boolean isWin = (!isDraw && !state.isEliminated() && state.getTankId() == winnerTankId);
             if (isWin) {
@@ -421,19 +480,16 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
             }
         }
 
-        // 2. Lưu lịch sử trận đấu khớp với 2 bảng phpMyAdmin (LƯU ĐẦY ĐỦ CẢ NGƯỜI THOÁT)
         if (matchDAO != null) {
             int duration = (int) (ConfigLoader.getDefaultMatchDuration() - this.matchRemainingTime);
             String roomName = "Room " + (gameLoop != null ? "Game" : "1");
 
-            // Sắp xếp thứ hạng: Người thắng đứng đầu (Hạng 1), người thoát hoặc thua xếp sau
             allMatchParticipants.sort((p1, p2) -> {
                 if (p1.getTankId() == winnerTankId) return -1;
                 if (p2.getTankId() == winnerTankId) return 1;
                 return Integer.compare(p2.getScore(), p1.getScore());
             });
 
-            // DÙNG allMatchParticipants ĐỂ BẢNG match_participants LƯU ĐỦ CẢ 2 XE
             matchDAO.recordMatchResult(roomName, winnerUserId, duration, allMatchParticipants);
         }
     }
@@ -452,33 +508,58 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
         }
     }
 
-    public boolean isGameOver() { return isGameOver; }
-    public double getMatchRemainingTime() { return matchRemainingTime; }
-    public double getRespawnDelay() { return respawnDelay; }
+    /**
+     * Kiểm tra xem trận đấu đã kết thúc hay chưa.
+     *
+     * @return {@code true} nếu đã kết thúc
+     */
+    public boolean isGameOver() {
+        return isGameOver;
+    }
+
+    /**
+     * Lấy thời gian còn lại của trận đấu (tính bằng giây).
+     *
+     * @return số giây còn lại
+     */
+    public double getMatchRemainingTime() {
+        return matchRemainingTime;
+    }
+
+    /**
+     * Lấy độ trễ hồi sinh sau khi xe bị tiêu diệt (giây).
+     *
+     * @return thời gian hồi sinh (giây)
+     */
+    public double getRespawnDelay() {
+        return respawnDelay;
+    }
+
     @Override
     public void onMapChanged(MapChangeEvent event) {
-            MapUpdateDTO dto = new MapUpdateDTO(event.getRow(), event.getCol(), event.getNewTileCode());
-            broadcastPacket(new Packet(PacketType.MAP_UPDATE, GSON.toJson(dto)));
-            
-            // Broadcast hiệu ứng vỡ vụn
-            double tileSize = ConfigLoader.getTileSize();
-            double centerX = event.getCol() * tileSize + tileSize / 2.0;
-            double centerY = event.getRow() * tileSize + tileSize / 2.0;
-            broadcastEffect(new GameEventEffectDTO("WALL_BREAK", centerX, centerY, -1));
-        }
+        MapUpdateDTO dto = new MapUpdateDTO(event.getRow(), event.getCol(), event.getNewTileCode());
+        broadcastPacket(new Packet(PacketType.MAP_UPDATE, GSON.toJson(dto)));
+
+        double tileSize = ConfigLoader.getTileSize();
+        double centerX = event.getCol() * tileSize + tileSize / 2.0;
+        double centerY = event.getRow() * tileSize + tileSize / 2.0;
+        broadcastEffect(new GameEventEffectDTO("WALL_BREAK", centerX, centerY, -1));
+    }
 
     @Override
     public void onItemPickup(ItemPickupEvent event) {
-            TankEntity tank = gameLoop.getTank(event.getTankId());
-            if (tank == null || !tank.isAlive() || tank.isProtected() ) return;
-            long now = System.currentTimeMillis();
+        TankEntity tank = gameLoop.getTank(event.getTankId());
+        if (tank == null || !tank.isAlive() || tank.isProtected()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
 
-            switch (event.getItemType()) {
-                case SHIELD -> tank.setShieldActiveUntilMillis(now + (long) (ConfigLoader.getShieldDurationSeconds() * 1000));
-                case NITRO -> tank.setNitroActiveUntilMillis(now + (long) (ConfigLoader.getNitroDurationSeconds() * 1000));
-                case ROCKET_AMMO -> tank.setRocketBuffActiveUntilMillis(now + (long) (ConfigLoader.getMissileBuffDurationSeconds() * 1000));
-                case HEALTH_PACK -> tank.setHp(Math.min(maxHp, tank.getHp() + ConfigLoader.getHealAmount()));
-            }
-            broadcastEffect(new GameEventEffectDTO("ITEM_PICKUP_" + event.getItemType(), tank.getX(), tank.getY(), tank.getId()));
+        switch (event.getItemType()) {
+            case SHIELD -> tank.setShieldActiveUntilMillis(now + (long) (ConfigLoader.getShieldDurationSeconds() * 1000));
+            case NITRO -> tank.setNitroActiveUntilMillis(now + (long) (ConfigLoader.getNitroDurationSeconds() * 1000));
+            case ROCKET_AMMO -> tank.setRocketBuffActiveUntilMillis(now + (long) (ConfigLoader.getMissileBuffDurationSeconds() * 1000));
+            case HEALTH_PACK -> tank.setHp(Math.min(maxHp, tank.getHp() + ConfigLoader.getHealAmount()));
+        }
+        broadcastEffect(new GameEventEffectDTO("ITEM_PICKUP_" + event.getItemType(), tank.getX(), tank.getY(), tank.getId()));
     }
 }

@@ -5,10 +5,10 @@ import com.tank2d.client.ClientSession;
 import com.tank2d.client.network.ClientSocket;
 import com.tank2d.client.view.GameCanvasApp;
 import com.tank2d.common.dto.RoomDTO;
+import com.tank2d.common.exception.GameNetworkException;
 import com.tank2d.common.model.User;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
-
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -18,7 +18,6 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.stage.Stage;
 
-import com.tank2d.common.exception.GameNetworkException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -26,9 +25,16 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Điều khiển màn hình phòng chờ trận đấu (Room Waiting View).
+ * <p>
+ * Quản lý danh sách thành viên trong phòng, trạng thái sẵn sàng, chọn thời lượng trận đấu (đối với chủ phòng)
+ * và chuyển tiếp sang màn hình chơi game (GameCanvasApp) khi trận đấu bắt đầu.
+ */
 public class RoomController {
 
     private static final Logger LOGGER = Logger.getLogger(RoomController.class.getName());
+    private static final Gson GSON = new Gson();
 
     @FXML
     private Label roomNameLabel;
@@ -65,16 +71,17 @@ public class RoomController {
     @FXML
     private ComboBox<String> durationComboBox;
 
-    private final Gson gson = new Gson();
     private final ClientSession session = ClientSession.getInstance();
     private final Consumer<Packet> packetListener = this::handleServerPacket;
 
     private RoomDTO currentRoom;
     private boolean listenerRegistered = false;
 
-    // ==========================================
-    // SET ROOM
-    // ==========================================
+    /**
+     * Nạp dữ liệu phòng chơi và khởi tạo giao diện phòng.
+     *
+     * @param room dữ liệu phòng từ máy chủ
+     */
     public void setRoom(RoomDTO room) {
         this.currentRoom = room;
         if (room == null) return;
@@ -88,7 +95,6 @@ public class RoomController {
             LOGGER.info("[Room] Đã đăng ký Room Packet Listener.");
         }
 
-        // Xin Server dữ liệu Room mới nhất ngay khi mở lại phòng
         try {
             ClientSocket socket = session.getClientSocket();
             if (socket != null && socket.isConnected()) {
@@ -97,9 +103,6 @@ public class RoomController {
         } catch (Exception ignored) {}
     }
 
-    // ==========================================
-    // SETUP DURATION
-    // ==========================================
     private void setupDurationComboBox() {
         if (durationComboBox == null) return;
 
@@ -110,9 +113,6 @@ public class RoomController {
         durationComboBox.setOnAction(event -> handleDurationChanged());
     }
 
-    // ==========================================
-    // UPDATE ROOM UI
-    // ==========================================
     private void updateRoomUI(RoomDTO room) {
         Platform.runLater(() -> {
             roomNameLabel.setText(room.getRoomName());
@@ -124,77 +124,102 @@ public class RoomController {
                     + "  •  Thời lượng: " + room.getDuration() + "s"
             );
 
-            updateSpawnSlots(room);
+            clearSlots();
+
+            List<String> players = room.getPlayerNames();
+            Map<Integer, Boolean> readyStates = room.getReadyStates();
+            int hostId = room.getHostId();
+
+            if (players != null) {
+                for (int i = 0; i < players.size(); i++) {
+                    String username = players.get(i);
+                    boolean isHost = false;
+                    boolean isReady = false;
+
+                    User currentUser = session.getCurrentUser();
+                    if (currentUser != null && username.equals(currentUser.getUsername())) {
+                        isHost = (currentUser.getId() == hostId);
+                        isReady = readyStates != null && Boolean.TRUE.equals(readyStates.get(currentUser.getId()));
+                    } else {
+                        if (readyStates != null) {
+                            for (Map.Entry<Integer, Boolean> entry : readyStates.entrySet()) {
+                                if (entry.getKey() == hostId) {
+                                    if (i == 0) isHost = true;
+                                }
+                            }
+                        }
+                        if (i == 0) isHost = true;
+                        isReady = isHost || (readyStates != null && isGuestReady(readyStates, hostId, i));
+                    }
+
+                    renderSlot(i + 1, username, isHost, isReady);
+                }
+            }
+
             updateDurationUI(room);
             updateButton(room);
         });
     }
 
-    private void updateSpawnSlots(RoomDTO room) {
-        List<String> players = room.getPlayerNames();
-        Map<Integer, Boolean> readyMap = room.getReadyStates();
-
-        updateSingleSlot(p1Label, p1StatusBadge, players, readyMap, room, 0);
-        updateSingleSlot(p2Label, p2StatusBadge, players, readyMap, room, 1);
-        updateSingleSlot(p3Label, p3StatusBadge, players, readyMap, room, 2);
-        updateSingleSlot(p4Label, p4StatusBadge, players, readyMap, room, 3);
-    }
-
-    private void updateSingleSlot(Label nameLabel, Label badgeLabel, List<String> players, 
-                                  Map<Integer, Boolean> readyMap, RoomDTO room, int index) {
-        if (nameLabel == null || badgeLabel == null) return;
-
-        if (players != null && index < players.size()) {
-            String playerName = players.get(index);
-            nameLabel.setText(playerName);
-            nameLabel.setStyle("-fx-text-fill: #0f172a; -fx-font-size: 14px; -fx-font-weight: bold;");
-
-            // 1. Slot 0 luôn là Chủ phòng (Host)
-            if (index == 0) {
-                badgeLabel.setText("👑 CHỦ PHÒNG");
-                badgeLabel.setStyle("-fx-background-color: #dbeafe; -fx-text-fill: #1d4ed8; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
-            } else {
-                // 2. Slot thành viên (P2, P3, P4)
-                User currentUser = session.getCurrentUser();
-                boolean isReady = false;
-
-                // Nếu là chính bản thân Client này
-                if (currentUser != null && playerName.equalsIgnoreCase(currentUser.getUsername())) {
-                    isReady = isCurrentUserReady(room);
-                } else {
-                    // Nếu là người chơi khác: Lấy theo thứ tự index trong danh sách thành viên không phải host
-                    if (readyMap != null && !readyMap.isEmpty()) {
-                        List<Map.Entry<Integer, Boolean>> nonHostReady = readyMap.entrySet().stream()
-                                .filter(e -> e.getKey() != room.getHostId())
-                                .toList();
-                        
-                        int guestIndex = index - 1; // Slot 1 là khách thứ 0, Slot 2 là khách thứ 1
-                        if (guestIndex >= 0 && guestIndex < nonHostReady.size()) {
-                            isReady = Boolean.TRUE.equals(nonHostReady.get(guestIndex).getValue());
-                        }
-                    }
-                }
-
-                if (isReady) {
-                    badgeLabel.setText("✅ ĐÃ SẴN SÀNG");
-                    badgeLabel.setStyle("-fx-background-color: #dcfce7; -fx-text-fill: #15803d; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
-                } else {
-                    badgeLabel.setText("⏳ CHƯA SẴN SÀNG");
-                    badgeLabel.setStyle("-fx-background-color: #f1f5f9; -fx-text-fill: #64748b; -fx-font-weight: bold; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
+    private boolean isGuestReady(Map<Integer, Boolean> readyStates, int hostId, int slotIndex) {
+        int currentIndex = 0;
+        for (Map.Entry<Integer, Boolean> entry : readyStates.entrySet()) {
+            if (entry.getKey() != hostId) {
+                currentIndex++;
+                if (currentIndex == slotIndex) {
+                    return Boolean.TRUE.equals(entry.getValue());
                 }
             }
+        }
+        return false;
+    }
+
+    private void clearSlots() {
+        resetSlot(p1Label, p1StatusBadge, "Chỗ trống P1");
+        resetSlot(p2Label, p2StatusBadge, "Chỗ trống P2");
+        resetSlot(p3Label, p3StatusBadge, "Chỗ trống P3");
+        resetSlot(p4Label, p4StatusBadge, "Chỗ trống P4");
+    }
+
+    private void resetSlot(Label nameLabel, Label badgeLabel, String placeholder) {
+        if (nameLabel != null) {
+            nameLabel.setText(placeholder);
+            nameLabel.setStyle("-fx-text-fill: #94a3b8; -fx-font-style: italic;");
+        }
+        if (badgeLabel != null) {
+            badgeLabel.setText("TRỐNG");
+            badgeLabel.setStyle("-fx-background-color: #f1f5f9; -fx-text-fill: #94a3b8; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
+        }
+    }
+
+    private void renderSlot(int slot, String username, boolean isHost, boolean isReady) {
+        switch (slot) {
+            case 1 -> applySlot(p1Label, p1StatusBadge, username, isHost, isReady);
+            case 2 -> applySlot(p2Label, p2StatusBadge, username, isHost, isReady);
+            case 3 -> applySlot(p3Label, p3StatusBadge, username, isHost, isReady);
+            case 4 -> applySlot(p4Label, p4StatusBadge, username, isHost, isReady);
+            default -> {}
+        }
+    }
+
+    private void applySlot(Label nameLabel, Label badgeLabel, String username, boolean isHost, boolean isReady) {
+        if (nameLabel == null || badgeLabel == null) return;
+
+        nameLabel.setText(username);
+        nameLabel.setStyle("-fx-text-fill: #0f172a; -fx-font-weight: bold; -fx-font-style: normal;");
+
+        if (isHost) {
+            badgeLabel.setText("CHỦ PHÒNG");
+            badgeLabel.setStyle("-fx-background-color: #fef3c7; -fx-text-fill: #b45309; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
+        } else if (isReady) {
+            badgeLabel.setText("SẴN SÀNG");
+            badgeLabel.setStyle("-fx-background-color: #dcfce7; -fx-text-fill: #15803d; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
         } else {
-            // Slot trống
-            nameLabel.setText("Trống");
-            nameLabel.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 14px; -fx-font-weight: bold;");
             badgeLabel.setText("ĐANG CHỜ...");
             badgeLabel.setStyle("-fx-background-color: #f8fafc; -fx-text-fill: #cbd5e1; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
         }
     }
 
-    // ==========================================
-    // UPDATE DURATION UI
-    // ==========================================
     private void updateDurationUI(RoomDTO room) {
         if (durationComboBox == null) return;
 
@@ -255,17 +280,11 @@ public class RoomController {
         }
     }
 
-    // ==========================================
-    // UPDATE BUTTON
-    // ==========================================
     private void updateButton(RoomDTO room) {
         User currentUser = session.getCurrentUser();
         if (currentUser == null) return;
 
         boolean isHost = room.getHostId() == currentUser.getId();
-
-        // BỎ HOÀN TOÀN KHỐI: if ("Playing".equalsIgnoreCase(room.getStatus())) khóa nút!
-        // Vì người chơi đang ở màn hình room.fxml thì luôn ở chế độ chuẩn bị/chờ ván mới.
 
         if (isHost) {
             readyButton.setText("BẮT ĐẦU TRẬN ĐẤU");
@@ -307,19 +326,16 @@ public class RoomController {
         Map<Integer, Boolean> readyMap = room.getReadyStates();
         if (readyMap == null || readyMap.isEmpty()) return false;
 
-        // Chỉ kiểm tra những người KHÔNG PHẢI HOST
-        // Tất cả khách trong phòng bắt buộc phải có ready == true
         int nonHostCount = 0;
         for (Map.Entry<Integer, Boolean> entry : readyMap.entrySet()) {
             if (entry.getKey() != room.getHostId()) {
                 nonHostCount++;
                 if (!Boolean.TRUE.equals(entry.getValue())) {
-                    return false; // Có ít nhất 1 người chơi chưa bấm Sẵn sàng
+                    return false;
                 }
             }
         }
 
-        // Phòng phải có ít nhất 1 khách và tất cả khách đều đã bấm Sẵn sàng
         return nonHostCount > 0;
     }
 
@@ -335,7 +351,7 @@ public class RoomController {
 
     private void handleRoomStateUpdate(String rawJson) {
         try {
-            RoomDTO room = gson.fromJson(rawJson, RoomDTO.class);
+            RoomDTO room = GSON.fromJson(rawJson, RoomDTO.class);
             if (room == null) return;
             currentRoom = room;
             updateRoomUI(room);
@@ -425,8 +441,6 @@ public class RoomController {
         Platform.runLater(() -> {
             try {
                 Stage stage = (Stage) roomNameLabel.getScene().getWindow();
-                
-                // 1. MỞ KHÓA KÍCH THƯỚC (RẤT QUAN TRỌNG ĐỂ KHÔNG BỊ VIỀN TRẮNG)
                 stage.setMinWidth(0);
                 stage.setMinHeight(0);
                 stage.setMaxWidth(Double.MAX_VALUE);
@@ -441,7 +455,6 @@ public class RoomController {
                 stage.setScene(gameScene);
                 stage.setTitle("Tank 2D - Game");
                 
-                // 2. Ép cửa sổ co vừa vặn với Scene 600x600
                 stage.sizeToScene();
                 stage.setResizable(false);
                 stage.centerOnScreen();

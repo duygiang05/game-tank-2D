@@ -1,6 +1,7 @@
 package com.tank2d.common.protocol;
 
 import com.google.gson.Gson;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -8,87 +9,96 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Tiện ích gửi/nhận dữ liệu an toàn qua mạng.
- * Áp dụng cơ chế Length-prefix (4 byte độ dài + UTF-8 payload) để triệt tiêu lỗi dính gói TCP.
+ * Tiện ích truyền nhận gói tin qua giao thức mạng TCP theo cơ chế Length-Prefix Framing.
+ * <p>
+ * <b>Giải pháp triệt tiêu hiện tượng dính gói / vỡ gói TCP (TCP Sticky / Fragmented Packets):</b>
+ * Mỗi thông điệp được cấu trúc gồm 2 phần:
+ * <ol>
+ *     <li><b>Header (4 bytes):</b> Số nguyên 32-bit (Big-Endian) biểu diễn độ dài chính xác (N bytes) của phần thân dữ liệu (Payload).</li>
+ *     <li><b>Payload (N bytes):</b> Chuỗi ký tự JSON mã hóa theo chuẩn UTF-8.</li>
+ * </ol>
+ * Phía nhận sẽ sử dụng {@link DataInputStream#readFully(byte[])} để chặn và đọc đủ đúng N bytes của một gói tin hoàn chỉnh.
  */
-public class NetworkUtil {
+public final class NetworkUtil {
 
-    private static final Gson gson = new Gson();
+    private static final Gson GSON = new Gson();
 
-    // =========================================================================
-    // 1. TẦNG TRUYỀN DẪN RAW STRING (CHUỖI THÔ)
-    // =========================================================================
+    private NetworkUtil() {}
 
     /**
-     * Gửi chuỗi dữ liệu (JSON) qua luồng ra (DataOutputStream).
-     * Hàm được đồng bộ hóa (synchronized) để tránh xung đột khi nhiều luồng cùng gửi dữ liệu qua 1 socket.
+     * Gửi chuỗi dữ liệu (JSON) qua luồng ra socket.
+     * Hàm được đồng bộ hóa (synchronized trên {@code out}) để tránh tranh chấp luồng khi nhiều thread cùng ghi.
+     *
+     * @param out     luồng dữ liệu ra của socket
+     * @param payload chuỗi ký tự JSON cần gửi
+     * @throws IOException nếu đường truyền mạng gặp sự cố đứt gãy
      */
     public static void send(DataOutputStream out, String payload) throws IOException {
-        if (out == null || payload == null) return;
+        if (out == null || payload == null) {
+            return;
+        }
         byte[] bytes = payload.getBytes(StandardCharsets.UTF_8);
-        
+
         synchronized (out) {
-            // 1. Ghi 4 byte số nguyên biểu thị độ dài chính xác của dữ liệu
             out.writeInt(bytes.length);
-            
-            // 2. Ghi toàn bộ dữ liệu byte ra đường ống
             out.write(bytes);
-            
-            // 3. Đẩy dữ liệu đi ngay lập tức, không cho phép đệm (buffer) giữ lại
             out.flush();
         }
     }
 
     /**
-     * Đọc chuỗi dữ liệu (JSON) từ luồng vào (DataInputStream).
-     * Chờ đọc đủ 4 byte độ dài, sau đó đọc đúng N byte dữ liệu tiếp theo.
+     * Đọc chuỗi dữ liệu (JSON) từ luồng vào socket bằng cơ chế đóng khung độ dài.
+     *
+     * @param in luồng dữ liệu vào của socket
+     * @return chuỗi JSON hoàn chỉnh, hoặc {@code null} nếu kết nối đã bị đóng bởi đối tác (EOF)
+     * @throws IOException nếu luồng mạng gặp sự cố truyền tải bất thường
      */
     public static String receive(DataInputStream in) throws IOException {
-        if (in == null) return null;
-        
+        if (in == null) {
+            return null;
+        }
+
         try {
-            // 1. Đọc đúng 4 byte đầu để biết độ dài gói tin
             int length = in.readInt();
-            if (length <= 0) return null;
-            
-            // 2. Tạo mảng byte chứa đúng kích thước đã đọc
+            if (length <= 0) {
+                return null;
+            }
+
             byte[] buffer = new byte[length];
-            
-            // 3. Đọc đủ N byte dữ liệu vào mảng (readFully sẽ chặn đến khi đọc đủ)
             in.readFully(buffer);
-            
-            // 4. Chuyển mảng byte về dạng chuỗi UTF-8
             return new String(buffer, StandardCharsets.UTF_8);
         } catch (EOFException e) {
-            // Xử lý an toàn khi đối phương đóng kết nối
             return null;
         }
     }
 
-    // =========================================================================
-    // 2. TẦNG GIAO VẬN PACKET (LÀM VIỆC TRỰC TIẾP VỚI ĐỐI TƯỢNG PACKET)
-    // =========================================================================
-
     /**
-     * Gửi trực tiếp đối tượng Packet qua socket.
-     * Tự động serialize Packet sang JSON và gọi hàm send() chuẩn hóa ở trên.
+     * Tuần tự hóa (Serialize) đối tượng {@link Packet} thành JSON và gửi qua socket.
+     *
+     * @param out    luồng dữ liệu ra của socket
+     * @param packet đối tượng gói tin cần gửi
+     * @throws IOException nếu đường truyền gặp sự cố
      */
     public static void sendPacket(DataOutputStream out, Packet packet) throws IOException {
-        if (out == null || packet == null) return;
-        String jsonPayload = gson.toJson(packet);
+        if (out == null || packet == null) {
+            return;
+        }
+        String jsonPayload = GSON.toJson(packet);
         send(out, jsonPayload);
     }
 
     /**
-     * Đọc trực tiếp đối tượng Packet từ socket.
-     * Nhận chuỗi JSON từ hàm receive() và tự động deserialize về đối tượng Packet.
-     * @return Đối tượng Packet nhận được, hoặc null nếu kết nối bị ngắt.
+     * Đọc và giải tuần tự hóa (Deserialize) gói tin từ luồng vào socket thành đối tượng {@link Packet}.
+     *
+     * @param in luồng dữ liệu vào của socket
+     * @return thực thể {@link Packet} nhận được, hoặc {@code null} nếu kết nối kết thúc
+     * @throws IOException nếu đọc luồng thất bại
      */
     public static Packet readPacket(DataInputStream in) throws IOException {
         String jsonPayload = receive(in);
         if (jsonPayload == null) {
             return null;
         }
-        return gson.fromJson(jsonPayload, Packet.class);
+        return GSON.fromJson(jsonPayload, Packet.class);
     }
 }

@@ -178,6 +178,11 @@ public class ClientHandler implements Runnable {
         }
     }
 
+    /**
+     * Xử lý yêu cầu đăng nhập từ client.
+     *
+     * @param rawJson chuỗi JSON gói tin đăng nhập
+     */
     private void handleLogin(String rawJson) {
         LoginResponse res;
         try {
@@ -185,7 +190,6 @@ public class ClientHandler implements Runnable {
             User user = userDAO.login(req.getUsername(), req.getPassword());
 
             if (user != null) {
-                // Kiểm tra xem User này đã có kết nối nào khác đang dùng hay chưa
                 boolean isAlreadyLoggedIn = false;
                 for (ClientHandler client : connectedClients) {
                     if (client != this && client.currentUser != null && client.currentUser.getId() == user.getId()) {
@@ -213,7 +217,6 @@ public class ClientHandler implements Runnable {
         try {
             NetworkUtil.sendPacket(dos, new Packet(PacketType.AUTH_LOGIN_RES, gson.toJson(res)));
 
-            // Kiểm tra trạng thái trận đấu cũ hoặc án phạt sau khi đăng nhập thành công
             if (currentUser != null) {
                 if (!checkUserPenalized()) {
                     Room playingRoom = roomManager.getPlayingRoomByUserId(currentUser.getId());
@@ -227,6 +230,12 @@ public class ClientHandler implements Runnable {
         } catch (IOException ignored) {}
     }
 
+    /**
+     * Kiểm tra xem người dùng hiện tại có đang chịu án phạt do thoát trận trước đó hay không.
+     *
+     * @return {@code true} nếu người dùng vẫn bị phạt
+     * @throws IOException khi gửi packet thất bại
+     */
     private boolean checkUserPenalized() throws IOException {
         if (currentUser == null) return false;
         if (roomManager.isPenalized(currentUser.getId())) {
@@ -337,7 +346,6 @@ public class ClientHandler implements Runnable {
             Packet response = new Packet(PacketType.ROOM_STATE_UPDATE, gson.toJson(roomManager.getRoomDTO(currentRoomId)));
             NetworkUtil.sendPacket(dos, response);
 
-            // Cập nhật sảnh ngay khi tạo phòng mới
             broadcastLobbyRooms();
         } catch (IOException ignored) {}
     }
@@ -363,7 +371,7 @@ public class ClientHandler implements Runnable {
 
             if (success) {
                 currentRoomId = roomId;
-                broadcastRoomState(); // Gửi ROOM_STATE_UPDATE cho các thành viên TRONG phòng
+                broadcastRoomState();
                 broadcastLobbyRooms();
             } else {
                 LOGGER.info("[Room] Từ chối " + currentUser.getUsername() + " vào phòng " + roomId);
@@ -401,13 +409,12 @@ public class ClientHandler implements Runnable {
             }
         } catch (Exception ignored) {}
 
-        // Chuyển toàn bộ quyền quyết định loại đạn cho GameLoop
         currentGameLoop.handleShootRequest(tank, requestedType);
     }
 
-    // =========================================================================
-    // TASK 1 (GIANG) & FIX THEO PHẢN HỒI CỦA HOÀNG (PHYSICS & MAP)
-    // =========================================================================
+    /**
+     * Bắt đầu trận đấu: khởi tạo GameLoop, nạp Map, gán xe tăng và phân phối vị trí xuất phát.
+     */
     private void handleStartGame() {
         try {
             if (currentUser == null || currentRoomId == -1) return;
@@ -420,13 +427,8 @@ public class ClientHandler implements Runnable {
                 return;
             }
 
-            // Đổi trạng thái phòng thành Playing
             room.setStatus("Playing");
-
-            // Bắn thông báo cho người trong phòng
             broadcastGameStart();
-
-            // Cập nhật ngay danh sách sảnh thành "Đang chơi" để người ngoài sảnh thấy và không bấm vào
             broadcastLobbyRooms();
 
             int serverTickRate = ConfigLoader.getPhysicsStats().has("server_tick_rate")
@@ -445,24 +447,15 @@ public class ClientHandler implements Runnable {
             gameLoop.setMapChangeListener(stateManager);
             gameLoop.setItemEventListener(stateManager);
 
-            // Lưu GameLoop và GameStateManager vào Room để hỗ trợ Reconnect
             room.setGameLoop(gameLoop);
             room.setGameStateManager(stateManager);
             room.getUserTankMappings().clear();
             
-            /// GẮN CALLBACK ĐỂ KHI TRẬN ĐẤU KẾT THÚC THÌ RESET PHÒNG VỀ "Waiting"
             int targetRoomId = currentRoomId;
             stateManager.setOnGameOverCallback(() -> {
-                // 1. Gỡ phạt cho những người chơi đã thoát trước đó trong phòng này
                 liftPenaltiesForRoom(targetRoomId);
-
-                // 2. Reset phòng và ép toàn bộ khách về Chưa sẵn sàng
                 roomManager.resetRoomAfterMatch(targetRoomId);
-
-                // 3. Broadcast RoomDTO mới nhất (ready = false) cho những người còn lại trong phòng
                 broadcastRoomStateForRoom(targetRoomId);
-
-                // 4. Broadcast ra sảnh để cập nhật trạng thái phòng thành "Đang chờ"
                 broadcastLobbyRooms();
             });
 
@@ -472,7 +465,6 @@ public class ClientHandler implements Runnable {
             int tankIndex = 1;
             for (ClientHandler client : connectedClients) {
                 if (client.currentRoomId == currentRoomId && client.currentUser != null) {
-                    // Lấy tọa độ và góc xoay chuẩn 100% từ file Map JSON qua ConfigLoader:
                     double startX = ConfigLoader.getSpawnX(tankIndex, 15.0);
                     double startY = ConfigLoader.getSpawnY(tankIndex, 15.0);
                     double startAngle = ConfigLoader.getSpawnAngle(tankIndex, 0.0);
@@ -486,15 +478,12 @@ public class ClientHandler implements Runnable {
                     client.currentGameLoop = gameLoop;
                     client.currentGameStateManager = stateManager;
 
-                    // Lưu mapping userId -> tankId vào Room để phục vụ Reconnect
                     room.getUserTankMappings().put(client.currentUser.getId(), tankIndex);
 
                     tankIndex++;
                 }
             }
 
-
-            // Gửi mapping Tank -> Username cho tất cả client trong phòng.
             List<TankPlayerDTO> tankPlayers = new ArrayList<>();
             for (ClientHandler client : connectedClients) {
                 if (client.currentRoomId == currentRoomId && client.currentUser != null && client.myTankId > 0) {
@@ -513,8 +502,6 @@ public class ClientHandler implements Runnable {
                 }
             }
 
-
-            // 6. Snapshot Listener hỗ trợ Bụi Cỏ / Tàng hình cá nhân hóa
             int finalRoomId = currentRoomId;
             gameLoop.setSnapshotListener(perViewerSnapshots -> {
                 networkBroadcastPool.submit(() -> {
@@ -541,8 +528,11 @@ public class ClientHandler implements Runnable {
         }
     }
 
-     // ROOM DURATION
-// =========================================================
+    /**
+     * Xử lý yêu cầu thay đổi thời lượng trận đấu từ chủ phòng.
+     *
+     * @param rawJson chuỗi JSON chứa giá trị thời lượng mới (giây)
+     */
     private void handleRoomDuration(String rawJson) {
         try {
             if (currentUser == null) {
@@ -561,7 +551,6 @@ public class ClientHandler implements Runnable {
                 return;
             }
 
-            // Chỉ Host được thay đổi thời lượng
             if (!room.isHost(currentUser.getId())) {
                 LOGGER.info("[Room] User " + currentUser.getUsername() + " không phải Host.");
                 return;
@@ -569,7 +558,6 @@ public class ClientHandler implements Runnable {
 
             int duration = gson.fromJson(rawJson, Integer.class);
 
-            // Chỉ chấp nhận 45 / 60 / 90 / 180 giây
             if (duration != 45 && duration != 60 && duration != 90 && duration != 180) {
                 LOGGER.info("[Room] Thời lượng không hợp lệ: " + duration);
                 return;
@@ -579,8 +567,6 @@ public class ClientHandler implements Runnable {
 
             if (success) {
                 LOGGER.info("[Room] Host " + currentUser.getUsername() + " chọn " + duration + " giây.");
-
-                // Đồng bộ duration cho tất cả người trong phòng
                 broadcastRoomState();
                 broadcastLobbyRooms();
             }
@@ -589,6 +575,12 @@ public class ClientHandler implements Runnable {
             LOGGER.log(Level.SEVERE, "[Room] Lỗi xử lý ROOM_DURATION_REQ", e);
         }
     }
+
+    /**
+     * Xử lý gói tin phím bấm điều khiển di chuyển và xoay nòng xe từ người chơi.
+     *
+     * @param rawJson chuỗi JSON mô tả trạng thái bàn phím
+     */
     private void handlePlayerInput(String rawJson) {
         if (currentGameLoop == null || myTankId == -1) return;
 
@@ -623,6 +615,11 @@ public class ClientHandler implements Runnable {
         } catch (Exception ignored) {}
     }
 
+    /**
+     * Hủy bỏ án phạt cho tất cả người chơi liên quan đến phòng đấu đã chỉ định.
+     *
+     * @param roomId mã số phòng
+     */
     private void liftPenaltiesForRoom(int roomId) {
         List<Integer> penalizedUsers = roomManager.getPenalizedUserIdsForRoom(roomId);
         roomManager.removePenaltiesForRoom(roomId);
@@ -636,16 +633,17 @@ public class ClientHandler implements Runnable {
         }
     }
 
+    /**
+     * Xử lý yêu cầu thoát phòng từ người chơi (cả trong lúc chờ và giữa trận đấu).
+     */
     private void handleLeaveRoom() {
         try {
             if (currentUser == null || currentRoomId == -1) return;
 
             if (currentGameStateManager != null && myTankId != -1) {
-                // TH1: Người chơi chủ động bấm nút Thoát giữa trận
                 int leaverUserId = currentUser.getId();
                 int leaverRoomId = currentRoomId;
 
-                // Kích hoạt xử thua / loại bỏ xe đầu hàng
                 currentGameStateManager.handlePlayerSurrender(myTankId);
 
                 this.currentGameLoop = null;
@@ -661,14 +659,12 @@ public class ClientHandler implements Runnable {
 
                 Room targetRoom = roomManager.getRoom(leaverRoomId);
                 if (targetRoom != null && "Playing".equalsIgnoreCase(targetRoom.getStatus())) {
-                    // Trận đấu vẫn đang diễn ra (trận 3-4 người) -> Phạt cho tới khi trận kết thúc
                     roomManager.addPenalty(leaverUserId, leaverRoomId);
                     try {
                         NetworkUtil.sendPacket(dos, new Packet(PacketType.GAME_PENALTY_NOTIFY,
                                 "PENALTY_ACTIVE:" + leaverRoomId));
                     } catch (IOException ignored) {}
                 } else {
-                    // Trận đấu đã kết thúc ngay lập tức (trận 2 người hoặc phòng hủy) -> Không phạt
                     roomManager.removePenalty(leaverUserId);
                     try {
                         NetworkUtil.sendPacket(dos, new Packet(PacketType.GAME_PENALTY_NOTIFY, "PENALTY_LIFTED"));
@@ -696,6 +692,9 @@ public class ClientHandler implements Runnable {
         }
     }
 
+    /**
+     * Xử lý yêu cầu tái kết nối (Reconnect) vào trận đấu đang diễn ra.
+     */
     private void handleReconnectGame() {
         try {
             if (currentUser == null) return;
@@ -721,7 +720,6 @@ public class ClientHandler implements Runnable {
             if (reconnected) {
                 LOGGER.info("[Reconnect] User " + currentUser.getUsername() + " đã reconnect thành công vào xe Tank " + tankId + " tại phòng " + currentRoomId);
 
-                // 1. Gửi phản hồi RECONNECT_RES
                 ReconnectResponseDTO resDTO = new ReconnectResponseDTO(
                         roomManager.getRoomDTO(currentRoomId),
                         tankId,
@@ -729,7 +727,6 @@ public class ClientHandler implements Runnable {
                 );
                 NetworkUtil.sendPacket(dos, new Packet(PacketType.GAME_RECONNECT_RES, gson.toJson(resDTO)));
 
-                // 2. Gửi mapping Tank -> Username
                 List<TankPlayerDTO> tankPlayers = new ArrayList<>();
                 for (Map.Entry<Integer, Integer> entry : playingRoom.getUserTankMappings().entrySet()) {
                     int uId = entry.getKey();
@@ -751,29 +748,27 @@ public class ClientHandler implements Runnable {
         }
     }
 
+    /**
+     * Đóng kết nối client an toàn, xử lý AFK nếu đang trong trận hoặc rời phòng nếu đang ở phòng chờ.
+     */
     public void closeConnection() {
         isRunning = false;
         connectedClients.remove(this);
 
         if (currentUser != null) {
             if (currentGameStateManager != null && myTankId != -1) {
-                // TH2: Ngắt kết nối đột ngột trong trận -> chuyển xe sang AFK, giữ nguyên phòng để chờ Reconnect
                 LOGGER.info("[ClientHandler] User " + currentUser.getUsername() + " (Tank " + myTankId + ") ngắt kết nối đột ngột trong trận. Kích hoạt chế độ AFK.");
                 currentGameStateManager.handlePlayerDisconnected(myTankId);
-                // KHÔNG gọi roomManager.leaveRoom()!
                 this.currentGameStateManager = null;
                 this.currentGameLoop = null;
                 this.currentRoomId = -1;
                 this.myTankId = -1;
             } else if (currentRoomId != -1) {
-                // Đang ở phòng chờ bình thường thì leaveRoom
                 handleLeaveRoom();
             }
-            // Giải phóng user khi đóng kết nối để có thể đăng nhập lại bình thường
             this.currentUser = null;
         }
 
-        // Đảm bảo sảnh luôn nhận danh sách phòng mới nhất khi có client ngắt kết nối đột ngột
         broadcastLobbyRooms();
 
         try {

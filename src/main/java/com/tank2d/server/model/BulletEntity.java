@@ -1,6 +1,10 @@
 package com.tank2d.server.model;
 
+/**
+ * Thực thể biểu diễn một viên đạn đang bay trong trận đấu.
+ */
 public class BulletEntity {
+
     public enum BulletType { NORMAL, ROCKET }
 
     private final int id;
@@ -12,6 +16,17 @@ public class BulletEntity {
     private boolean alive = true;
     private final BulletType type;
 
+    /**
+     * Khởi tạo một viên đạn mới.
+     *
+     * @param id      mã định danh viên đạn
+     * @param ownerId mã ID xe tăng bắn ra viên đạn
+     * @param x       tọa độ X xuất phát
+     * @param y       tọa độ Y xuất phát
+     * @param vx      thành phần vận tốc trục X (pixel/s)
+     * @param vy      thành phần vận tốc trục Y (pixel/s)
+     * @param type    loại đạn (NORMAL hoặc ROCKET)
+     */
     public BulletEntity(int id, int ownerId, double x, double y, double vx, double vy, BulletType type) {
         this.id = id;
         this.ownerId = ownerId;

@@ -1,6 +1,10 @@
 package com.tank2d.server.model;
 
+/**
+ * Thực thể biểu diễn một chiếc xe tăng trong thế giới game 2D.
+ */
 public class TankEntity {
+
     public enum MoveState { FORWARD, BACKWARD, NONE }
     public enum RotateState { LEFT, RIGHT, NONE }
 
@@ -18,10 +22,23 @@ public class TankEntity {
     private boolean alive = true;
     private long lastShotTimeMillis = 0L;
 
-    // --- TRẠNG THÁI BẢO HỘ 5s (TASK 1) ---
     private boolean isProtected = false;
     private double protectionTimer = 0.0;
 
+    private long shieldActiveUntilMillis = 0L;
+    private long nitroActiveUntilMillis = 0L;
+    private long rocketBuffActiveUntilMillis = 0L;
+
+    /**
+     * Khởi tạo một thực thể xe tăng mới với các thông số ban đầu.
+     *
+     * @param id            mã định danh xe tăng
+     * @param startX        tọa độ khởi tạo X
+     * @param startY        tọa độ khởi tạo Y
+     * @param startAngle    góc quay ban đầu tính bằng độ [0, 360)
+     * @param speed         tốc độ di chuyển cơ bản (pixel/s)
+     * @param rotationSpeed tốc độ quay thân xe (độ/s)
+     */
     public TankEntity(int id, double startX, double startY, double startAngle, double speed, double rotationSpeed) {
         this.id = id;
         this.x = startX;
@@ -57,18 +74,14 @@ public class TankEntity {
     public void setAlive(boolean alive) { this.alive = alive; }
     public void setLastShotTimeMillis(long t) { this.lastShotTimeMillis = t; }
 
-    public void setProtected(boolean isProtected) { 
-        this.isProtected = isProtected; 
+    public void setProtected(boolean isProtected) {
+        this.isProtected = isProtected;
     }
 
     public void setProtectionTimer(double timer) {
         this.protectionTimer = Math.max(0.0, timer);
         this.isProtected = (this.protectionTimer > 0.0);
     }
-
-    private long shieldActiveUntilMillis = 0L;
-    private long nitroActiveUntilMillis = 0L;
-    private long rocketBuffActiveUntilMillis = 0L;
 
     public long getShieldActiveUntilMillis() { return shieldActiveUntilMillis; }
     public long getNitroActiveUntilMillis() { return nitroActiveUntilMillis; }

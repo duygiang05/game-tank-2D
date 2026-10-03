@@ -3,13 +3,14 @@ package com.tank2d.client.controller;
 import com.google.gson.Gson;
 import com.tank2d.client.ClientSession;
 import com.tank2d.client.network.ClientSocket;
+import com.tank2d.client.util.ToastUtil;
 import com.tank2d.common.dto.LoginRequest;
 import com.tank2d.common.dto.LoginResponse;
 import com.tank2d.common.dto.RegisterResponse;
+import com.tank2d.common.exception.GameNetworkException;
 import com.tank2d.common.model.User;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
-
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
@@ -21,20 +22,19 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import javafx.util.Duration;
 
-import com.tank2d.client.util.ToastUtil;
-import com.tank2d.common.exception.GameNetworkException;
 import java.io.IOException;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Điều khiển màn hình Đăng nhập và Đăng ký tài khoản (Login/Register View).
+ */
 public class LoginController {
 
     private static final Logger LOGGER = Logger.getLogger(LoginController.class.getName());
+    private static final Gson GSON = new Gson();
 
-    // ==========================================
-    // LOGIN FORM
-    // ==========================================
     @FXML
     private VBox loginForm;
 
@@ -50,9 +50,6 @@ public class LoginController {
     @FXML
     private Button togglePasswordBtn;
 
-    // ==========================================
-    // REGISTER FORM
-    // ==========================================
     @FXML
     private VBox registerForm;
 
@@ -77,20 +74,16 @@ public class LoginController {
     @FXML
     private Button toggleConfirmPasswordBtn;
 
-    // ==========================================
-    // TRẠNG THÁI ẨN / HIỆN MẬT KHẨU
-    // ==========================================
     private boolean isPasswordVisible = false;
     private boolean isRegisterPasswordVisible = false;
     private boolean isConfirmPasswordVisible = false;
 
-    private final Gson gson = new Gson();
     private final ClientSession session = ClientSession.getInstance();
     private final Consumer<Packet> packetListener = this::handleServerPacket;
 
-    // ==========================================
-    // KHỞI TẠO & RÀNG BUỘC ĐỒNG BỘ MẬT KHẨU
-    // ==========================================
+    /**
+     * Khởi tạo giao diện và liên kết 2 chiều giữa trường PasswordField và TextField hiển thị mật khẩu.
+     */
     @FXML
     public void initialize() {
         if (passwordField != null && passwordTextField != null) {
@@ -104,9 +97,6 @@ public class LoginController {
         }
     }
 
-    // ==========================================
-    // CÁC HÀM TOGGLE MẮT XEM MẬT KHẨU
-    // ==========================================
     @FXML
     private void togglePasswordVisibility() {
         isPasswordVisible = !isPasswordVisible;
@@ -147,9 +137,9 @@ public class LoginController {
         }
     }
 
-    // ==========================================
-    // XỬ LÝ LOGIN
-    // ==========================================
+    /**
+     * Xử lý sự kiện bấm nút Đăng nhập.
+     */
     @FXML
     private void handleLogin(ActionEvent event) {
         String username = usernameField.getText().trim();
@@ -173,7 +163,7 @@ public class LoginController {
                 session.addPacketListener(packetListener);
 
                 LoginRequest request = new LoginRequest(username, password);
-                String requestJson = gson.toJson(request);
+                String requestJson = GSON.toJson(request);
                 Packet packet = new Packet(PacketType.AUTH_LOGIN_REQ, requestJson);
 
                 clientSocket.sendPacket(packet);
@@ -194,9 +184,9 @@ public class LoginController {
         loginThread.start();
     }
 
-    // ==========================================
-    // NHẬN PACKET TỪ SERVER
-    // ==========================================
+    /**
+     * Nhận và xử lý gói tin phản hồi xác thực đăng nhập từ Server.
+     */
     private void handleServerPacket(Packet packet) {
         if (packet == null || packet.getType() == null) {
             return;
@@ -209,7 +199,7 @@ public class LoginController {
         LOGGER.info("[Login] Nhận AUTH_LOGIN_RES từ Server.");
 
         try {
-            LoginResponse response = gson.fromJson(packet.getData(), LoginResponse.class);
+            LoginResponse response = GSON.fromJson(packet.getData(), LoginResponse.class);
             session.removePacketListener(packetListener);
 
             Platform.runLater(() -> {
@@ -235,9 +225,9 @@ public class LoginController {
         }
     }
 
-    // ==========================================
-    // XỬ LÝ REGISTER
-    // ==========================================
+    /**
+     * Xử lý sự kiện bấm nút Đăng ký tài khoản mới.
+     */
     @FXML
     private void handleRegister(ActionEvent event) {
         String username = registerUsernameField.getText().trim();
@@ -260,7 +250,7 @@ public class LoginController {
                 clientSocket.connect();
 
                 LoginRequest request = new LoginRequest(username, password);
-                String requestJson = gson.toJson(request);
+                String requestJson = GSON.toJson(request);
                 Packet packet = new Packet(PacketType.AUTH_REGISTER_REQ, requestJson);
 
                 clientSocket.sendPacket(packet);
@@ -271,7 +261,7 @@ public class LoginController {
                     return;
                 }
 
-                RegisterResponse response = gson.fromJson(responsePacket.getData(), RegisterResponse.class);
+                RegisterResponse response = GSON.fromJson(responsePacket.getData(), RegisterResponse.class);
 
                 Platform.runLater(() -> {
                     if (response.isSuccess()) {
@@ -302,9 +292,6 @@ public class LoginController {
         registerThread.start();
     }
 
-    // ==========================================
-    // CHUYỂN ĐỔI GIỮA CÁC FORM
-    // ==========================================
     @FXML
     private void showRegister(ActionEvent event) {
         loginForm.setVisible(false);
@@ -323,9 +310,6 @@ public class LoginController {
         loginForm.setManaged(true);
     }
 
-    // ==========================================
-    // CHUYỂN VÀO LOBBY
-    // ==========================================
     private void openLobby() {
         try {
             javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(
@@ -344,9 +328,6 @@ public class LoginController {
         }
     }
 
-    // ==========================================
-    // TOAST NOTIFICATION (TỰ TẮT SAU 5 GIÂY)
-    // ==========================================
     private void showToast(String message, boolean isSuccess) {
         Window window = usernameField.getScene() != null ? usernameField.getScene().getWindow() : null;
         ToastUtil.showToast(window, message, isSuccess);

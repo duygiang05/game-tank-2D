@@ -1,33 +1,57 @@
 package com.tank2d.server.game;
 
-import com.tank2d.server.model.TankEntity;
+import com.tank2d.common.config.ConfigLoader;
+import com.tank2d.common.dto.game.BulletSnapshotDTO;
+import com.tank2d.common.dto.game.GameSnapshotDTO;
+import com.tank2d.common.dto.game.ItemSnapshotDTO;
+import com.tank2d.common.dto.game.TankSnapshotDTO;
+import com.tank2d.server.game.event.CombatEvent;
+import com.tank2d.server.game.event.CombatEventListener;
+import com.tank2d.server.game.event.ItemEventListener;
+import com.tank2d.server.game.event.ItemPickupEvent;
+import com.tank2d.server.game.event.MapChangeEvent;
+import com.tank2d.server.game.event.MapChangeListener;
+import com.tank2d.server.game.event.SnapshotListener;
+import com.tank2d.server.map.GameMap;
 import com.tank2d.server.model.BulletEntity;
 import com.tank2d.server.model.ItemEntity;
-import com.tank2d.server.physics.TankMovementProcessor;
+import com.tank2d.server.model.TankEntity;
 import com.tank2d.server.physics.BulletMovementProcessor;
-import com.tank2d.server.physics.CollisionDetector;
-import com.tank2d.server.physics.ShootingProcessor;
-import com.tank2d.server.physics.ItemSpawnProcessor;
-import com.tank2d.server.physics.ProtectionProcessor;
 import com.tank2d.server.physics.BushClusterProcessor;
 import com.tank2d.server.physics.BushVisibilityProcessor;
-import com.tank2d.server.map.GameMap;
-import com.tank2d.server.map.TileType;
-import com.tank2d.server.item.ItemType;
-import com.tank2d.common.dto.game.*;
-import com.tank2d.server.game.event.*;
-import com.tank2d.common.config.ConfigLoader;
+import com.tank2d.server.physics.CollisionDetector;
+import com.tank2d.server.physics.ItemSpawnProcessor;
+import com.tank2d.server.physics.ProtectionProcessor;
+import com.tank2d.server.physics.ShootingProcessor;
+import com.tank2d.server.physics.TankMovementProcessor;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Vòng lặp vật lý chính của trận đấu (Game Loop Thread).
+ * <p>
+ * Đảm nhiệm điều phối chu kỳ tính toán vật lý cố định theo tick rate (ví dụ 60Hz), bao gồm:
+ * <ul>
+ *     <li>Cập nhật chuyển động xe và đạn.</li>
+ *     <li>Phát hiện và giải quyết va chạm hình học (Xe-Bản đồ, Xe-Xe, Đạn-Xe, Đạn-Tường, Xe-Item).</li>
+ *     <li>Sinh và thu hồi vật phẩm định kỳ.</li>
+ *     <li>Tính toán khả kiến qua cụm bụi cỏ và đóng gói snapshot gửi tới từng người chơi.</li>
+ * </ul>
+ */
 public class GameLoop implements Runnable {
 
     private static final Logger LOGGER = Logger.getLogger(GameLoop.class.getName());
+    private static final double NANOSECONDS_PER_SECOND = 1_000_000_000.0;
+    private static final int DEFAULT_ITEM_SIZE = 40;
+
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     private final Map<Integer, TankEntity> tanks = new ConcurrentHashMap<>();
@@ -54,9 +78,14 @@ public class GameLoop implements Runnable {
 
     private double itemSpawnAccumulator = 0.0;
 
+    /**
+     * Khởi tạo GameLoop với tần số tick quy định.
+     *
+     * @param serverTickRate số lượng tick vật lý trong 1 giây (ví dụ: 60)
+     */
     public GameLoop(int serverTickRate) {
         this.tickRate = serverTickRate;
-        this.timePerTickNs = 1_000_000_000.0 / this.tickRate;
+        this.timePerTickNs = NANOSECONDS_PER_SECOND / this.tickRate;
 
         this.tankSize = (int) ConfigLoader.getTankSize();
         this.bulletSize = (int) ConfigLoader.getBulletSize();
@@ -65,13 +94,70 @@ public class GameLoop implements Runnable {
         this.normalBulletDamage = damage.has("normal_bullet") ? damage.get("normal_bullet").getAsInt() : 1;
     }
 
-    public void addTank(TankEntity tank) { tanks.put(tank.getId(), tank); }
-    public TankEntity getTank(int id) { return tanks.get(id); }
-    public void addBullet(BulletEntity bullet) { bullets.put(bullet.getId(), bullet); }
-    public Map<Integer, BulletEntity> getBullets() { return bullets; }
-    public Map<Integer, ItemEntity> getItems() { return items; }
-    public void stopLoop() { running.set(false); }
+    /**
+     * Đưa một xe tăng vào quản lý trong GameLoop.
+     *
+     * @param tank thực thể xe tăng
+     */
+    public void addTank(TankEntity tank) {
+        tanks.put(tank.getId(), tank);
+    }
 
+    /**
+     * Lấy thông tin thực thể xe tăng theo ID.
+     *
+     * @param id mã số xe tăng
+     * @return thực thể {@link TankEntity} hoặc null nếu không tồn tại
+     */
+    public TankEntity getTank(int id) {
+        return tanks.get(id);
+    }
+
+    /**
+     * Đưa một viên đạn vào danh sách quản lý vật lý.
+     *
+     * @param bullet thực thể đạn
+     */
+    public void addBullet(BulletEntity bullet) {
+        bullets.put(bullet.getId(), bullet);
+    }
+
+    /**
+     * Lấy bản đồ các viên đạn đang hoạt động trong trận đấu.
+     *
+     * @return bản đồ id -> {@link BulletEntity}
+     */
+    public Map<Integer, BulletEntity> getBullets() {
+        return bullets;
+    }
+
+    /**
+     * Lấy bản đồ các vật phẩm hỗ trợ đang xuất hiện trên bản đồ.
+     *
+     * @return bản đồ id -> {@link ItemEntity}
+     */
+    public Map<Integer, ItemEntity> getItems() {
+        return items;
+    }
+
+    /**
+     * Dừng vòng lặp GameLoop an toàn.
+     */
+    public void stopLoop() {
+        running.set(false);
+    }
+
+    /**
+     * Tạo và đưa một viên đạn mới vào không gian trận đấu.
+     *
+     * @param ownerId ID xe tăng bắn ra viên đạn
+     * @param x       tọa độ xuất phát X
+     * @param y       tọa độ xuất phát Y
+     * @param vx      vận tốc theo trục X (pixel/s)
+     * @param vy      vận tốc theo trục Y (pixel/s)
+     * @param type    loại đạn (NORMAL hoặc ROCKET)
+     * @return thực thể {@link BulletEntity} vừa được khởi tạo
+     */
     public BulletEntity spawnBullet(int ownerId, double x, double y, double vx, double vy, BulletEntity.BulletType type) {
         int newId = bulletIdSeq.getAndIncrement();
         BulletEntity bullet = new BulletEntity(newId, ownerId, x, y, vx, vy, type);
@@ -79,15 +165,29 @@ public class GameLoop implements Runnable {
         return bullet;
     }
 
+    /**
+     * Xử lý yêu cầu bắn đạn từ xe tăng.
+     *
+     * @param tank          xe tăng gửi lệnh bắn
+     * @param requestedType loại đạn yêu cầu từ phía client
+     * @return {@code true} nếu phát bắn hợp lệ và sinh đạn thành công
+     */
     public boolean handleShootRequest(TankEntity tank, BulletEntity.BulletType requestedType) {
         long now = System.currentTimeMillis();
         ShootingProcessor.ShotResult result = ShootingProcessor.tryShoot(tank, now);
-        if (!result.success) return false;
+        if (!result.success) {
+            return false;
+        }
 
         spawnBullet(tank.getId(), tank.getX(), tank.getY(), result.vx, result.vy, result.type);
         return true;
     }
 
+    /**
+     * Gán bản đồ trận đấu và tự động phân cụm bụi cỏ bằng BFS.
+     *
+     * @param gameMap bản đồ trận đấu
+     */
     public void setGameMap(GameMap gameMap) {
         this.gameMap = gameMap;
         if (gameMap != null) {
@@ -95,16 +195,61 @@ public class GameLoop implements Runnable {
             LOGGER.info("Đã gán nhãn " + clusters + " cụm bụi cỏ.");
         }
     }
-    public void setCombatListener(CombatEventListener listener) { this.combatListener = listener; }
-    public void setSnapshotListener(SnapshotListener listener) { this.snapshotListener = listener; }
-    public void setMapChangeListener(MapChangeListener listener) { this.mapChangeListener = listener; }
-    public void setItemEventListener(ItemEventListener listener) { this.itemEventListener = listener; }
 
+    /**
+     * Đăng ký đối tượng lắng nghe các sự kiện giao tranh (Combat Events).
+     *
+     * @param listener đối tượng triển khai {@link CombatEventListener}
+     */
+    public void setCombatListener(CombatEventListener listener) {
+        this.combatListener = listener;
+    }
+
+    /**
+     * Đăng ký đối tượng lắng nghe snapshot dữ liệu gửi tới client định kỳ.
+     *
+     * @param listener đối tượng triển khai {@link SnapshotListener}
+     */
+    public void setSnapshotListener(SnapshotListener listener) {
+        this.snapshotListener = listener;
+    }
+
+    /**
+     * Đăng ký đối tượng lắng nghe các sự kiện thay đổi địa hình bản đồ (phá gạch).
+     *
+     * @param listener đối tượng triển khai {@link MapChangeListener}
+     */
+    public void setMapChangeListener(MapChangeListener listener) {
+        this.mapChangeListener = listener;
+    }
+
+    /**
+     * Đăng ký đối tượng lắng nghe các sự kiện nhặt vật phẩm bổ trợ.
+     *
+     * @param listener đối tượng triển khai {@link ItemEventListener}
+     */
+    public void setItemEventListener(ItemEventListener listener) {
+        this.itemEventListener = listener;
+    }
+
+    /**
+     * Gán trình quản lý trạng thái trận đấu {@link GameStateManager}.
+     *
+     * @param stateManager đối tượng quản lý trạng thái
+     */
     public void setStateManager(GameStateManager stateManager) {
         this.stateManager = stateManager;
         this.setCombatListener(stateManager);
     }
-    public GameStateManager getStateManager() { return stateManager; }
+
+    /**
+     * Lấy trình quản lý trạng thái trận đấu hiện tại.
+     *
+     * @return {@link GameStateManager} hoặc null
+     */
+    public GameStateManager getStateManager() {
+        return stateManager;
+    }
 
     @Override
     public void run() {
@@ -114,7 +259,7 @@ public class GameLoop implements Runnable {
 
         while (running.get()) {
             long now = System.nanoTime();
-            double deltaTime = (now - lastTime) / 1_000_000_000.0;
+            double deltaTime = (now - lastTime) / NANOSECONDS_PER_SECOND;
             lastTime = now;
 
             updatePhysics(deltaTime);
@@ -136,82 +281,86 @@ public class GameLoop implements Runnable {
         LOGGER.info("GameLoop stopped.");
     }
 
-    public void tick(double deltaTime) { updatePhysics(deltaTime); }
-
+    /**
+     * Cập nhật toàn bộ vật lý, va chạm và sự kiện trong một tick đơn lẻ:
+     * đếm ngược trạng thái, di chuyển xe và đạn, giải quyết va chạm hình học,
+     * tự động sinh/thu hồi vật phẩm và phát tán snapshot tới các người chơi.
+     *
+     * @param deltaTime khoảng thời gian trôi qua giữa 2 tick (giây)
+     */
     private void updatePhysics(double deltaTime) {
         tickCount++;
 
         if (stateManager != null) {
             stateManager.update(deltaTime);
-            if (stateManager.isGameOver()) return;
+            if (stateManager.isGameOver()) {
+                return;
+            }
         }
 
-        // 0. Giảm dần thời gian bảo hộ sau hồi sinh
         for (TankEntity tank : tanks.values()) {
             ProtectionProcessor.update(tank, deltaTime);
         }
 
-        // 1. Lưu vị trí cũ
         Map<Integer, double[]> prevPositions = new HashMap<>();
         for (TankEntity tank : tanks.values()) {
             prevPositions.put(tank.getId(), new double[]{tank.getX(), tank.getY()});
         }
 
-        // 2. Di chuyển xe (đã tự áp dụng nitro bên trong TankMovementProcessor)
         for (TankEntity tank : tanks.values()) {
             TankMovementProcessor.update(tank, deltaTime);
         }
 
-        // 3. Chặn xuyên tường / ra biên
         for (TankEntity tank : tanks.values()) {
             double[] prev = prevPositions.get(tank.getId());
             CollisionDetector.resolveTankMapCollision(tank, gameMap, prev[0], prev[1], tankSize);
         }
 
-        // 4. Chặn xe đè xe
         CollisionDetector.resolveTankTankCollision(tanks.values(), tankSize, prevPositions);
 
-        // 5. Di chuyển đạn
         for (BulletEntity bullet : bullets.values()) {
             BulletMovementProcessor.update(bullet, deltaTime);
         }
 
-        // 6. Va chạm Đạn-Xe / Đạn-Tường
         CollisionDetector.BulletCollisionResult bulletResult = CollisionDetector.resolveBulletCollisions(
                 bullets.values(), tanks.values(), gameMap, bulletSize, tankSize, normalBulletDamage);
 
         if (combatListener != null) {
-            for (CombatEvent e : bulletResult.combatEvents) combatListener.onCombatEvent(e);
+            for (CombatEvent e : bulletResult.combatEvents) {
+                combatListener.onCombatEvent(e);
+            }
         }
         if (mapChangeListener != null) {
-            for (MapChangeEvent e : bulletResult.mapChangeEvents) mapChangeListener.onMapChanged(e);
+            for (MapChangeEvent e : bulletResult.mapChangeEvents) {
+                mapChangeListener.onMapChanged(e);
+            }
         }
 
         bullets.values().removeIf(b -> !b.isAlive());
 
-        // 7. Sinh item định kỳ
         itemSpawnAccumulator += deltaTime;
         double spawnInterval = ConfigLoader.getItemSpawnIntervalSeconds();
         if (itemSpawnAccumulator >= spawnInterval) {
             itemSpawnAccumulator -= spawnInterval;
             ItemEntity newItem = ItemSpawnProcessor.trySpawn(gameMap, items.values(), itemIdSeq);
-            if (newItem != null) items.put(newItem.getId(), newItem);
+            if (newItem != null) {
+                items.put(newItem.getId(), newItem);
+            }
         }
 
-        // 8. Tự huỷ item quá hạn chưa ai nhặt
         long now = System.currentTimeMillis();
         long despawnMs = (long) (ConfigLoader.getItemDespawnSeconds() * 1000);
         items.values().removeIf(it -> (now - it.getSpawnTimeMillis()) > despawnMs);
 
-        // 9. Va chạm Xe-Item
-        int itemSize = gameMap != null ? gameMap.getTileSize() : 40;
+        int itemSize = gameMap != null ? gameMap.getTileSize() : DEFAULT_ITEM_SIZE;
         List<ItemPickupEvent> pickupEvents = CollisionDetector.resolveItemPickups(tanks.values(), items.values(), tankSize, itemSize);
         if (itemEventListener != null) {
-            for (ItemPickupEvent e : pickupEvents) itemEventListener.onItemPickup(e);
+            for (ItemPickupEvent e : pickupEvents) {
+                itemEventListener.onItemPickup(e);
+            }
         }
         items.values().removeIf(it -> !it.isActive());
 
-        // 10. Gửi snapshot — theo từng người xem (bụi cỏ ẩn/hiện khác nhau)
         if (snapshotListener != null) {
             List<BulletSnapshotDTO> bulletDTOs = buildBulletDTOs();
             List<ItemSnapshotDTO> itemDTOs = buildItemDTOs();
@@ -223,8 +372,23 @@ public class GameLoop implements Runnable {
         }
     }
 
-    public Map<Integer, TankEntity> getTanks() { return tanks; }
-    public long getTickCount() { return tickCount; }
+    /**
+     * Lấy toàn bộ danh sách các xe tăng trong phòng đấu.
+     *
+     * @return bản đồ id -> {@link TankEntity}
+     */
+    public Map<Integer, TankEntity> getTanks() {
+        return tanks;
+    }
+
+    /**
+     * Lấy số tick vật lý đã xử lý kể từ lúc bắt đầu trận đấu.
+     *
+     * @return số lượng tick
+     */
+    public long getTickCount() {
+        return tickCount;
+    }
 
     private List<BulletSnapshotDTO> buildBulletDTOs() {
         List<BulletSnapshotDTO> bulletDTOs = new ArrayList<>(bullets.size());
@@ -250,16 +414,33 @@ public class GameLoop implements Runnable {
         return itemDTOs;
     }
 
-    /** Snapshot đầy đủ, không lọc bụi cỏ — dùng cho demo/công cụ debug, KHÔNG dùng để gửi client thật. */
+    /**
+     * Đóng gói snapshot đầy đủ không áp dụng lọc bụi cỏ (phục vụ debug/quan sát toàn cảnh).
+     *
+     * @return đối tượng {@link GameSnapshotDTO} chứa trạng thái đầy đủ
+     */
     public GameSnapshotDTO buildSnapshot() {
         return buildInternal(-1, false, buildBulletDTOs(), buildItemDTOs());
     }
 
-    /** Snapshot dành riêng cho 1 người xem — xe khác đang nấp bụi (và chưa bắn gần đây) sẽ bị ẩn khỏi danh sách. */
+    /**
+     * Đóng gói snapshot tùy biến riêng theo góc nhìn của một xe tăng cụ thể (lọc tàng hình trong bụi cỏ).
+     *
+     * @param viewerTankId ID xe tăng của người xem
+     * @return đối tượng {@link GameSnapshotDTO} đã được lọc hiển thị
+     */
     public GameSnapshotDTO buildSnapshotFor(int viewerTankId) {
         return buildSnapshotFor(viewerTankId, buildBulletDTOs(), buildItemDTOs());
     }
 
+    /**
+     * Đóng gói snapshot với danh sách đạn và item đã được tính toán sẵn.
+     *
+     * @param viewerTankId ID xe tăng người xem
+     * @param bulletDTOs   danh sách DTO đạn
+     * @param itemDTOs     danh sách DTO vật phẩm
+     * @return {@link GameSnapshotDTO}
+     */
     public GameSnapshotDTO buildSnapshotFor(int viewerTankId, List<BulletSnapshotDTO> bulletDTOs, List<ItemSnapshotDTO> itemDTOs) {
         return buildInternal(viewerTankId, true, bulletDTOs, itemDTOs);
     }
@@ -273,7 +454,7 @@ public class GameLoop implements Runnable {
         for (TankEntity tank : tanks.values()) {
             if (applyBushStealth
                     && !BushVisibilityProcessor.isVisibleTo(viewerTank, tank, gameMap, now, revealWindowMs)) {
-                continue; // bị ẩn khỏi snapshot của viewer này
+                continue;
             }
 
             boolean isGhost = tank.isProtected();

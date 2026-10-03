@@ -14,13 +14,21 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Tiện ích tải và lưu bộ nhớ đệm (cache) tài nguyên hình ảnh và cấu hình giao diện.
+ */
 public class AssetLoader {
 
     private static final Logger LOGGER = Logger.getLogger(AssetLoader.class.getName());
     private static final Map<String, Image> imageCache = new ConcurrentHashMap<>();
     private static JsonObject colorConfig;
 
-    // Tải ảnh từ thư mục src/main/resources/com/tank2d/client/assets/images/
+    /**
+     * Tải hình ảnh từ tài nguyên classpath với bộ nhớ đệm.
+     *
+     * @param path đường dẫn tương đối trong thư mục images
+     * @return đối tượng {@link Image} hoặc null nếu không tìm thấy
+     */
     public static Image getImage(String path) {
         if (!imageCache.containsKey(path)) {
             try (InputStream is = AssetLoader.class.getResourceAsStream("/com/tank2d/client/assets/images/" + path)) {
@@ -36,12 +44,11 @@ public class AssetLoader {
         return imageCache.get(path);
     }
 
-    /*
-     * Lấy ảnh vật phẩm bổ trợ theo loại (Type):
-     * 1: Túi máu (tiles/medkit.png)
-     * 2: Khiên chắn (tiles/shield.png)
-     * 3: Bình khí tăng tốc (tiles/speed_boots.png)
-     * 4: Đạn tên lửa (bullets/missile.png)
+    /**
+     * Lấy hình ảnh đại diện của vật phẩm bổ trợ (Power-up) theo loại.
+     *
+     * @param type tên loại vật phẩm (HEALTH_PACK, SHIELD, NITRO, ROCKET_AMMO)
+     * @return đối tượng {@link Image} tương ứng hoặc null
      */
     public static Image getPowerUpImage(String type) {
         if (type == null) return null;
@@ -54,7 +61,11 @@ public class AssetLoader {
         }
     }
     
-    // Nạp cấu hình màu sắc từ file JSON cấu hình
+    /**
+     * Nạp cấu hình chủ đề màu sắc từ tài nguyên theme_colors.json.
+     *
+     * @return đối tượng {@link JsonObject} chứa bảng màu
+     */
     public static JsonObject getColorTheme() {
         if (colorConfig == null) {
             try (InputStream is = AssetLoader.class.getResourceAsStream("/com/tank2d/client/assets/config/theme_colors.json")) {
@@ -66,7 +77,12 @@ public class AssetLoader {
         return colorConfig;
     }
 
-    // Nạp bản đồ JSON động từ thư mục config/maps/
+    /**
+     * Nạp cấu hình bản đồ từ file JSON tại thư mục config/maps/.
+     *
+     * @param mapName tên định danh bản đồ
+     * @return đối tượng {@link JsonObject} chứa dữ liệu bản đồ hoặc null
+     */
     public static JsonObject loadMapConfig(String mapName) {
         try {
             String path = "config/maps/" + mapName + ".json";

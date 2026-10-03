@@ -12,9 +12,14 @@ import java.net.Socket;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Quản lý kết nối TCP Socket trực tiếp phía Client tới máy chủ.
+ */
 public class ClientSocket {
 
     private static final Logger LOGGER = Logger.getLogger(ClientSocket.class.getName());
+    private static final String DEFAULT_HOST = "localhost";
+    private static final int DEFAULT_PORT = 8888;
 
     private Socket socket;
     private DataInputStream dis;
@@ -24,7 +29,7 @@ public class ClientSocket {
     private final int port;
 
     public ClientSocket() {
-        this("localhost", 8888);
+        this(DEFAULT_HOST, DEFAULT_PORT);
     }
 
     public ClientSocket(String host, int port) {
@@ -32,6 +37,11 @@ public class ClientSocket {
         this.port = port;
     }
 
+    /**
+     * Thiết lập kết nối socket và khởi tạo các luồng I/O.
+     *
+     * @throws IOException nếu kết nối máy chủ thất bại
+     */
     public void connect() throws IOException {
         socket = new Socket(host, port);
         dis = new DataInputStream(socket.getInputStream());
@@ -39,6 +49,12 @@ public class ClientSocket {
         LOGGER.info("[ClientSocket] Đã kết nối tới " + host + ":" + port);
     }
 
+    /**
+     * Gửi một gói tin {@link Packet} tới máy chủ.
+     *
+     * @param packet đối tượng gói tin cần gửi
+     * @throws IOException nếu socket bị ngắt hoặc gửi lỗi
+     */
     public synchronized void sendPacket(Packet packet) throws IOException {
         if (!isConnected()) {
             throw new NetworkException(ErrorCode.NET_CLIENT_NOT_CONNECTED);
@@ -46,6 +62,12 @@ public class ClientSocket {
         NetworkUtil.sendPacket(dos, packet);
     }
 
+    /**
+     * Nhận một gói tin {@link Packet} từ máy chủ.
+     *
+     * @return đối tượng gói tin nhận được
+     * @throws IOException nếu đọc luồng thất bại
+     */
     public Packet receivePacket() throws IOException {
         if (!isConnected()) {
             throw new NetworkException(ErrorCode.NET_CLIENT_NOT_CONNECTED);
@@ -53,13 +75,18 @@ public class ClientSocket {
         return NetworkUtil.readPacket(dis);
     }
 
+    /**
+     * Gửi yêu cầu và đồng bộ đợi phản hồi tương ứng qua cùng luồng socket.
+     *
+     * @param packet gói tin gửi đi
+     * @return gói tin phản hồi nhận về
+     * @throws IOException nếu kết nối gặp sự cố
+     */
     public synchronized Packet sendAndReceivePacket(Packet packet) throws IOException {
         if (!isConnected()) {
             throw new NetworkException(ErrorCode.NET_CLIENT_NOT_CONNECTED);
         }
-        // Gửi request
         NetworkUtil.sendPacket(dos, packet);
-        // Chờ đúng response trước khi thread khác được dùng socket
         return NetworkUtil.readPacket(dis);
     }
 
@@ -67,11 +94,20 @@ public class ClientSocket {
         return socket != null && socket.isConnected() && !socket.isClosed();
     }
 
+    /**
+     * Đóng an toàn kết nối socket và giải phóng các luồng dữ liệu.
+     */
     public void close() {
         try {
-            if (dis != null) dis.close();
-            if (dos != null) dos.close();
-            if (socket != null && !socket.isClosed()) socket.close();
+            if (dis != null) {
+                dis.close();
+            }
+            if (dos != null) {
+                dos.close();
+            }
+            if (socket != null && !socket.isClosed()) {
+                socket.close();
+            }
             LOGGER.info("[ClientSocket] Đã đóng kết nối.");
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "[ClientSocket] Lỗi đóng kết nối", e);

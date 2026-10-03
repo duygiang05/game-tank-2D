@@ -30,6 +30,10 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Bộ điều khiển màn hình Bảng xếp hạng người chơi (Leaderboard Controller).
+ * Hiển thị thứ hạng Top người chơi theo điểm tích lũy, số mạng hạ gục và số trận thắng.
+ */
 public class LeaderboardController {
 
     private static final Logger LOGGER = Logger.getLogger(LeaderboardController.class.getName());
@@ -47,11 +51,13 @@ public class LeaderboardController {
     private final Gson gson = new Gson();
     private final Consumer<Packet> packetListener = this::handleServerPacket;
 
+    /**
+     * Khởi tạo giao diện bảng xếp hạng và gửi yêu cầu tải dữ liệu từ server.
+     */
     @FXML
     private void initialize() {
         session.addPacketListener(packetListener);
 
-        // Cấu hình từng dòng hiển thị chuẩn xác, không bao giờ cuộn ngang
         leaderboardListView.setCellFactory(listView -> new ListCell<LeaderboardDTO>() {
             @Override
             protected void updateItem(LeaderboardDTO player, boolean empty) {
@@ -64,7 +70,6 @@ public class LeaderboardController {
                 } else {
                     int rank = player.getRank();
 
-                    // Cột 1: Hạng (80px)
                     Label rankLabel = new Label();
                     rankLabel.setPrefWidth(80);
                     rankLabel.setAlignment(Pos.CENTER_LEFT);
@@ -83,7 +88,6 @@ public class LeaderboardController {
                         rankLabel.setStyle("-fx-text-fill: #64748b; -fx-font-weight: bold; -fx-font-size: 13px;");
                     }
 
-                    // Cột 2: Tên người chơi (200px) - Tự động rút gọn dấu ... nếu quá dài
                     Label nameLabel = new Label(player.getUsername());
                     nameLabel.setPrefWidth(200);
                     nameLabel.setMaxWidth(200);
@@ -91,19 +95,16 @@ public class LeaderboardController {
                     nameLabel.setAlignment(Pos.CENTER_LEFT);
                     nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13.5px;");
 
-                    // Cột 3: Điểm số (120px)
                     Label pointsLabel = new Label(String.format("%,d", player.getTotalPoints()));
                     pointsLabel.setPrefWidth(120);
                     pointsLabel.setAlignment(Pos.CENTER_RIGHT);
                     pointsLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13.5px;");
 
-                    // Cột 4: Kills (120px)
                     Label killsLabel = new Label(String.valueOf(player.getTotalKills()));
                     killsLabel.setPrefWidth(120);
                     killsLabel.setAlignment(Pos.CENTER_RIGHT);
                     killsLabel.setStyle("-fx-text-fill: #dc2626; -fx-font-weight: bold; -fx-font-size: 13px;");
 
-                    // Cột 5: Wins (100px) - Hiển thị đầy đủ không bị mất
                     Label winsLabel = new Label(String.valueOf(player.getTotalWins()));
                     winsLabel.setPrefWidth(100);
                     winsLabel.setAlignment(Pos.CENTER_RIGHT);
@@ -113,7 +114,6 @@ public class LeaderboardController {
                     row.setAlignment(Pos.CENTER_LEFT);
                     row.setStyle("-fx-padding: 6px 10px; -fx-background-radius: 8px;");
 
-                    // Định dạng màu nền cao cấp cho Top 1, 2, 3 và người chơi thường
                     if (rank == 1) {
                         row.setStyle(row.getStyle() + "-fx-background-color: #fefce8; -fx-border-color: #fef08a; -fx-border-width: 1px; -fx-border-radius: 8px;");
                         nameLabel.setStyle(nameLabel.getStyle() + "-fx-text-fill: #854d0e;");
@@ -142,6 +142,9 @@ public class LeaderboardController {
         loadLeaderboard();
     }
 
+    /**
+     * Gửi yêu cầu lấy dữ liệu bảng xếp hạng từ máy chủ.
+     */
     private void loadLeaderboard() {
         try {
             ClientSocket clientSocket = session.getClientSocket();
@@ -162,6 +165,11 @@ public class LeaderboardController {
         }
     }
 
+    /**
+     * Xử lý gói tin nhận từ máy chủ.
+     *
+     * @param packet gói tin nhận được
+     */
     private void handleServerPacket(Packet packet) {
         if (packet == null || packet.getType() == null) return;
 
@@ -170,6 +178,11 @@ public class LeaderboardController {
         }
     }
 
+    /**
+     * Phân tích và render danh sách xếp hạng nhận được lên ListView.
+     *
+     * @param rawJson chuỗi JSON danh sách LeaderboardDTO
+     */
     private void handleLeaderboardResponse(String rawJson) {
         try {
             Type type = new TypeToken<List<LeaderboardDTO>>() {}.getType();
@@ -192,6 +205,9 @@ public class LeaderboardController {
         }
     }
 
+    /**
+     * Quay trở về màn hình sảnh chờ (Lobby).
+     */
     @FXML
     private void handleBack() {
         session.removePacketListener(packetListener);

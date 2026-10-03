@@ -1,10 +1,11 @@
 package com.tank2d.common.protocol;
 
+/**
+ * Định nghĩa danh mục tất cả các loại gói tin (Packet Types) trao đổi giữa Client và Server.
+ */
 public enum PacketType {
 
-    // =========================
-    // AUTH
-    // =========================
+    /** Nhóm gói tin xác thực tài khoản và chỉ số người chơi */
     AUTH_LOGIN_REQ,
     AUTH_LOGIN_RES,
     AUTH_REGISTER_REQ,
@@ -16,29 +17,20 @@ public enum PacketType {
     MATCH_DETAIL_REQ,
     MATCH_DETAIL_RES,
     LOGOUT_REQ,
-    // =========================
-    // LOBBY
-    // =========================
 
+    /** Nhóm gói tin quản lý sảnh chờ và phòng đấu */
     LOBBY_GET_ROOMS_REQ,
     LOBBY_ROOMS_RES,
     ROOM_LIST_UPDATE,
-    // =========================
-    // ROOM
-    // =========================
-
     ROOM_CREATE_REQ,
     ROOM_JOIN_REQ,
     ROOM_STATE_UPDATE,
     ROOM_READY_REQ,
     ROOM_LEAVE_REQ,
     ROOM_START_REQ,
-    // Host chọn thời lượng trận đấu
     ROOM_DURATION_REQ,
-    // =========================
-    // GAME
-    // =========================
 
+    /** Nhóm gói tin đồng bộ trận đấu, chiến đấu và bản đồ */
     GAME_START_NOTIFY,
     TANK_PLAYER_INFO_REQ,
     TANK_PLAYER_INFO,
@@ -48,6 +40,8 @@ public enum PacketType {
     GAME_EVENT_EFFECT,
     GAME_OVER_NOTIFY,
     MAP_UPDATE,
+
+    /** Nhóm gói tin xử lý kết nối lại và trạng thái kỷ luật thoát trận */
     GAME_RECONNECT_PROMPT,
     GAME_RECONNECT_REQ,
     GAME_RECONNECT_RES,

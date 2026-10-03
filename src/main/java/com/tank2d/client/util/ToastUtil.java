@@ -21,6 +21,10 @@ public class ToastUtil {
 
     /**
      * Hiển thị thông báo Toast với thời gian mặc định 5 giây.
+     *
+     * @param window cửa sổ hiển thị thông báo
+     * @param message nội dung thông báo
+     * @param isSuccess true nếu thông báo thành công, false nếu là thông báo lỗi
      */
     public static void showToast(Window window, String message, boolean isSuccess) {
         showToast(window, message, isSuccess, 5.0);
@@ -28,13 +32,17 @@ public class ToastUtil {
 
     /**
      * Hiển thị thông báo Toast với thời gian tùy chỉnh.
+     *
+     * @param window cửa sổ hiển thị thông báo
+     * @param message nội dung thông báo
+     * @param isSuccess true nếu thông báo thành công, false nếu là thông báo lỗi
+     * @param durationSeconds thời gian hiển thị tính bằng giây
      */
     public static void showToast(Window window, String message, boolean isSuccess, double durationSeconds) {
         Platform.runLater(() -> {
             try {
                 Window targetWindow = window;
                 if (targetWindow == null || !targetWindow.isShowing()) {
-                    // Fallback lấy cửa sổ chính đang mở
                     for (Window w : Window.getWindows()) {
                         if (w.isShowing() && w instanceof Stage) {
                             targetWindow = w;
@@ -74,7 +82,6 @@ public class ToastUtil {
                 popup.getContent().add(label);
                 popup.show(targetWindow);
 
-                // Căn giữa theo chiều ngang và cách mép trên cửa sổ 65px
                 popup.setX(targetWindow.getX() + (targetWindow.getWidth() - label.getWidth()) / 2.0);
                 popup.setY(targetWindow.getY() + 65.0);
 
@@ -93,6 +100,13 @@ public class ToastUtil {
         });
     }
 
+    /**
+     * Hiển thị thông báo Toast gắn liền với một Node trên Scene.
+     *
+     * @param node thành phần UI chứa Scene hiển thị
+     * @param message nội dung thông báo
+     * @param isSuccess true nếu thông báo thành công, false nếu là thông báo lỗi
+     */
     public static void showToast(Node node, String message, boolean isSuccess) {
         if (node != null && node.getScene() != null) {
             showToast(node.getScene().getWindow(), message, isSuccess);

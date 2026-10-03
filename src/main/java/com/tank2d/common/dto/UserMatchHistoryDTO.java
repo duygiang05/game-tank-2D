@@ -2,13 +2,17 @@ package com.tank2d.common.dto;
 
 import java.io.Serializable;
 
+/**
+ * DTO chứa tóm tắt kết quả một trận đấu trong lịch sử của người chơi.
+ */
 public class UserMatchHistoryDTO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     private int matchId;
     private String roomName;
-    private String result; // "VICTORY", "DEFEAT", "DRAW"
+    /** Kết quả trận đấu: VICTORY, DEFEAT hoặc DRAW */
+    private String result;
     private int rankPosition;
     private int kills;
     private int hits;

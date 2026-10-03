@@ -16,13 +16,21 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Lớp truy xuất cơ sở dữ liệu đối với thông tin người dùng và chỉ số tích lũy (User DAO).
+ */
 public class UserDAO {
 
     private static final Logger LOGGER = Logger.getLogger(UserDAO.class.getName());
 
     /**
-     * Đăng ký tài khoản mới: băm mật khẩu bằng BCrypt và lưu vào CSDL. CSDL có
-     * sẵn trigger tự động tạo bản ghi trong bảng user_stats.
+     * Đăng ký tài khoản mới: băm mật khẩu bằng BCrypt và lưu vào CSDL.
+     * CSDL có sẵn trigger tự động tạo bản ghi trong bảng user_stats.
+     *
+     * @param username tên tài khoản người chơi
+     * @param plainPassword mật khẩu dạng thô
+     * @return true nếu đăng ký thành công, false nếu thông tin không hợp lệ hoặc đã tồn tại
+     * @throws DatabaseException khi gặp lỗi truy vấn cơ sở dữ liệu
      */
     public boolean register(String username, String plainPassword) {
         if (username == null || plainPassword == null || username.trim().isEmpty() || plainPassword.isEmpty()) {
@@ -34,7 +42,6 @@ public class UserDAO {
             return false;
         }
 
-        // Băm mật khẩu bằng BCrypt (cost factor mặc định là 10)
         String hashedPassword = BCrypt.hashpw(plainPassword, BCrypt.gensalt());
 
         String sql = "INSERT INTO users (username, password_hash) VALUES (?, ?)";
@@ -54,10 +61,12 @@ public class UserDAO {
     }
 
     /**
-     * Xác thực đăng nhập: lấy hash từ CSDL và so khớp với plain text bằng
-     * BCrypt.checkpw().
+     * Xác thực đăng nhập: lấy chuỗi băm từ CSDL và so khớp với mật khẩu thô bằng BCrypt.checkpw().
      *
-     * @return User object nếu hợp lệ, null nếu sai tên hoặc mật khẩu.
+     * @param username tên đăng nhập
+     * @param plainPassword mật khẩu thô
+     * @return đối tượng {@link User} nếu thông tin hợp lệ, null nếu sai tài khoản hoặc mật khẩu
+     * @throws DatabaseException khi gặp lỗi truy vấn cơ sở dữ liệu
      */
     public User login(String username, String plainPassword) {
         if (username == null || plainPassword == null || username.trim().isEmpty() || plainPassword.isEmpty()) {
@@ -76,7 +85,6 @@ public class UserDAO {
                     String dbUsername = rs.getString("username");
                     String dbPasswordHash = rs.getString("password_hash");
 
-                    // So khớp chuỗi mật khẩu gõ vào với hash BCrypt trong DB
                     if (BCrypt.checkpw(plainPassword, dbPasswordHash)) {
                         return new User(id, dbUsername);
                     }
@@ -93,6 +101,13 @@ public class UserDAO {
 
     /**
      * Cập nhật điểm tích lũy sau mỗi trận đấu vào bảng user_stats.
+     *
+     * @param userId mã định danh người dùng
+     * @param pointsEarned điểm số nhận được từ trận đấu
+     * @param kills số mạng hạ gục
+     * @param hits số phát bắn trúng đích
+     * @param isWin true nếu là người chiến thắng
+     * @return true nếu cập nhật thành công, false nếu thất bại
      */
     public boolean updateMatchStats(int userId, int pointsEarned, int kills, int hits, boolean isWin) {
         String sql = "UPDATE user_stats SET "
@@ -125,7 +140,8 @@ public class UserDAO {
      * 2. Tổng kills giảm dần (total_kills DESC)
      * 3. Tổng số trận thắng giảm dần (total_wins DESC)
      * 4. Id người dùng tăng dần (u.id ASC - ổn định thứ hạng khi bằng điểm)
-     * Giới hạn: LIMIT 10
+     *
+     * @return danh sách các {@link LeaderboardDTO} của Top 10 người chơi
      */
     public List<LeaderboardDTO> getLeaderboard() {
         List<LeaderboardDTO> leaderboard = new ArrayList<>();
@@ -169,8 +185,13 @@ public class UserDAO {
 
         return leaderboard;
     }
+
     /**
-     * Kiểm tra nhanh sự tồn tại của username để tránh lỗi duplicate key.
+     * Kiểm tra sự tồn tại của tên đăng nhập để tránh lỗi trùng khóa (duplicate key).
+     *
+     * @param username tên tài khoản cần kiểm tra
+     * @return true nếu tài khoản đã tồn tại, ngược lại false
+     * @throws DatabaseException khi gặp sự cố truy vấn CSDL
      */
     public boolean isUsernameTaken(String username) {
         String sql = "SELECT 1 FROM users WHERE username = ? LIMIT 1";

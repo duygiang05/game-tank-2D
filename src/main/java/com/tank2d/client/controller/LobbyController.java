@@ -38,6 +38,11 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Bộ điều khiển giao diện sảnh chờ (Lobby Controller).
+ * Quản lý danh sách phòng, tạo phòng, tham gia phòng, bộ lọc thời gian trận đấu,
+ * cảnh báo phạt khi thoát trận và điều hướng kết nối lại (reconnect).
+ */
 public class LobbyController {
 
     private static final Logger LOGGER = Logger.getLogger(LobbyController.class.getName());
@@ -99,17 +104,18 @@ public class LobbyController {
     private boolean isPenalized = false;
     private int penalizedRoomId = -1;
 
+    /**
+     * Khởi tạo giao diện sảnh chờ, đăng ký lắng nghe gói tin mạng,
+     * thiết lập bộ lọc và render danh sách phòng.
+     */
     @FXML
     private void initialize() {
-        // Đăng ký nhận packet từ Reader Thread của ClientSession
         session.addPacketListener(packetListener);
 
-        // Cấu hình bộ lọc thời gian
         durationFilterComboBox.getItems().addAll("Tất cả", "45s", "60s", "90s", "180s");
         durationFilterComboBox.setValue("Tất cả");
         durationFilterComboBox.setOnAction(event -> applyDurationFilter());
 
-        // Hiển thị tên người dùng
         if (session.getCurrentUser() != null) {
             usernameLabel.setText(session.getCurrentUser().getUsername());
         } else {
@@ -118,7 +124,6 @@ public class LobbyController {
 
         statusLabel.setText("Đang tải danh sách phòng...");
 
-        // Render từng dòng phòng: Để nền trong suốt để khi click vào sẽ ăn style CSS nổi bật (.list-cell:selected)
         roomListView.setCellFactory(listView -> new ListCell<RoomDTO>() {
             @Override
             protected void updateItem(RoomDTO room, boolean empty) {
@@ -128,25 +133,21 @@ public class LobbyController {
                     setText(null);
                     setGraphic(null);
                 } else {
-                    // Cột 1: Tên phòng (260px)
                     Label nameLabel = new Label("🎮  " + room.getRoomName());
                     nameLabel.setPrefWidth(260);
                     nameLabel.setAlignment(Pos.CENTER_LEFT);
                     nameLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #0f172a; -fx-font-size: 13.5px;");
 
-                    // Cột 2: Số người chơi (110px)
                     Label playersLabel = new Label(room.getCurrentPlayers() + " / " + room.getMaxPlayers());
                     playersLabel.setPrefWidth(110);
                     playersLabel.setAlignment(Pos.CENTER);
                     playersLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #2563eb; -fx-font-size: 13px;");
 
-                    // Cột 3: Thời lượng (120px)
                     Label durationLabel = new Label("⏱ " + room.getDuration() + "s");
                     durationLabel.setPrefWidth(120);
                     durationLabel.setAlignment(Pos.CENTER);
                     durationLabel.setStyle("-fx-text-fill: #64748b; -fx-font-size: 13px;");
 
-                    // Cột 4: Trạng thái (140px)
                     String status = room.getStatus() != null ? room.getStatus() : "WAITING";
                     boolean isWaiting = status.equalsIgnoreCase("WAITING") || status.toLowerCase().contains("chờ");
                     Label statusLabelCell = new Label(isWaiting ? "● Đang chờ" : "▶ Đang chơi");
@@ -169,10 +170,12 @@ public class LobbyController {
             }
         });
 
-        // Bắn request lấy danh sách phòng hiện tại
         loadRooms();
     }
 
+    /**
+     * Gửi yêu cầu lấy danh sách phòng hiện có từ máy chủ.
+     */
     private void loadRooms() {
         try {
             ClientSocket clientSocket = session.getClientSocket();
@@ -193,6 +196,9 @@ public class LobbyController {
         }
     }
 
+    /**
+     * Xử lý sự kiện tạo phòng mới.
+     */
     @FXML
     private void handleCreateRoom() {
         if (isPenalized) {
@@ -227,6 +233,9 @@ public class LobbyController {
         }
     }
 
+    /**
+     * Xử lý sự kiện tham gia phòng được chọn.
+     */
     @FXML
     private void handleJoinRoom() {
         if (isPenalized) {
@@ -272,6 +281,11 @@ public class LobbyController {
         }
     }
 
+    /**
+     * Định tuyến gói tin phản hồi từ Server về các hàm xử lý tương ứng.
+     *
+     * @param packet gói tin nhận được từ máy chủ
+     */
     private void handleServerPacket(Packet packet) {
         if (packet == null || packet.getType() == null) {
             return;
@@ -304,6 +318,11 @@ public class LobbyController {
         }
     }
 
+    /**
+     * Cập nhật danh sách phòng hiển thị và kiểm tra trạng thái gỡ phạt/kết thúc trận.
+     *
+     * @param rawJson chuỗi JSON danh sách phòng từ server
+     */
     private void handleLobbyRoomsUpdate(String rawJson) {
         try {
             Type roomListType = new TypeToken<List<RoomDTO>>() {}.getType();
@@ -317,7 +336,6 @@ public class LobbyController {
                 allRooms = rooms;
                 applyDurationFilter();
 
-                // 1. Kiểm tra tự động gỡ phạt nếu phòng bị phạt đã kết thúc hoặc không còn trong danh sách Playing
                 if (isPenalized && penalizedRoomId != -1) {
                     boolean penRoomStillPlaying = false;
                     for (RoomDTO r : rooms) {
@@ -340,7 +358,6 @@ public class LobbyController {
                     }
                 }
 
-                // 2. Kiểm tra xem trận đấu dở dang (reconnect) đã kết thúc chưa
                 if (pendingReconnectMatch != null) {
                     boolean matchStillActive = false;
                     for (RoomDTO r : rooms) {
@@ -367,6 +384,9 @@ public class LobbyController {
         }
     }
 
+    /**
+     * Áp dụng bộ lọc thời gian trận đấu lên danh sách hiển thị.
+     */
     private void applyDurationFilter() {
         String selectedFilter = durationFilterComboBox.getValue();
         if (selectedFilter == null) {
@@ -394,6 +414,11 @@ public class LobbyController {
         }
     }
 
+    /**
+     * Xử lý cập nhật trạng thái phòng khi tham gia hoặc mở phòng.
+     *
+     * @param rawJson dữ liệu phòng dạng JSON
+     */
     private void handleRoomStateUpdate(String rawJson) {
         try {
             RoomDTO room = gson.fromJson(rawJson, RoomDTO.class);
@@ -402,7 +427,6 @@ public class LobbyController {
                 return;
             }
 
-            // KIỂM TRA ĐIỀU KIỆN TIÊN QUYẾT: TÊN MÌNH PHẢI CÓ TRONG PHÒNG
             User currentUser = session.getCurrentUser();
             boolean isJoined = currentUser != null 
                     && room.getPlayerNames() != null 
@@ -412,7 +436,6 @@ public class LobbyController {
                 LOGGER.info("[Lobby] Vào phòng thành công: " + room.getRoomName());
                 openRoom(room);
             } else {
-                // Nếu mình không có trong phòng (do phòng đang chơi hoặc đã đầy bị Server từ chối)
                 LOGGER.warning("[Lobby] Không thể vào phòng (bị Server từ chối): " + room.getRoomName());
                 showError("Không thể vào phòng! Phòng đang chiến đấu hoặc đã đầy.");
             }
@@ -423,10 +446,14 @@ public class LobbyController {
         }
     }
 
+    /**
+     * Mở giao diện phòng chơi (Room view).
+     *
+     * @param room đối tượng RoomDTO đại diện thông tin phòng
+     */
     private void openRoom(RoomDTO room) {
         Platform.runLater(() -> {
             try {
-                // Gỡ packet listener của sảnh trước khi mở phòng
                 session.removePacketListener(packetListener);
 
                 FXMLLoader loader = new FXMLLoader(
@@ -447,7 +474,6 @@ public class LobbyController {
                 stage.show();
 
             } catch (IOException e) {
-                // Nếu load thất bại thì hồi phục listener
                 session.addPacketListener(packetListener);
                 LOGGER.log(Level.SEVERE, "[Lobby] Không thể mở Room", e);
                 showError("Không thể mở giao diện phòng!");
@@ -455,6 +481,9 @@ public class LobbyController {
         });
     }
 
+    /**
+     * Xử lý đăng xuất tài khoản và quay trở lại màn hình đăng nhập.
+     */
     @FXML
     private void handleLogout() {
         try {
@@ -487,6 +516,9 @@ public class LobbyController {
         }
     }
 
+    /**
+     * Mở màn hình Bảng xếp hạng người chơi.
+     */
     @FXML
     private void handleLeaderboard() {
         if (isPenalized) {
@@ -501,7 +533,6 @@ public class LobbyController {
         }
 
         try {
-            // Gỡ listener của sảnh TRƯỚC để LeaderboardController làm việc chuẩn xác
             session.removePacketListener(packetListener);
 
             FXMLLoader loader = new FXMLLoader(
@@ -521,6 +552,9 @@ public class LobbyController {
         }
     }
 
+    /**
+     * Mở màn hình Lịch sử thi đấu của người chơi.
+     */
     @FXML
     private void handleMatchHistory() {
         if (isPenalized) {
@@ -554,6 +588,11 @@ public class LobbyController {
         }
     }
 
+    /**
+     * Xử lý thông báo phạt khi người chơi thoát trận giữa chừng hoặc khi hết phạt.
+     *
+     * @param message nội dung thông báo trạng thái phạt
+     */
     private void handlePenaltyNotify(String message) {
         Platform.runLater(() -> {
             if ("PENALTY_LIFTED".equals(message)) {
@@ -591,6 +630,11 @@ public class LobbyController {
         });
     }
 
+    /**
+     * Xử lý gói tin nhắc nhở trận đấu dở dang khi đăng nhập lại.
+     *
+     * @param rawJson dữ liệu ReconnectPromptDTO dạng JSON
+     */
     private void handleReconnectPrompt(String rawJson) {
         try {
             ReconnectPromptDTO promptDTO = gson.fromJson(rawJson, ReconnectPromptDTO.class);
@@ -605,6 +649,11 @@ public class LobbyController {
         }
     }
 
+    /**
+     * Hiển thị hộp thoại Modal hỏi người chơi có muốn kết nối lại trận đấu không.
+     *
+     * @param promptDTO thông tin phòng và thời gian còn lại
+     */
     private void showReconnectModal(ReconnectPromptDTO promptDTO) {
         if (promptDTO == null) return;
         if (reconnectRoomLabel != null) {
@@ -624,6 +673,9 @@ public class LobbyController {
         statusLabel.setStyle("-fx-text-fill: #ea580c; -fx-font-weight: bold;");
     }
 
+    /**
+     * Tạm bỏ qua hộp thoại kết nối lại và cho phép xem sảnh chờ.
+     */
     @FXML
     private void handleSkipReconnect() {
         if (reconnectOverlay != null) {
@@ -636,6 +688,9 @@ public class LobbyController {
         statusLabel.setStyle("-fx-text-fill: #ea580c; -fx-font-weight: bold;");
     }
 
+    /**
+     * Xác nhận quay lại trận đấu đang diễn ra.
+     */
     @FXML
     private void handleConfirmReconnect() {
         try {
@@ -657,6 +712,11 @@ public class LobbyController {
         }
     }
 
+    /**
+     * Xử lý dữ liệu phản hồi khôi phục trạng thái game và chuyển sang màn hình trận đấu.
+     *
+     * @param rawJson dữ liệu ReconnectResponseDTO dạng JSON
+     */
     private void handleReconnectResponse(String rawJson) {
         try {
             ReconnectResponseDTO resDTO = gson.fromJson(rawJson, ReconnectResponseDTO.class);
@@ -710,6 +770,11 @@ public class LobbyController {
         }
     }
 
+    /**
+     * Hiển thị thông báo lỗi lên nhãn trạng thái giao diện.
+     *
+     * @param message nội dung thông báo lỗi
+     */
     private void showError(String message) {
         Platform.runLater(() -> statusLabel.setText(message));
     }

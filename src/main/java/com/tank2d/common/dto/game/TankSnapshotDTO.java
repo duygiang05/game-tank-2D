@@ -1,12 +1,8 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package com.tank2d.common.dto.game;
 
 /**
- *
- * @author Admin
+ * DTO ảnh chụp trạng thái (Snapshot) của một xe tăng trên sàn đấu.
+ * Chứa thông tin vị trí (x, y), góc nòng pháo, máu, trạng thái sống, hiệu ứng khiên, tăng tốc, tàng hình và mất kết nối.
  */
 public class TankSnapshotDTO {
     private int id;
@@ -16,11 +12,24 @@ public class TankSnapshotDTO {
     private int hp;
     private boolean isAlive;
     
-    private boolean isGhost;      // Trạng thái mờ/bảo hộ sau hồi sinh
-    private boolean hasShield;    // Trạng thái khiên bảo vệ
-    private boolean hasNitro;     // Trạng thái tăng tốc Nitro
-    private boolean isDisconnected; // Trạng thái ngắt kết nối (AFK)
+    private boolean isGhost;
+    private boolean hasShield;
+    private boolean hasNitro;
+    private boolean isDisconnected;
 
+    /**
+     * Khởi tạo bản ghi snapshot đầy đủ của xe tăng bao gồm các hiệu ứng bổ trợ.
+     *
+     * @param id mã xe tăng
+     * @param x tọa độ X
+     * @param y tọa độ Y
+     * @param angle góc quay (độ)
+     * @param hp lượng máu hiện tại
+     * @param isAlive trạng thái còn sống
+     * @param isGhost trạng thái bảo hộ/vô hình sau hồi sinh
+     * @param hasShield trạng thái khiên bảo vệ
+     * @param hasNitro trạng thái tăng tốc
+     */
     public TankSnapshotDTO(int id, double x, double y, double angle, int hp, boolean isAlive, 
                            boolean isGhost, boolean hasShield, boolean hasNitro) {
         this.id = id;
@@ -35,7 +44,16 @@ public class TankSnapshotDTO {
         this.isDisconnected = false;
     }
 
-    // Constructor cũ 
+    /**
+     * Khởi tạo snapshot xe tăng cơ bản không có hiệu ứng bổ trợ.
+     *
+     * @param id mã xe tăng
+     * @param x tọa độ X
+     * @param y tọa độ Y
+     * @param angle góc quay (độ)
+     * @param hp lượng máu
+     * @param isAlive trạng thái sống
+     */
     public TankSnapshotDTO(int id, double x, double y, double angle, int hp, boolean isAlive) {
         this(id, x, y, angle, hp, isAlive, false, false, false);
     }

@@ -1,5 +1,8 @@
 package com.tank2d.common.dto.game;
 
+/**
+ * DTO ảnh chụp trạng thái viên đạn đang bay trên sàn đấu (Bullet Snapshot).
+ */
 public class BulletSnapshotDTO {
     private int id;
     private int ownerId;
@@ -7,11 +10,22 @@ public class BulletSnapshotDTO {
     private double y;
     private double vx;
     private double vy;
-    private String type; // "NORMAL" hoặc "ROCKET"
+    /** Loại đạn: NORMAL hoặc ROCKET */
+    private String type;
 
-    // Constructor mặc định cho Gson deserialize
     public BulletSnapshotDTO() {}
 
+    /**
+     * Khởi tạo snapshot trạng thái đạn.
+     *
+     * @param id mã định danh viên đạn
+     * @param ownerId mã xe tăng bắn đạn
+     * @param x tọa độ X
+     * @param y tọa độ Y
+     * @param vx vận tốc theo trục X
+     * @param vy vận tốc theo trục Y
+     * @param type loại đạn
+     */
     public BulletSnapshotDTO(int id, int ownerId, double x, double y, double vx, double vy, String type) {
         this.id = id;
         this.ownerId = ownerId;

@@ -1,11 +1,25 @@
 package com.tank2d.common.dto.game;
 
-/** Payload mở rộng cho PLAYER_SHOOT_REQ — client CHỌN loại đạn muốn bắn, server tự quyết định có cho phép không. */
+/**
+ * DTO đại diện cho yêu cầu bắn đạn từ client lên server (PLAYER_SHOOT_REQ).
+ */
 public class PlayerShootRequestDTO {
-    private String bulletType; // "NORMAL" | "ROCKET", có thể null -> mặc định NORMAL
+
+    /** Loại đạn: NORMAL hoặc ROCKET (null tương đương NORMAL). */
+    private String bulletType;
 
     public PlayerShootRequestDTO() {}
-    public PlayerShootRequestDTO(String bulletType) { this.bulletType = bulletType; }
 
-    public String getBulletType() { return bulletType; }
+    /**
+     * Khởi tạo yêu cầu bắn đạn theo loại đạn chỉ định.
+     *
+     * @param bulletType loại đạn ("NORMAL" hoặc "ROCKET")
+     */
+    public PlayerShootRequestDTO(String bulletType) { 
+        this.bulletType = bulletType; 
+    }
+
+    public String getBulletType() { 
+        return bulletType; 
+    }
 }

@@ -14,14 +14,21 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Trình quản lý âm thanh (Sound Manager).
+ * Xử lý phát nhạc nền (BGM) lặp vô tận và hiệu ứng âm thanh (SFX) đa luồng.
+ */
 public class SoundManager {
 
     private static final Logger LOGGER = Logger.getLogger(SoundManager.class.getName());
     private static final Map<String, URL> soundResourceCache = new HashMap<>();
     private static Clip bgmClip;
     private static boolean isMuted = false;
-    private static float sfxVolumeGain = 0.0f; // dB (0 = nguyên bản, -10.0f = nhỏ đi)
+    private static float sfxVolumeGain = 0.0f;
 
+    /**
+     * Nạp sẵn tất cả file âm thanh hiệu ứng và nhạc nền vào bộ nhớ đệm URL.
+     */
     public static void init() {
         loadSound("shoot_normal", "sounds/shoot_normal.wav");
         loadSound("shoot_rocket", "sounds/shoot_rocket.wav");
@@ -32,11 +39,15 @@ public class SoundManager {
         loadSound("item_nitro", "sounds/item_nitro.wav");
         loadSound("item_rocket", "sounds/item_rocket.wav");
         loadSound("game_over", "sounds/game_over.wav");
-        
-        // Lưu URL nhạc nền (khuyến khích dùng file .wav cho BGM)
         loadSound("bgm", "sounds/bgm.wav");
     }
 
+    /**
+     * Nạp URL tài nguyên âm thanh theo khóa định danh.
+     *
+     * @param key khóa âm thanh
+     * @param path đường dẫn tài nguyên
+     */
     private static void loadSound(String key, String path) {
         try {
             URL url = SoundManager.class.getResource("/com/tank2d/client/assets/" + path);
@@ -50,6 +61,12 @@ public class SoundManager {
         }
     }
 
+    /**
+     * Chuyển đổi định dạng audio sang PCM_SIGNED 16-bit nếu cần thiết để Java Sound phát được.
+     *
+     * @param audioStream luồng audio nguồn
+     * @return luồng audio đã chuyển đổi hoặc nguyên bản
+     */
     private static AudioInputStream convertToSupportedFormat(AudioInputStream audioStream) {
         AudioFormat baseFormat = audioStream.getFormat();
         if (baseFormat.getEncoding() != AudioFormat.Encoding.PCM_SIGNED) {
@@ -69,14 +86,17 @@ public class SoundManager {
         return audioStream;
     }
 
-    // Phát hiệu ứng âm thanh (SFX) đa luồng không gây giật lag
+    /**
+     * Phát hiệu ứng âm thanh (SFX) trên một luồng nền riêng biệt để không ảnh hưởng FPS hiển thị.
+     *
+     * @param key khóa định danh âm thanh cần phát
+     */
     public static void playSound(String key) {
         if (isMuted) return;
         
         URL url = soundResourceCache.get(key);
         if (url == null) return;
 
-        // Chạy trên luồng riêng để đảm bảo Render 60 FPS không bị ảnh hưởng
         new Thread(() -> {
             try (InputStream is = url.openStream();
                  InputStream bufferedIn = new BufferedInputStream(is);
@@ -86,13 +106,11 @@ public class SoundManager {
                 Clip clip = AudioSystem.getClip();
                 clip.open(audioStream);
 
-                // Chỉnh âm lượng nếu hỗ trợ
                 if (clip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
                     FloatControl gainControl = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
                     gainControl.setValue(sfxVolumeGain);
                 }
 
-                // Tự động giải phóng tài nguyên khi phát xong hoàn toàn
                 clip.addLineListener(event -> {
                     if (event.getType() == LineEvent.Type.STOP) {
                         clip.close();
@@ -107,7 +125,9 @@ public class SoundManager {
         }).start();
     }
 
-    // Quản lý BGM Nhạc nền
+    /**
+     * Phát nhạc nền (BGM) ở chế độ lặp vô tận.
+     */
     public static void playBGM() {
         if (isMuted) return;
         URL url = soundResourceCache.get("bgm");
@@ -124,8 +144,6 @@ public class SoundManager {
 
                 bgmClip = AudioSystem.getClip();
                 bgmClip.open(audioStream);
-                
-                // Lặp vô tận
                 bgmClip.loop(Clip.LOOP_CONTINUOUSLY);
                 bgmClip.start();
             } catch (Exception e) {
@@ -134,6 +152,9 @@ public class SoundManager {
         }).start();
     }
 
+    /**
+     * Dừng phát nhạc nền và giải phóng Clip.
+     */
     public static void stopBGM() {
         if (bgmClip != null) {
             if (bgmClip.isRunning()) {
@@ -144,6 +165,11 @@ public class SoundManager {
         }
     }
 
+    /**
+     * Phát âm thanh nhặt vật phẩm tương ứng theo loại vật phẩm.
+     *
+     * @param itemType tên loại vật phẩm
+     */
     public static void playItemSound(String itemType) {
         if (itemType == null) return;
         switch (itemType.toUpperCase()) {
@@ -155,6 +181,11 @@ public class SoundManager {
         }
     }
 
+    /**
+     * Bật hoặc tắt âm thanh toàn bộ trò chơi.
+     *
+     * @param muted true nếu tắt tiếng, false nếu bật tiếng
+     */
     public static void setMuted(boolean muted) {
         isMuted = muted;
         if (muted) stopBGM();
