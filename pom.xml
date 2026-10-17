@@ -15,6 +15,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <javafx.version>21.0.2</javafx.version>
+        <app.mainClass>com.tank2d.Tank2DOnline</app.mainClass>
     </properties>
 
     <dependencies>
@@ -105,7 +106,7 @@
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
-                    <mainClass>com.tank2d.Tank2DOnline</mainClass>
+                <mainClass>${app.mainClass}</mainClass>
                 </configuration>
             </plugin>
 
@@ -185,5 +186,14 @@
 
         </plugins>
     </build>
+
+    <profiles>
+    <profile>
+        <id>asset-preview</id>
+        <properties>
+            <app.mainClass>com.tank2d.client.AssetPreviewApp</app.mainClass>
+        </properties>
+    </profile>
+    </profiles>
 
 </project>

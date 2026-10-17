@@ -1,0 +1,14 @@
+.preview-root { -fx-background-color: #0b1928; -fx-font-family: "Segoe UI", "Arial"; }
+.preview-header { -fx-padding: 22; -fx-background-color: #142b3d; -fx-border-color: #37758a; -fx-border-width: 0 0 2 0; }
+.preview-title { -fx-font-size: 28px; -fx-text-fill: #f5b952; -fx-font-weight: bold; }
+.preview-subtitle { -fx-text-fill: #9db7c5; -fx-font-size: 12px; }
+.preview-content { -fx-padding: 22; }
+.section-heading { -fx-text-fill: #eaf3f7; -fx-font-size: 12px; -fx-font-weight: bold; }
+.preview-footnote { -fx-text-fill: #9db7c5; -fx-font-size: 10px; }
+.button { -fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: #071525; -fx-background-color: transparent; -fx-background-size: 100% 100%; -fx-background-repeat: no-repeat; -fx-cursor: hand; }
+.ui-blue { -fx-background-image: url("../assets/ui/kenney/blue/button_rectangle_flat.png"); }
+.ui-green { -fx-background-image: url("../assets/ui/kenney/green/button_rectangle_flat.png"); }
+.ui-yellow { -fx-background-image: url("../assets/ui/kenney/yellow/button_rectangle_flat.png"); }
+.ui-red { -fx-background-image: url("../assets/ui/kenney/red/button_rectangle_flat.png"); }
+.button:hover { -fx-opacity: 0.84; }
+.button:pressed { -fx-opacity: 0.68; }
