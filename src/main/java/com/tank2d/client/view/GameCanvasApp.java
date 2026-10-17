@@ -35,6 +35,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
@@ -70,6 +71,9 @@ public class GameCanvasApp extends Application {
     private int tileSize;
     private int myTankId = -1;
 
+    private int windowWidth;
+    private int windowHeight;
+
     private StackPane rootPane;
     private Canvas canvas;
     private GraphicsContext gc;
@@ -81,6 +85,8 @@ public class GameCanvasApp extends Application {
     private AnimationTimer renderTimer;
     private AnimationTimer fireworkTimer;
     private Timeline matchTimer;
+    private Label hudTimerLabel;
+    private VBox hudScoreBox;
     private Consumer<Packet> packetListener;
     private final Gson gson = new Gson();
 
@@ -330,27 +336,40 @@ public class GameCanvasApp extends Application {
         canvas = new Canvas(canvasWidth, canvasHeight);
         gc = canvas.getGraphicsContext2D();
 
+        HBox mainLayout = new HBox();
+        mainLayout.setPrefSize(windowWidth, windowHeight);
+        mainLayout.setMinSize(windowWidth, windowHeight);
+        mainLayout.setMaxSize(windowWidth, windowHeight);
+
+        StackPane canvasWrapper = new StackPane();
+        canvasWrapper.setPrefSize(canvasWidth, canvasHeight);
+        canvasWrapper.setMinSize(canvasWidth, canvasHeight);
+        canvasWrapper.setMaxSize(canvasWidth, canvasHeight);
+        canvasWrapper.setStyle("-fx-background-color: #16181D;");
+        canvasWrapper.getChildren().add(canvas);
+
+        int hudWidth = Math.max(0, windowWidth - canvasWidth);
+        VBox rightPanel = createRightHUDPanel(hudWidth, canvasHeight);
+
+        mainLayout.getChildren().addAll(canvasWrapper, rightPanel);
+
         rootPane = new StackPane();
-        rootPane.setStyle("-fx-background-color: #16181D;");
-        rootPane.getChildren().add(canvas);
-        StackPane.setAlignment(canvas, Pos.CENTER);
+        rootPane.setPrefSize(windowWidth, windowHeight);
+        rootPane.setMinSize(windowWidth, windowHeight);
+        rootPane.setMaxSize(windowWidth, windowHeight);
+        rootPane.setStyle("-fx-background-color: #0f172a;");
+        rootPane.getChildren().add(mainLayout);
 
-        Button exitButton = new Button("✕ Thoát");
-        exitButton.setStyle("-fx-background-color: rgba(231, 76, 60, 0.75); -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: bold; -fx-background-radius: 15px; -fx-padding: 3px 10px; -fx-cursor: hand;");
-        exitButton.setOnMouseEntered(e -> exitButton.setStyle("-fx-background-color: rgba(231, 76, 60, 1.0); -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: bold; -fx-background-radius: 15px; -fx-padding: 3px 10px; -fx-cursor: hand;"));
-        exitButton.setOnMouseExited(e -> exitButton.setStyle("-fx-background-color: rgba(231, 76, 60, 0.75); -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: bold; -fx-background-radius: 15px; -fx-padding: 3px 10px; -fx-cursor: hand;"));
-        StackPane.setAlignment(exitButton, Pos.TOP_RIGHT);
-        StackPane.setMargin(exitButton, new Insets(6, 6, 0, 0));
-        exitButton.setOnAction(e -> handleExit());
-        rootPane.getChildren().add(exitButton);
-
-        Scene scene = new Scene(rootPane, canvasWidth, canvasHeight);
+        Scene scene = new Scene(rootPane, windowWidth, windowHeight);
 
         scene.setOnKeyPressed(e -> {
             activeKeys.add(e.getCode());
             if (e.getCode() == KeyCode.SPACE && !spacePressed) {
                 spacePressed = true;
                 sendShootRequestToServer();
+            }
+            if (e.getCode() == KeyCode.ESCAPE) {
+                handleExit();
             }
         });
 
@@ -374,10 +393,6 @@ public class GameCanvasApp extends Application {
         canvas.setFocusTraversable(true);
         Platform.runLater(() -> {
             canvas.requestFocus();
-            if (primaryStage != null) {
-                primaryStage.sizeToScene();
-                primaryStage.centerOnScreen();
-            }
         });
 
         initNetworkReceiver();
@@ -386,6 +401,69 @@ public class GameCanvasApp extends Application {
         startRenderLoop();
 
         return scene;
+    }
+
+    private VBox createRightHUDPanel(int hudWidth, int hudHeight) {
+        VBox panel = new VBox(12);
+        panel.setPadding(new Insets(16, 14, 16, 14));
+        panel.setPrefWidth(hudWidth);
+        panel.setMinWidth(hudWidth);
+        panel.setMaxWidth(hudWidth);
+        panel.setPrefHeight(hudHeight);
+        panel.setMinHeight(hudHeight);
+        panel.setMaxHeight(hudHeight);
+        panel.setStyle("-fx-background-color: #0f172a; -fx-border-color: #334155; -fx-border-width: 0 0 0 2;");
+
+        Label hudTitle = new Label("CHIẾN TRƯỜNG");
+        hudTitle.setStyle("-fx-text-fill: #f8fafc; -fx-font-size: 15px; -fx-font-weight: bold; -fx-alignment: CENTER;");
+        hudTitle.setMaxWidth(Double.MAX_VALUE);
+        hudTitle.setAlignment(Pos.CENTER);
+
+        VBox timerCard = new VBox(4);
+        timerCard.setAlignment(Pos.CENTER);
+        timerCard.setPadding(new Insets(8, 10, 8, 10));
+        timerCard.setStyle("-fx-background-color: #1e293b; -fx-background-radius: 10px; -fx-border-color: #475569; -fx-border-radius: 10px; -fx-border-width: 1px;");
+
+        Label timerCaption = new Label("THỜI GIAN CÒN LẠI");
+        timerCaption.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 10px; -fx-font-weight: bold;");
+
+        hudTimerLabel = new Label("⏱ 01:00");
+        hudTimerLabel.setStyle("-fx-text-fill: #facc15; -fx-font-size: 19px; -fx-font-weight: bold; -fx-font-family: 'Segoe UI', monospace;");
+
+        timerCard.getChildren().addAll(timerCaption, hudTimerLabel);
+
+        VBox scoreCard = new VBox(6);
+        scoreCard.setPadding(new Insets(10, 8, 10, 8));
+        scoreCard.setStyle("-fx-background-color: #1e293b; -fx-background-radius: 10px; -fx-border-color: #475569; -fx-border-radius: 10px; -fx-border-width: 1px;");
+        VBox.setVgrow(scoreCard, javafx.scene.layout.Priority.ALWAYS);
+
+        Label scoreTitle = new Label("DANH SÁCH TANK");
+        scoreTitle.setStyle("-fx-text-fill: #38bdf8; -fx-font-size: 11px; -fx-font-weight: bold;");
+
+        hudScoreBox = new VBox(6);
+        hudScoreBox.setAlignment(Pos.TOP_LEFT);
+
+        scoreCard.getChildren().addAll(scoreTitle, hudScoreBox);
+
+        VBox guideCard = new VBox(4);
+        guideCard.setPadding(new Insets(8, 10, 8, 10));
+        guideCard.setStyle("-fx-background-color: #1e293b; -fx-background-radius: 10px;");
+        Label guideTitle = new Label("PHÍM ĐIỀU KHIỂN");
+        guideTitle.setStyle("-fx-text-fill: #cbd5e1; -fx-font-size: 10px; -fx-font-weight: bold;");
+        Label guideKeys = new Label("• Di chuyển: W A S D / Mũi tên\n• Bắn đạn: Phím SPACE\n• Rời trận: Phím ESC");
+        guideKeys.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 9.5px;");
+        guideCard.getChildren().addAll(guideTitle, guideKeys);
+
+        Button exitBtn = new Button("✕ RỜI TRẬN");
+        exitBtn.setMaxWidth(Double.MAX_VALUE);
+        exitBtn.setPrefHeight(34);
+        exitBtn.setStyle("-fx-background-color: #ef4444; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 12px; -fx-background-radius: 8px; -fx-cursor: hand;");
+        exitBtn.setOnMouseEntered(e -> exitBtn.setStyle("-fx-background-color: #dc2626; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 12px; -fx-background-radius: 8px; -fx-cursor: hand;"));
+        exitBtn.setOnMouseExited(e -> exitBtn.setStyle("-fx-background-color: #ef4444; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 12px; -fx-background-radius: 8px; -fx-cursor: hand;"));
+        exitBtn.setOnAction(e -> handleExit());
+
+        panel.getChildren().addAll(hudTitle, timerCard, scoreCard, guideCard, exitBtn);
+        return panel;
     }
 
     private void initGameConfigurations() {
@@ -398,6 +476,8 @@ public class GameCanvasApp extends Application {
         int rows = ConfigLoader.getMapRows();
         this.canvasWidth = cols * this.tileSize;
         this.canvasHeight = rows * this.tileSize;
+        this.windowWidth = ConfigLoader.getWindowWidth();
+        this.windowHeight = ConfigLoader.getWindowHeight();
 
         this.mapMatrix = ConfigLoader.getMapMatrix();
         this.bushClusterIds = BushClusterUtil.computeClusterIds(this.mapMatrix);
@@ -421,6 +501,9 @@ public class GameCanvasApp extends Application {
         matchTimer = new Timeline(new KeyFrame(Duration.seconds(1), e -> {
             if (matchRemainingTime > 0) {
                 matchRemainingTime--;
+            }
+            if (hudTimerLabel != null) {
+                hudTimerLabel.setText(String.format("⏱ %02d:%02d", matchRemainingTime / 60, matchRemainingTime % 60));
             }
         }));
         matchTimer.setCycleCount(Timeline.INDEFINITE);
@@ -928,57 +1011,27 @@ public class GameCanvasApp extends Application {
     }
 
     private void renderHUD() {
-        gc.save();
+        if (hudScoreBox == null) {
+            return;
+        }
 
-        double clockWidth = 76;
-        double clockHeight = 22;
-        double clockX = (canvasWidth / 2.0) - (clockWidth / 2.0);
-        gc.setFill(Color.rgb(0, 0, 0, 0.45));
-        gc.fillRoundRect(clockX, 6, clockWidth, clockHeight, 6, 6);
-        gc.setStroke(Color.rgb(255, 215, 0, 0.4));
-        gc.setLineWidth(1.0);
-        gc.strokeRoundRect(clockX, 6, clockWidth, clockHeight, 6, 6);
+        Platform.runLater(() -> {
+            hudScoreBox.getChildren().clear();
 
-        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
-        gc.setFill(Color.rgb(255, 235, 59, 0.95));
-        gc.fillText(String.format("⏱ %02d:%02d", matchRemainingTime / 60, matchRemainingTime % 60), clockX + 11, 21);
+            String[] tankBadgeColors = {"#22c55e", "#ef4444", "#a855f7", "#eab308"};
+            String[] tankBgColors = {"rgba(34,197,94,0.15)", "rgba(239,68,68,0.15)", "rgba(168,85,247,0.15)", "rgba(234,179,8,0.15)"};
 
-        int boardWidth = 145;
-        int rowHeight = 14;
-        int boardHeight = 20 + (Math.max(1, tankPlayers.size()) * rowHeight) + 4;
+            if (tankPlayers.isEmpty()) {
+                Label loadingLbl = new Label("Đang kết nối...");
+                loadingLbl.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 11px;");
+                hudScoreBox.getChildren().add(loadingLbl);
+                return;
+            }
 
-        gc.setFill(Color.rgb(15, 18, 24, 0.45));
-        gc.fillRoundRect(6, 6, boardWidth, boardHeight, 6, 6);
-        gc.setStroke(Color.rgb(255, 255, 255, 0.15));
-        gc.strokeRoundRect(6, 6, boardWidth, boardHeight, 6, 6);
-
-        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 9.5));
-        gc.setFill(Color.rgb(200, 200, 200, 0.85));
-        gc.fillText("DANH SÁCH CHIẾN ĐẤU", 10, 18);
-        gc.setStroke(Color.rgb(255, 255, 255, 0.1));
-        gc.strokeLine(10, 21, boardWidth + 2, 21);
-
-        gc.setFont(Font.font("Consolas", FontWeight.BOLD, 10));
-        int startY = 33;
-        Color[] tankColors = {
-            Color.rgb(76, 175, 80, 0.95), Color.rgb(244, 67, 54, 0.95),
-            Color.rgb(156, 39, 176, 0.95), Color.rgb(255, 193, 7, 0.95)
-        };
-
-        if (tankPlayers.isEmpty()) {
-            gc.setFill(Color.rgb(200, 200, 200, 0.5));
-            gc.fillText("Đang nạp...", 10, startY);
-        } else {
             for (TankPlayerDTO player : tankPlayers) {
                 int tId = player.getTankId();
                 String displayName = player.getUsername();
-
-                if (tId == myTankId) {
-                    displayName += "*";
-                }
-                if (displayName.length() > 7) {
-                    displayName = displayName.substring(0, 7);
-                }
+                boolean isMe = (tId == myTankId);
 
                 int currentHp = (int) maxHp;
                 if (globalPlayerStates.containsKey(tId)) {
@@ -987,14 +1040,33 @@ public class GameCanvasApp extends Application {
                     currentHp = displayTanks.get(tId).getHp();
                 }
 
-                int colorIdx = Math.abs(tId - 1) % tankColors.length;
-                gc.setFill(tankColors[colorIdx]);
-                gc.fillText(String.format("%-7s | HP:%d", displayName, currentHp), 10, startY);
-                startY += rowHeight;
-            }
-        }
+                int colorIdx = Math.abs(tId - 1) % tankBadgeColors.length;
 
-        gc.restore();
+                HBox row = new HBox(6);
+                row.setAlignment(Pos.CENTER_LEFT);
+                row.setPadding(new Insets(3, 6, 3, 6));
+                row.setStyle("-fx-background-color: " + (isMe ? "rgba(59,130,246,0.25)" : tankBgColors[colorIdx])
+                        + "; -fx-background-radius: 6px; -fx-border-color: " + (isMe ? "#3b82f6" : "transparent")
+                        + "; -fx-border-radius: 6px; -fx-border-width: 1px;");
+
+                Label pBadge = new Label("P" + tId);
+                pBadge.setStyle("-fx-text-fill: " + tankBadgeColors[colorIdx] + "; -fx-font-weight: bold; -fx-font-size: 10px;");
+
+                String nameText = displayName + (isMe ? " (Bạn)" : "");
+                if (nameText.length() > 9) {
+                    nameText = nameText.substring(0, 9) + "..";
+                }
+                Label nameLbl = new Label(nameText);
+                nameLbl.setStyle("-fx-text-fill: #f1f5f9; -fx-font-weight: " + (isMe ? "bold" : "normal") + "; -fx-font-size: 10.5px;");
+                HBox.setHgrow(nameLbl, Priority.ALWAYS);
+
+                Label hpLbl = new Label(currentHp + " HP");
+                hpLbl.setStyle("-fx-text-fill: " + (currentHp > 0 ? "#4ade80" : "#94a3b8") + "; -fx-font-weight: bold; -fx-font-size: 10px;");
+
+                row.getChildren().addAll(pBadge, nameLbl, hpLbl);
+                hudScoreBox.getChildren().add(row);
+            }
+        });
     }
 
     private void showGameOverPopup(GameOverDTO gameOver) {
@@ -1004,9 +1076,9 @@ public class GameCanvasApp extends Application {
 
         StackPane overlay = new StackPane();
         overlay.setStyle("-fx-background-color: rgba(10, 12, 18, 0.88);");
-        overlay.setPrefSize(canvasWidth, canvasHeight);
+        overlay.setPrefSize(windowWidth, windowHeight);
 
-        fireworkCanvas = new Canvas(canvasWidth, canvasHeight);
+        fireworkCanvas = new Canvas(windowWidth, windowHeight);
         gcFirework = fireworkCanvas.getGraphicsContext2D();
         overlay.getChildren().add(fireworkCanvas);
 
@@ -1119,11 +1191,11 @@ public class GameCanvasApp extends Application {
                 if (gcFirework == null) {
                     return;
                 }
-                gcFirework.clearRect(0, 0, canvasWidth, canvasHeight);
+                gcFirework.clearRect(0, 0, windowWidth, windowHeight);
 
                 if (now - lastSpawn > 400_000_000L) {
-                    double spawnX = Math.random() * canvasWidth;
-                    double spawnY = Math.random() * (canvasHeight * 0.6);
+                    double spawnX = Math.random() * windowWidth;
+                    double spawnY = Math.random() * (windowHeight * 0.6);
                     Color color = fireworkColors[(int) (Math.random() * fireworkColors.length)];
 
                     for (int i = 0; i < 35; i++) {
@@ -1164,9 +1236,15 @@ public class GameCanvasApp extends Application {
                     primaryStage = (Stage) canvas.getScene().getWindow();
                 }
                 FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/tank2d/client/view/lobby.fxml"));
-                primaryStage.setScene(new Scene(loader.load(), 800, 600));
+                Parent root = loader.load();
+                primaryStage.setMinWidth(0);
+                primaryStage.setMinHeight(0);
+                primaryStage.setMaxWidth(Double.MAX_VALUE);
+                primaryStage.setMaxHeight(Double.MAX_VALUE);
+                primaryStage.setScene(new Scene(root, windowWidth, windowHeight));
                 primaryStage.setTitle("Tank 2D Online - Lobby");
-                primaryStage.centerOnScreen();
+                primaryStage.setResizable(false);
+                primaryStage.sizeToScene();
                 primaryStage.show();
             } catch (IOException e) {
                 LOGGER.log(Level.SEVERE, "[GameCanvasApp] Không thể quay lại Lobby", e);
@@ -1191,9 +1269,14 @@ public class GameCanvasApp extends Application {
                     controller.resetReadyForReplay();
                 }
 
-                primaryStage.setScene(new Scene(root, 800, 600));
+                primaryStage.setMinWidth(0);
+                primaryStage.setMinHeight(0);
+                primaryStage.setMaxWidth(Double.MAX_VALUE);
+                primaryStage.setMaxHeight(Double.MAX_VALUE);
+                primaryStage.setScene(new Scene(root, windowWidth, windowHeight));
                 primaryStage.setTitle("Tank 2D Online - Room");
-                primaryStage.centerOnScreen();
+                primaryStage.setResizable(false);
+                primaryStage.sizeToScene();
                 primaryStage.show();
             } catch (IOException e) {
                 LOGGER.log(Level.SEVERE, "[GameCanvasApp] Không thể quay lại Room", e);

@@ -6,6 +6,7 @@ import com.tank2d.client.network.ClientSocket;
 import com.tank2d.client.view.GameCanvasApp;
 import com.tank2d.common.dto.RoomDTO;
 import com.tank2d.common.exception.GameNetworkException;
+import com.tank2d.common.config.ConfigLoader;
 import com.tank2d.common.model.User;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
@@ -127,29 +128,31 @@ public class RoomController {
             clearSlots();
 
             List<String> players = room.getPlayerNames();
+            String hostUsername = room.getHostUsername();
+            Map<String, Boolean> playerReadyMap = room.getPlayerReadyMap();
             Map<Integer, Boolean> readyStates = room.getReadyStates();
             int hostId = room.getHostId();
+            User currentUser = session.getCurrentUser();
 
             if (players != null) {
                 for (int i = 0; i < players.size(); i++) {
                     String username = players.get(i);
                     boolean isHost = false;
-                    boolean isReady = false;
-
-                    User currentUser = session.getCurrentUser();
-                    if (currentUser != null && username.equals(currentUser.getUsername())) {
+                    if (hostUsername != null && !hostUsername.trim().isEmpty()) {
+                        isHost = hostUsername.equalsIgnoreCase(username);
+                    } else if (currentUser != null && username.equals(currentUser.getUsername())) {
                         isHost = (currentUser.getId() == hostId);
-                        isReady = readyStates != null && Boolean.TRUE.equals(readyStates.get(currentUser.getId()));
-                    } else {
-                        if (readyStates != null) {
-                            for (Map.Entry<Integer, Boolean> entry : readyStates.entrySet()) {
-                                if (entry.getKey() == hostId) {
-                                    if (i == 0) isHost = true;
-                                }
-                            }
+                    } else if (i == 0) {
+                        isHost = true;
+                    }
+
+                    boolean isReady = isHost;
+                    if (!isHost) {
+                        if (playerReadyMap != null && playerReadyMap.containsKey(username)) {
+                            isReady = Boolean.TRUE.equals(playerReadyMap.get(username));
+                        } else if (currentUser != null && username.equals(currentUser.getUsername()) && readyStates != null) {
+                            isReady = Boolean.TRUE.equals(readyStates.get(currentUser.getId()));
                         }
-                        if (i == 0) isHost = true;
-                        isReady = isHost || (readyStates != null && isGuestReady(readyStates, hostId, i));
                     }
 
                     renderSlot(i + 1, username, isHost, isReady);
@@ -161,17 +164,12 @@ public class RoomController {
         });
     }
 
-    private boolean isGuestReady(Map<Integer, Boolean> readyStates, int hostId, int slotIndex) {
-        int currentIndex = 0;
-        for (Map.Entry<Integer, Boolean> entry : readyStates.entrySet()) {
-            if (entry.getKey() != hostId) {
-                currentIndex++;
-                if (currentIndex == slotIndex) {
-                    return Boolean.TRUE.equals(entry.getValue());
-                }
-            }
+    private boolean isUserHost(RoomDTO room, User user) {
+        if (room == null || user == null) return false;
+        if (room.getHostUsername() != null && !room.getHostUsername().trim().isEmpty()) {
+            return room.getHostUsername().equalsIgnoreCase(user.getUsername());
         }
-        return false;
+        return room.getHostId() == user.getId();
     }
 
     private void clearSlots() {
@@ -226,7 +224,7 @@ public class RoomController {
         User currentUser = session.getCurrentUser();
         if (currentUser == null) return;
 
-        boolean isHost = room.getHostId() == currentUser.getId();
+        boolean isHost = isUserHost(room, currentUser);
         String durationText = room.getDuration() + " giây";
 
         durationComboBox.setOnAction(null);
@@ -244,7 +242,7 @@ public class RoomController {
     private void handleDurationChanged() {
         if (currentRoom == null) return;
         User currentUser = session.getCurrentUser();
-        if (currentUser == null || currentRoom.getHostId() != currentUser.getId()) return;
+        if (currentUser == null || !isUserHost(currentRoom, currentUser)) return;
 
         String selected = durationComboBox.getValue();
         if (selected == null) return;
@@ -284,7 +282,7 @@ public class RoomController {
         User currentUser = session.getCurrentUser();
         if (currentUser == null) return;
 
-        boolean isHost = room.getHostId() == currentUser.getId();
+        boolean isHost = isUserHost(room, currentUser);
 
         if (isHost) {
             readyButton.setText("BẮT ĐẦU TRẬN ĐẤU");
@@ -318,11 +316,32 @@ public class RoomController {
 
     private boolean isCurrentUserReady(RoomDTO room) {
         User currentUser = session.getCurrentUser();
-        if (currentUser == null || room.getReadyStates() == null) return false;
-        return room.getReadyStates().getOrDefault(currentUser.getId(), false);
+        if (currentUser == null) return false;
+
+        if (room.getPlayerReadyMap() != null && room.getPlayerReadyMap().containsKey(currentUser.getUsername())) {
+            return Boolean.TRUE.equals(room.getPlayerReadyMap().get(currentUser.getUsername()));
+        }
+        if (room.getReadyStates() != null) {
+            return room.getReadyStates().getOrDefault(currentUser.getId(), false);
+        }
+        return false;
     }
 
     private boolean areAllPlayersReady(RoomDTO room) {
+        if (room.getPlayerReadyMap() != null && !room.getPlayerReadyMap().isEmpty()) {
+            String hostUsername = room.getHostUsername();
+            int nonHostCount = 0;
+            for (Map.Entry<String, Boolean> entry : room.getPlayerReadyMap().entrySet()) {
+                if (hostUsername == null || !hostUsername.equalsIgnoreCase(entry.getKey())) {
+                    nonHostCount++;
+                    if (!Boolean.TRUE.equals(entry.getValue())) {
+                        return false;
+                    }
+                }
+            }
+            return nonHostCount > 0;
+        }
+
         Map<Integer, Boolean> readyMap = room.getReadyStates();
         if (readyMap == null || readyMap.isEmpty()) return false;
 
@@ -366,7 +385,7 @@ public class RoomController {
         User currentUser = session.getCurrentUser();
         if (currentUser == null) return;
 
-        if (currentRoom.getHostId() == currentUser.getId()) {
+        if (isUserHost(currentRoom, currentUser)) {
             handleStartGame();
             return;
         }
@@ -454,12 +473,10 @@ public class RoomController {
                 Scene gameScene = gameCanvasApp.createGameScene();
                 stage.setScene(gameScene);
                 stage.setTitle("Tank 2D - Game");
-                
-                stage.sizeToScene();
                 stage.setResizable(false);
-                stage.centerOnScreen();
+                stage.sizeToScene();
                 stage.show();
-                LOGGER.info("[Game] Đã chuyển sang màn hình Game chuẩn 600x600!");
+                LOGGER.info("[Game] Đã chuyển sang màn hình Game!");
 
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "[Game] Không thể mở màn hình Game", e);
@@ -488,7 +505,10 @@ public class RoomController {
                 FXMLLoader loader = new FXMLLoader(
                         RoomController.class.getResource("/com/tank2d/client/view/lobby.fxml")
                 );
-                Scene lobbyScene = new Scene(loader.load(), 800, 600);
+                Scene lobbyScene = new Scene(loader.load(),
+                        ConfigLoader.getWindowWidth(),
+                        ConfigLoader.getWindowHeight()
+                );
 
                 Stage stage = (Stage) leaveButton.getScene().getWindow();
                 stage.setScene(lobbyScene);

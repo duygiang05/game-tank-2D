@@ -163,6 +163,24 @@ public final class ConfigLoader {
     }
 
     /**
+     * Chiều rộng tiêu chuẩn của cửa sổ ứng dụng (pixel).
+     *
+     * @return chiều rộng cửa sổ
+     */
+    public static int getWindowWidth() {
+        return getPropertyInt("window.width", 800);
+    }
+
+    /**
+     * Chiều cao tiêu chuẩn của cửa sổ ứng dụng (pixel).
+     *
+     * @return chiều cao cửa sổ
+     */
+    public static int getWindowHeight() {
+        return getPropertyInt("window.height", 600);
+    }
+
+    /**
      * Nạp cấu hình bản đồ từ tệp tin JSON chỉ định.
      *
      * @param mapPath đường dẫn tệp JSON bản đồ

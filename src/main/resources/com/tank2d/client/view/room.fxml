@@ -82,23 +82,23 @@
             <!-- 4 Thẻ Slot Player -->
             <HBox alignment="CENTER" spacing="16.0">
 
-                <!-- SLOT P1 (Xanh dương) -->
+                <!-- SLOT P1 (Xanh lục / Green) -->
                 <VBox fx:id="slotP1"
                       alignment="CENTER"
                       spacing="9.0"
                       prefWidth="165.0"
                       prefHeight="235.0"
-                      style="-fx-background-color: white; -fx-background-radius: 14px; -fx-border-color: #3b82f6; -fx-border-width: 2px; -fx-border-radius: 14px; -fx-padding: 14px; -fx-effect: dropshadow(three-pass-box, rgba(59,130,246,0.18), 12, 0, 0, 4);">
+                      style="-fx-background-color: white; -fx-background-radius: 14px; -fx-border-color: #22c55e; -fx-border-width: 2px; -fx-border-radius: 14px; -fx-padding: 14px; -fx-effect: dropshadow(three-pass-box, rgba(34,197,94,0.18), 12, 0, 0, 4);">
 
                     <Label text="P1 • GÓC TRÊN TRÁI"
-                           style="-fx-text-fill: #1d4ed8; -fx-font-size: 11.5px; -fx-font-weight: bold;"/>
+                           style="-fx-text-fill: #15803d; -fx-font-size: 11.5px; -fx-font-weight: bold;"/>
 
-                    <!-- Mô hình Xe Tăng Chiến Đấu P1 (Blue Tank) -->
+                    <!-- Mô hình Xe Tăng Chiến Đấu P1 (Green Tank) -->
                     <StackPane prefWidth="85.0" prefHeight="75.0"
-                               style="-fx-background-color: #eff6ff; -fx-background-radius: 12px;">
-                        <Rectangle width="50.0" height="34.0" arcWidth="8.0" arcHeight="8.0" fill="#2563eb"/>
-                        <Circle radius="12.0" fill="#1d4ed8"/>
-                        <Rectangle width="22.0" height="6.0" arcWidth="3.0" arcHeight="3.0" fill="#1e3a8a" translateX="14.0"/>
+                               style="-fx-background-color: #f0fdf4; -fx-background-radius: 12px;">
+                        <Rectangle width="50.0" height="34.0" arcWidth="8.0" arcHeight="8.0" fill="#22c55e"/>
+                        <Circle radius="12.0" fill="#16a34a"/>
+                        <Rectangle width="22.0" height="6.0" arcWidth="3.0" arcHeight="3.0" fill="#166534" translateX="14.0"/>
                     </StackPane>
 
                     <Label fx:id="p1Label"
@@ -107,7 +107,7 @@
 
                     <Label fx:id="p1StatusBadge"
                            text="👑 CHỦ PHÒNG"
-                           style="-fx-background-color: #dbeafe; -fx-text-fill: #1d4ed8; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;"/>
+                           style="-fx-background-color: #dcfce7; -fx-text-fill: #15803d; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;"/>
                 </VBox>
 
                 <!-- SLOT P2 (Đỏ rực lửa) -->
@@ -138,7 +138,7 @@
                            style="-fx-background-color: #f1f5f9; -fx-text-fill: #64748b; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;"/>
                 </VBox>
 
-                <!-- SLOT P3 (Xanh lục rừng rậm) -->
+                <!-- SLOT P3 (Tím thần bí / Purple) -->
                 <VBox fx:id="slotP3"
                       alignment="CENTER"
                       spacing="9.0"
@@ -147,14 +147,14 @@
                       style="-fx-background-color: white; -fx-background-radius: 14px; -fx-border-color: #e2e8f0; -fx-border-width: 1.5px; -fx-border-radius: 14px; -fx-padding: 14px; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.05), 10, 0, 0, 3);">
 
                     <Label text="P3 • GÓC DƯỚI TRÁI"
-                           style="-fx-text-fill: #16a34a; -fx-font-size: 11.5px; -fx-font-weight: bold;"/>
+                           style="-fx-text-fill: #9333ea; -fx-font-size: 11.5px; -fx-font-weight: bold;"/>
 
-                    <!-- Mô hình Xe Tăng Chiến Đấu P3 (Green Tank) -->
+                    <!-- Mô hình Xe Tăng Chiến Đấu P3 (Purple Tank) -->
                     <StackPane prefWidth="85.0" prefHeight="75.0"
-                               style="-fx-background-color: #f0fdf4; -fx-background-radius: 12px;">
-                        <Rectangle width="50.0" height="34.0" arcWidth="8.0" arcHeight="8.0" fill="#22c55e"/>
-                        <Circle radius="12.0" fill="#16a34a"/>
-                        <Rectangle width="22.0" height="6.0" arcWidth="3.0" arcHeight="3.0" fill="#166534" translateX="14.0"/>
+                               style="-fx-background-color: #faf5ff; -fx-background-radius: 12px;">
+                        <Rectangle width="50.0" height="34.0" arcWidth="8.0" arcHeight="8.0" fill="#a855f7"/>
+                        <Circle radius="12.0" fill="#9333ea"/>
+                        <Rectangle width="22.0" height="6.0" arcWidth="3.0" arcHeight="3.0" fill="#6b21a8" translateX="14.0"/>
                     </StackPane>
 
                     <Label fx:id="p3Label"

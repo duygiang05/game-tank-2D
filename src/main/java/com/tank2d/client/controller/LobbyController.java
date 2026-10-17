@@ -8,6 +8,7 @@ import com.tank2d.client.view.GameCanvasApp;
 import com.tank2d.common.dto.RoomDTO;
 import com.tank2d.common.dto.game.ReconnectPromptDTO;
 import com.tank2d.common.dto.game.ReconnectResponseDTO;
+import com.tank2d.common.config.ConfigLoader;
 import com.tank2d.common.model.User;
 import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
@@ -469,7 +470,7 @@ public class LobbyController {
                 controller.setRoom(room);
 
                 Stage stage = (Stage) roomListView.getScene().getWindow();
-                stage.setScene(new Scene(root, 800, 600));
+                stage.setScene(new Scene(root, ConfigLoader.getWindowWidth(), ConfigLoader.getWindowHeight()));
                 stage.setTitle("Tank 2D Online - " + room.getRoomName());
                 stage.show();
 
@@ -506,7 +507,7 @@ public class LobbyController {
             Parent root = loader.load();
 
             Stage stage = (Stage) logoutButton.getScene().getWindow();
-            stage.setScene(new Scene(root, 800, 600));
+            stage.setScene(new Scene(root, ConfigLoader.getWindowWidth(), ConfigLoader.getWindowHeight()));
             stage.setTitle("Tank 2D Online - Login");
             stage.show();
 
@@ -541,7 +542,7 @@ public class LobbyController {
             Parent root = loader.load();
 
             Stage stage = (Stage) leaderboardButton.getScene().getWindow();
-            stage.setScene(new Scene(root, 800, 600));
+            stage.setScene(new Scene(root, ConfigLoader.getWindowWidth(), ConfigLoader.getWindowHeight()));
             stage.setTitle("Tank 2D Online - Leaderboard");
             stage.show();
 
@@ -577,7 +578,7 @@ public class LobbyController {
             Parent root = loader.load();
 
             Stage stage = (Stage) matchHistoryButton.getScene().getWindow();
-            stage.setScene(new Scene(root, 800, 600));
+            stage.setScene(new Scene(root, ConfigLoader.getWindowWidth(), ConfigLoader.getWindowHeight()));
             stage.setTitle("Tank 2D Online - Lịch sử thi đấu");
             stage.show();
 
@@ -752,9 +753,8 @@ public class LobbyController {
                     stage.setScene(gameScene);
                     stage.setTitle("Tank 2D - Game (Đã kết nối lại)");
 
-                    stage.sizeToScene();
                     stage.setResizable(false);
-                    stage.centerOnScreen();
+                    stage.sizeToScene();
                     stage.show();
                     LOGGER.info("[Lobby] Đã Reconnect thành công vào GameCanvasApp!");
 

@@ -72,6 +72,15 @@ public class Room {
         return hostId;
     }
 
+    public synchronized String getHostUsername() {
+        for (User player : players) {
+            if (player.getId() == hostId) {
+                return player.getUsername();
+            }
+        }
+        return "";
+    }
+
     public synchronized boolean isHost(int userId) {
         return hostId == userId;
     }
@@ -217,6 +226,9 @@ public class Room {
 
         hostId = newHost.getId();
         readyStates.put(newHost.getId(), true);
+
+        players.remove(randomIndex);
+        players.add(0, newHost);
 
         LOGGER.info("[Room] Host mới: " + newHost.getUsername() + " (ID: " + newHost.getId() + ")");
     }

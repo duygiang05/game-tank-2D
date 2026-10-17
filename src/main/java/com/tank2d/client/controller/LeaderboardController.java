@@ -217,7 +217,7 @@ public class LeaderboardController {
             Parent root = loader.load();
 
             Stage stage = (Stage) backButton.getScene().getWindow();
-            stage.setScene(new Scene(root, 800, 600));
+            stage.setScene(new Scene(root, com.tank2d.common.config.ConfigLoader.getWindowWidth(), com.tank2d.common.config.ConfigLoader.getWindowHeight()));
             stage.setTitle("Tank 2D Online - Lobby");
             stage.show();
         } catch (IOException e) {

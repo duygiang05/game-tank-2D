@@ -184,8 +184,10 @@ public class RoomManager {
 
     private RoomDTO toRoomDTO(Room room) {
         List<String> playerNames = new ArrayList<>();
+        Map<String, Boolean> playerReadyMap = new LinkedHashMap<>();
         for (User user : room.getPlayers()) {
             playerNames.add(user.getUsername());
+            playerReadyMap.put(user.getUsername(), room.isReady(user.getId()));
         }
 
         return new RoomDTO(
@@ -196,7 +198,9 @@ public class RoomManager {
                 room.getStatus(),
                 playerNames,
                 room.getHostId(),
+                room.getHostUsername(),
                 room.getReadyStates(),
+                playerReadyMap,
                 room.getDuration()
         );
     }

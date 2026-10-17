@@ -15,7 +15,9 @@ public class RoomDTO {
     private String status;
     private List<String> playerNames;
     private int hostId;
+    private String hostUsername;
     private Map<Integer, Boolean> readyStates;
+    private Map<String, Boolean> playerReadyMap;
     private int duration;
 
     public RoomDTO() {}
@@ -29,6 +31,20 @@ public class RoomDTO {
                    int hostId,
                    Map<Integer, Boolean> readyStates,
                    int duration) {
+        this(roomId, roomName, currentPlayers, maxPlayers, status, playerNames, hostId, "", readyStates, null, duration);
+    }
+
+    public RoomDTO(int roomId,
+                   String roomName,
+                   int currentPlayers,
+                   int maxPlayers,
+                   String status,
+                   List<String> playerNames,
+                   int hostId,
+                   String hostUsername,
+                   Map<Integer, Boolean> readyStates,
+                   Map<String, Boolean> playerReadyMap,
+                   int duration) {
         this.roomId = roomId;
         this.roomName = roomName;
         this.currentPlayers = currentPlayers;
@@ -36,7 +52,9 @@ public class RoomDTO {
         this.status = status;
         this.playerNames = playerNames;
         this.hostId = hostId;
+        this.hostUsername = hostUsername;
         this.readyStates = readyStates;
+        this.playerReadyMap = playerReadyMap;
         this.duration = duration;
     }
 
@@ -110,5 +128,21 @@ public class RoomDTO {
 
     public void setDuration(int duration) {
         this.duration = duration;
+    }
+
+    public String getHostUsername() {
+        return hostUsername;
+    }
+
+    public void setHostUsername(String hostUsername) {
+        this.hostUsername = hostUsername;
+    }
+
+    public Map<String, Boolean> getPlayerReadyMap() {
+        return playerReadyMap;
+    }
+
+    public void setPlayerReadyMap(Map<String, Boolean> playerReadyMap) {
+        this.playerReadyMap = playerReadyMap;
     }
 }

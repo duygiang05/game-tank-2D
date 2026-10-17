@@ -13,8 +13,8 @@ import javafx.stage.Stage;
  */
 public class Tank2DOnline extends Application {
 
-    private static final double WINDOW_WIDTH = 800;
-    private static final double WINDOW_HEIGHT = 600;
+    private static final double WINDOW_WIDTH = com.tank2d.common.config.ConfigLoader.getWindowWidth();
+    private static final double WINDOW_HEIGHT = com.tank2d.common.config.ConfigLoader.getWindowHeight();
 
     /**
      * Khởi tạo và thiết lập Stage chính với màn hình đăng nhập.
@@ -31,12 +31,8 @@ public class Tank2DOnline extends Application {
         Scene scene = new Scene(root, WINDOW_WIDTH, WINDOW_HEIGHT);
 
         stage.setTitle("Tank 2D Online");
-        stage.setWidth(WINDOW_WIDTH);
-        stage.setHeight(WINDOW_HEIGHT);
-        stage.setMinWidth(WINDOW_WIDTH);
-        stage.setMaxWidth(WINDOW_WIDTH);
-        stage.setMinHeight(WINDOW_HEIGHT);
-        stage.setMaxHeight(WINDOW_HEIGHT);
+        stage.setScene(scene);
+        stage.sizeToScene();
         stage.setResizable(false);
 
         stage.setOnCloseRequest(event -> {
