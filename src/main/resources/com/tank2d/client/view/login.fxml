@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
+<?import java.net.URL?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
@@ -8,201 +8,98 @@
 <?import javafx.scene.image.Image?>
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
-
-<BorderPane xmlns="http://javafx.com/javafx/21"
-            xmlns:fx="http://javafx.com/fxml/1"
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.tank2d.client.controller.LoginController"
-            stylesheets="@theme.css"
-            prefWidth="800.0"
-            prefHeight="600.0"
-            styleClass="root-pane">
-
+            prefWidth="800" prefHeight="600" styleClass="auth-root">
+    <stylesheets>
+        <URL value="@game-theme.css"/>
+        <URL value="@theme.css"/>
+    </stylesheets>
     <center>
-        <StackPane alignment="CENTER">
-
-            <!-- ============================================== -->
-            <!-- 1. LOGIN FORM CARD                             -->
-            <!-- ============================================== -->
-            <VBox fx:id="loginForm"
-                  alignment="CENTER"
-                  spacing="10.0"
-                  maxWidth="380.0"
-                  maxHeight="-Infinity"
-                  styleClass="auth-card">
-
-                <ImageView fitWidth="145.0"
-                           fitHeight="90.0"
-                           preserveRatio="true">
-                    <image>
-                        <Image url="@tank-logo_1.png"/>
-                    </image>
+        <StackPane alignment="CENTER" styleClass="auth-stage">
+            <!-- Login: all fx:id and onAction declarations match the original controller. -->
+            <VBox fx:id="loginForm" alignment="CENTER" spacing="9" maxWidth="420"
+                  maxHeight="-Infinity" styleClass="auth-panel">
+                <Label text="●  TANK COMMAND  /  MULTIPLAYER" styleClass="auth-kicker"/>
+                <ImageView fitWidth="154" fitHeight="91" preserveRatio="true">
+                    <image><Image url="@tank-logo_1.png"/></image>
                 </ImageView>
-
-                <Label text="TANK 2D ONLINE"
-                       style="-fx-text-fill: #1d4ed8; -fx-font-size: 22px; -fx-font-weight: bold;"/>
-
-                <Label text="Đăng nhập tài khoản"
-                       style="-fx-text-fill: #64748b; -fx-font-size: 14px; -fx-font-weight: bold;"/>
-
-                <VBox spacing="10.0" alignment="CENTER" maxWidth="310.0">
-                    <TextField fx:id="usernameField"
-                               prefHeight="42.0"
-                               maxWidth="310.0"
-                               promptText="Tên đăng nhập"
-                               styleClass="auth-field"/>
-
-                    <!-- Cụm Mật khẩu Đăng nhập có Mắt xem -->
-                    <StackPane alignment="CENTER_RIGHT" maxWidth="310.0">
-                        <PasswordField fx:id="passwordField"
-                                       prefHeight="42.0"
-                                       maxWidth="310.0"
-                                       promptText="Mật khẩu"
-                                       styleClass="auth-field"
-                                       style="-fx-padding: 0 40px 0 12px;"/>
-
-                        <TextField fx:id="passwordTextField"
-                                   prefHeight="42.0"
-                                   maxWidth="310.0"
-                                   promptText="Mật khẩu"
-                                   styleClass="auth-field"
-                                   style="-fx-padding: 0 40px 0 12px;"
-                                   visible="false"
-                                   managed="false"/>
-
-                        <Button fx:id="togglePasswordBtn"
-                                text="👁"
-                                onAction="#togglePasswordVisibility"
-                                style="-fx-background-color: transparent; -fx-cursor: hand; -fx-font-size: 15px; -fx-text-fill: #64748b; -fx-padding: 0 10px 0 0;"/>
+                <Label text="TANK 2D ONLINE" styleClass="auth-title"/>
+                <Label text="Đăng nhập để tham gia chiến trường" styleClass="auth-hint"/>
+                <VBox alignment="CENTER" spacing="11" maxWidth="320">
+                    <VBox.margin><Insets top="15"/></VBox.margin>
+                    <TextField fx:id="usernameField" prefHeight="43" maxWidth="320"
+                               promptText="Tên đăng nhập" styleClass="auth-input"/>
+                    <StackPane alignment="CENTER_RIGHT" maxWidth="320">
+                        <PasswordField fx:id="passwordField" prefHeight="43" maxWidth="320"
+                                       promptText="Mật khẩu" styleClass="auth-input"
+                                       style="-fx-padding: 0 42 0 14;"/>
+                        <TextField fx:id="passwordTextField" prefHeight="43" maxWidth="320"
+                                   promptText="Mật khẩu" styleClass="auth-input"
+                                   style="-fx-padding: 0 42 0 14;" visible="false" managed="false"/>
+                        <Button fx:id="togglePasswordBtn" text="👁" styleClass="auth-eye"
+                                onAction="#togglePasswordVisibility"/>
                     </StackPane>
                 </VBox>
-
-                <VBox spacing="9.0" alignment="CENTER" maxWidth="310.0">
-                    <VBox.margin>
-                        <Insets top="6.0"/>
-                    </VBox.margin>
-
-                    <Button fx:id="loginButton"
-                            text="Đăng nhập"
-                            maxWidth="310.0"
-                            prefHeight="42.0"
-                            styleClass="btn-primary"
-                            onAction="#handleLogin"/>
-
-                    <Button text="Chưa có tài khoản? Đăng ký ngay"
-                            maxWidth="310.0"
-                            prefHeight="38.0"
-                            styleClass="btn-outline"
-                            onAction="#showRegister"/>
+                <VBox alignment="CENTER" spacing="10" maxWidth="320">
+                    <VBox.margin><Insets top="12"/></VBox.margin>
+                    <Button fx:id="loginButton" text="ĐĂNG NHẬP" prefWidth="320" prefHeight="51"
+                            styleClass="auth-button-blue" onAction="#handleLogin"/>
+                    <Button text="CHƯA CÓ TÀI KHOẢN?  ĐĂNG KÝ" prefWidth="320" prefHeight="51"
+                            styleClass="auth-button-yellow" onAction="#showRegister"/>
                 </VBox>
-
+                <Label text="READY FOR BATTLE  •  ONLINE MULTIPLAYER" styleClass="auth-footnote">
+                    <VBox.margin><Insets top="9"/></VBox.margin>
+                </Label>
             </VBox>
-
-
-            <!-- ============================================== -->
-            <!-- 2. REGISTER FORM CARD                          -->
-            <!-- ============================================== -->
-            <VBox fx:id="registerForm"
-                  alignment="CENTER"
-                  spacing="9.0"
-                  maxWidth="380.0"
-                  maxHeight="-Infinity"
-                  visible="false"
-                  managed="false"
-                  styleClass="auth-card">
-
-                <ImageView fitWidth="125.0"
-                           fitHeight="78.0"
-                           preserveRatio="true">
-                    <image>
-                        <Image url="@tank-logo_1.png"/>
-                    </image>
+            <!-- Registration preserves the original three visibility toggles and methods. -->
+            <VBox fx:id="registerForm" alignment="CENTER" spacing="7" maxWidth="420"
+                  maxHeight="-Infinity" styleClass="auth-panel" visible="false" managed="false">
+                <Label text="●  TANK COMMAND  /  NEW RECRUIT" styleClass="auth-kicker"/>
+                <ImageView fitWidth="123" fitHeight="73" preserveRatio="true">
+                    <image><Image url="@tank-logo_1.png"/></image>
                 </ImageView>
-
-                <Label text="TANK 2D ONLINE"
-                       style="-fx-text-fill: #1d4ed8; -fx-font-size: 21px; -fx-font-weight: bold;"/>
-
-                <Label text="Đăng ký tài khoản mới"
-                       style="-fx-text-fill: #64748b; -fx-font-size: 14px; -fx-font-weight: bold;"/>
-
-                <VBox spacing="8.0" alignment="CENTER" maxWidth="310.0">
-                    <TextField fx:id="registerUsernameField"
-                               prefHeight="39.0"
-                               maxWidth="310.0"
-                               promptText="Tên đăng nhập mới"
-                               styleClass="auth-field"/>
-
-                    <!-- Mật khẩu đăng ký -->
-                    <StackPane alignment="CENTER_RIGHT" maxWidth="310.0">
-                        <PasswordField fx:id="registerPasswordField"
-                                       prefHeight="39.0"
-                                       maxWidth="310.0"
-                                       promptText="Mật khẩu"
-                                       styleClass="auth-field"
-                                       style="-fx-padding: 0 40px 0 12px;"/>
-
-                        <TextField fx:id="registerPasswordTextField"
-                                   prefHeight="39.0"
-                                   maxWidth="310.0"
-                                   promptText="Mật khẩu"
-                                   styleClass="auth-field"
-                                   style="-fx-padding: 0 40px 0 12px;"
-                                   visible="false"
-                                   managed="false"/>
-
-                        <Button fx:id="toggleRegisterPasswordBtn"
-                                text="👁"
-                                onAction="#toggleRegisterPasswordVisibility"
-                                style="-fx-background-color: transparent; -fx-cursor: hand; -fx-font-size: 15px; -fx-text-fill: #64748b; -fx-padding: 0 10px 0 0;"/>
+                <Label text="TANK 2D ONLINE" styleClass="auth-title"/>
+                <Label text="Tạo tài khoản chiến binh mới" styleClass="auth-hint"/>
+                <VBox alignment="CENTER" spacing="9" maxWidth="320">
+                    <VBox.margin><Insets top="10"/></VBox.margin>
+                    <TextField fx:id="registerUsernameField" prefHeight="40" maxWidth="320"
+                               promptText="Tên đăng nhập mới" styleClass="auth-input"/>
+                    <StackPane alignment="CENTER_RIGHT" maxWidth="320">
+                        <PasswordField fx:id="registerPasswordField" prefHeight="40" maxWidth="320"
+                                       promptText="Mật khẩu" styleClass="auth-input"
+                                       style="-fx-padding: 0 42 0 14;"/>
+                        <TextField fx:id="registerPasswordTextField" prefHeight="40" maxWidth="320"
+                                   promptText="Mật khẩu" styleClass="auth-input"
+                                   style="-fx-padding: 0 42 0 14;" visible="false" managed="false"/>
+                        <Button fx:id="toggleRegisterPasswordBtn" text="👁" styleClass="auth-eye"
+                                onAction="#toggleRegisterPasswordVisibility"/>
                     </StackPane>
-
-                    <!-- Xác nhận mật khẩu đăng ký -->
-                    <StackPane alignment="CENTER_RIGHT" maxWidth="310.0">
-                        <PasswordField fx:id="confirmPasswordField"
-                                       prefHeight="39.0"
-                                       maxWidth="310.0"
-                                       promptText="Xác nhận mật khẩu"
-                                       styleClass="auth-field"
-                                       style="-fx-padding: 0 40px 0 12px;"/>
-
-                        <TextField fx:id="confirmPasswordTextField"
-                                   prefHeight="39.0"
-                                   maxWidth="310.0"
-                                   promptText="Xác nhận mật khẩu"
-                                   styleClass="auth-field"
-                                   style="-fx-padding: 0 40px 0 12px;"
-                                   visible="false"
-                                   managed="false"/>
-
-                        <Button fx:id="toggleConfirmPasswordBtn"
-                                text="👁"
-                                onAction="#toggleConfirmPasswordVisibility"
-                                style="-fx-background-color: transparent; -fx-cursor: hand; -fx-font-size: 15px; -fx-text-fill: #64748b; -fx-padding: 0 10px 0 0;"/>
+                    <StackPane alignment="CENTER_RIGHT" maxWidth="320">
+                        <PasswordField fx:id="confirmPasswordField" prefHeight="40" maxWidth="320"
+                                       promptText="Xác nhận mật khẩu" styleClass="auth-input"
+                                       style="-fx-padding: 0 42 0 14;"/>
+                        <TextField fx:id="confirmPasswordTextField" prefHeight="40" maxWidth="320"
+                                   promptText="Xác nhận mật khẩu" styleClass="auth-input"
+                                   style="-fx-padding: 0 42 0 14;" visible="false" managed="false"/>
+                        <Button fx:id="toggleConfirmPasswordBtn" text="👁" styleClass="auth-eye"
+                                onAction="#toggleConfirmPasswordVisibility"/>
                     </StackPane>
                 </VBox>
-
-                <VBox spacing="8.0" alignment="CENTER" maxWidth="310.0">
-                    <VBox.margin>
-                        <Insets top="6.0"/>
-                    </VBox.margin>
-
-                    <Button text="Tạo tài khoản"
-                            maxWidth="310.0"
-                            prefHeight="42.0"
-                            styleClass="btn-success"
-                            onAction="#handleRegister"/>
-
-                    <Button text="← Đã có tài khoản? Đăng nhập"
-                            maxWidth="310.0"
-                            prefHeight="38.0"
-                            styleClass="btn-outline"
-                            onAction="#showLogin"/>
+                <VBox alignment="CENTER" spacing="8" maxWidth="320">
+                    <VBox.margin><Insets top="12"/></VBox.margin>
+                    <Button text="TẠO TÀI KHOẢN" prefWidth="320" prefHeight="50"
+                            styleClass="auth-button-green" onAction="#handleRegister"/>
+                    <Button text="←  QUAY LẠI ĐĂNG NHẬP" prefWidth="320" prefHeight="50"
+                            styleClass="auth-button-yellow" onAction="#showLogin"/>
                 </VBox>
-
+                <Label text="READY FOR BATTLE  •  ONLINE MULTIPLAYER" styleClass="auth-footnote">
+                    <VBox.margin><Insets top="6"/></VBox.margin>
+                </Label>
             </VBox>
-
         </StackPane>
     </center>
-
 </BorderPane>

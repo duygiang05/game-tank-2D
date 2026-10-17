@@ -1,101 +1,63 @@
-/* ========================================================
-   TANK 2D ONLINE - MODERN LIGHT GAMING THEME
-   ======================================================== */
-
-.root, .root-pane {
-    -fx-background-color: #f1f5f9;
-    -fx-font-family: "Segoe UI", "Arial", sans-serif;
+/* Sprint 3. Uses the Kenney UI PNGs verified in Sprint 1.
+   Scoped to auth-* classes to avoid changing Lobby, Room or previews. */
+.auth-root {
+    -fx-font-family: "Segoe UI", "Arial";
+    -fx-background-color: #0b1928;
 }
-
-/* Khối Card trắng trung tâm ôm khít form */
-.auth-card {
-    -fx-background-color: #ffffff;
-    -fx-background-radius: 18px;
-    -fx-padding: 24px 35px;
-    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.09), 18, 0, 0, 5);
+.auth-stage {
+    -fx-background-color: radial-gradient(center 50% 46%, radius 88%, #203c50, #0b1928);
+    -fx-padding: 10;
 }
-
-/* Định dạng ô nhập liệu */
-.auth-field {
-    -fx-background-color: #ffffff;
-    -fx-text-fill: #0f172a;
-    -fx-prompt-text-fill: #94a3b8;
-    -fx-border-color: #cbd5e1;
-    -fx-border-width: 1.4px;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
-    -fx-padding: 0 12px;
-    -fx-font-size: 13.5px;
+.auth-panel {
+    -fx-background-color: linear-gradient(to bottom, #17374a, #10283a);
+    -fx-background-radius: 16;
+    -fx-border-color: #3e7488;
+    -fx-border-radius: 16;
+    -fx-border-width: 1.4;
+    -fx-padding: 19 34 20 34;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,.43), 20, .1, 0, 6);
 }
-
-.auth-field:focused {
-    -fx-border-color: #2563eb;
-    -fx-border-width: 1.8px;
-    -fx-background-color: #fafcff;
-    -fx-effect: dropshadow(three-pass-box, rgba(37, 99, 235, 0.18), 8, 0, 0, 0);
+.auth-kicker { -fx-text-fill: #7ec6d7; -fx-font-size: 10px; -fx-font-weight: bold; }
+.auth-title { -fx-text-fill: #f5b952; -fx-font-size: 24px; -fx-font-weight: bold; }
+.auth-hint { -fx-text-fill: #b9d0da; -fx-font-size: 12px; }
+.auth-footnote { -fx-text-fill: #80a2b3; -fx-font-size: 9px; -fx-font-weight: bold; }
+.auth-input {
+    -fx-background-color: #092033;
+    -fx-background-radius: 8;
+    -fx-border-color: #417086;
+    -fx-border-width: 1.4;
+    -fx-border-radius: 8;
+    -fx-text-fill: #eaf3f7;
+    -fx-prompt-text-fill: #8aa7b4;
+    -fx-padding: 0 14;
+    -fx-font-size: 13px;
 }
-
-/* Nút chính: Đăng nhập (Màu xanh dương Game) */
-.btn-primary {
-    -fx-background-color: #2563eb;
-    -fx-text-fill: white;
-    -fx-font-weight: bold;
+.auth-input:focused { -fx-border-color: #55c6db; -fx-background-color: #103047; }
+.auth-eye {
+    -fx-background-color: transparent;
+    -fx-text-fill: #b7d8e4;
     -fx-font-size: 14px;
-    -fx-background-radius: 8px;
-    -fx-border-radius: 8px;
     -fx-cursor: hand;
-    -fx-effect: dropshadow(three-pass-box, rgba(37, 99, 235, 0.35), 8, 0, 0, 3);
+    -fx-padding: 0 12 0 0;
 }
-
-.btn-primary:hover {
-    -fx-background-color: #1d4ed8;
-    -fx-effect: dropshadow(three-pass-box, rgba(29, 78, 216, 0.5), 10, 0, 0, 4);
-}
-
-.btn-primary:pressed {
-    -fx-background-color: #1e40af;
-}
-
-/* Nút chính form Đăng ký: Tạo tài khoản (Xanh lá) */
-.btn-success {
-    -fx-background-color: #16a34a;
+.auth-eye:hover { -fx-text-fill: white; }
+.auth-button-blue, .auth-button-yellow, .auth-button-green {
+    -fx-background-color: transparent;
+    -fx-background-repeat: no-repeat;
+    -fx-background-position: center center;
+    -fx-background-size: 100% 100%;
     -fx-text-fill: white;
+    -fx-font-size: 13px;
     -fx-font-weight: bold;
-    -fx-font-size: 14px;
-    -fx-background-radius: 8px;
-    -fx-border-radius: 8px;
     -fx-cursor: hand;
-    -fx-effect: dropshadow(three-pass-box, rgba(22, 163, 74, 0.35), 8, 0, 0, 3);
+    -fx-padding: 0 12;
 }
-
-.btn-success:hover {
-    -fx-background-color: #15803d;
-    -fx-effect: dropshadow(three-pass-box, rgba(21, 128, 61, 0.5), 10, 0, 0, 4);
+.auth-button-blue { -fx-background-image: url("../assets/ui/kenney/blue/button_rectangle_gradient.png"); }
+.auth-button-yellow {
+    -fx-background-image: url("../assets/ui/kenney/yellow/button_rectangle_gradient.png");
+    -fx-text-fill: #253348;
 }
-
-.btn-success:pressed {
-    -fx-background-color: #166534;
-}
-
-/* Nút phụ: Chuyển form (Dạng viền mỏng) */
-.btn-outline {
-    -fx-background-color: #ffffff;
-    -fx-text-fill: #475569;
-    -fx-font-weight: bold;
-    -fx-font-size: 12.5px;
-    -fx-border-color: #cbd5e1;
-    -fx-border-width: 1.5px;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
-    -fx-cursor: hand;
-}
-
-.btn-outline:hover {
-    -fx-background-color: #f8fafc;
-    -fx-text-fill: #1e293b;
-    -fx-border-color: #94a3b8;
-}
-
-.btn-outline:pressed {
-    -fx-background-color: #f1f5f9;
-}
+.auth-button-green { -fx-background-image: url("../assets/ui/kenney/green/button_rectangle_gradient.png"); }
+.auth-button-blue:hover, .auth-button-yellow:hover, .auth-button-green:hover { -fx-opacity: .89; }
+.auth-button-blue:pressed, .auth-button-yellow:pressed, .auth-button-green:pressed { -fx-opacity: .70; }
+.auth-button-blue:disabled, .auth-button-yellow:disabled, .auth-button-green:disabled { -fx-opacity: .42; }
