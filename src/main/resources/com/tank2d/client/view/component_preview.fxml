@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<BorderPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            stylesheets="@game-theme.css"
+            prefWidth="900" prefHeight="650"
+            styleClass="game-ui-root">
+    <top>
+        <VBox alignment="CENTER" spacing="4">
+            <padding><Insets top="20" bottom="16"/></padding>
+            <Label text="TANK 2D ONLINE" styleClass="game-ui-title"/>
+            <Label text="SPRINT 2 — COMPONENT PREVIEW / KENNEY UI ASSETS" styleClass="game-ui-muted"/>
+        </VBox>
+    </top>
+    <center>
+        <VBox spacing="17" alignment="TOP_CENTER">
+            <padding><Insets left="45" right="45" top="4" bottom="20"/></padding>
+            <VBox spacing="11" alignment="CENTER_LEFT" maxWidth="800" styleClass="game-ui-panel">
+                <Label text="01 / KENNEY BUTTONS — hover, pressed, disabled" styleClass="game-ui-heading"/>
+                <HBox spacing="14" alignment="CENTER_LEFT">
+                    <Button text="TẠO PHÒNG" prefWidth="178" prefHeight="60"
+                            styleClass="game-ui-button-blue"/>
+                    <Button text="SẴN SÀNG" prefWidth="178" prefHeight="60"
+                            styleClass="game-ui-button-green"/>
+                    <Button text="BẢNG XẾP HẠNG" prefWidth="178" prefHeight="60"
+                            styleClass="game-ui-button-yellow"/>
+                    <Button text="RỜI PHÒNG" prefWidth="178" prefHeight="60"
+                            styleClass="game-ui-button-red"/>
+                </HBox>
+                <HBox spacing="14" alignment="CENTER_LEFT">
+                    <Button text="KHÔNG KHẢ DỤNG" prefWidth="178" prefHeight="60" disable="true"
+                            styleClass="game-ui-button-blue"/>
+                    <Label text="PNG thật: kenney/.../button_rectangle_gradient.png (192×64)" styleClass="game-ui-muted"/>
+                </HBox>
+            </VBox>
+            <HBox spacing="17" alignment="TOP_CENTER">
+                <VBox spacing="12" prefWidth="390" styleClass="game-ui-panel">
+                    <Label text="02 / INPUTS &amp; STATUS" styleClass="game-ui-heading"/>
+                    <TextField promptText="Tên chiến binh" prefHeight="41" styleClass="game-ui-field"/>
+                    <PasswordField promptText="Mật khẩu" prefHeight="41" styleClass="game-ui-field"/>
+                    <HBox spacing="9">
+                        <Label text="READY" styleClass="game-ui-badge-ready"/>
+                        <Label text="WAITING" styleClass="game-ui-badge-waiting"/>
+                        <Label text="PLAYING" styleClass="game-ui-badge-playing"/>
+                    </HBox>
+                    <HBox spacing="10" alignment="CENTER_LEFT" styleClass="game-ui-dialog">
+                        <ImageView fitWidth="24" fitHeight="24" preserveRatio="true">
+                            <image><Image url="@../assets/ui/kenney/blue/check_square_color_checkmark.png"/></image>
+                        </ImageView>
+                        <VBox spacing="3">
+                            <Label text="03 / GAME DIALOG" styleClass="game-ui-heading"/>
+                            <Label text="Hoàn tất kết nối, sẵn sàng thi đấu." styleClass="game-ui-muted"/>
+                        </VBox>
+                    </HBox>
+                </VBox>
+                <VBox spacing="10" prefWidth="390" styleClass="game-ui-panel">
+                    <Label text="04 / LIST ROWS" styleClass="game-ui-heading"/>
+                    <ListView prefHeight="210" styleClass="game-ui-list">
+                    </ListView>
+                    <Label text="Dòng dữ liệu chỉ định dạng; dữ liệu thực sẽ do controller cấp." styleClass="game-ui-muted" wrapText="true"/>
+                </VBox>
+            </HBox>
+        </VBox>
+    </center>
+</BorderPane>

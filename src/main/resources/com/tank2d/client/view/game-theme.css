@@ -1,0 +1,104 @@
+/* Tank2D — Sprint 2. Scoped classes; does not alter old FXML. */
+.game-ui-root {
+    -fx-font-family: "Segoe UI", "Arial";
+    -fx-background-color: #0b1928;
+}
+.game-ui-panel {
+    -fx-background-color: #142b3d;
+    -fx-background-radius: 14;
+    -fx-border-color: #386075;
+    -fx-border-width: 1.5;
+    -fx-border-radius: 14;
+    -fx-padding: 18 24;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 15, 0.1, 0, 5);
+}
+.game-ui-title {
+    -fx-text-fill: #f5b952;
+    -fx-font-weight: bold;
+    -fx-font-size: 23px;
+}
+.game-ui-heading {
+    -fx-text-fill: #eaf3f7;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+}
+.game-ui-muted { -fx-text-fill: #9db7c5; -fx-font-size: 12px; }
+.game-ui-field {
+    -fx-background-color: #092033;
+    -fx-background-radius: 8;
+    -fx-border-color: #417086;
+    -fx-border-width: 1.4;
+    -fx-border-radius: 8;
+    -fx-text-fill: #eaf3f7;
+    -fx-prompt-text-fill: #8aa7b4;
+    -fx-padding: 0 13;
+    -fx-font-size: 13px;
+}
+.game-ui-field:focused { -fx-border-color: #55c6db; -fx-background-color: #103047; }
+.game-ui-button-blue, .game-ui-button-green, .game-ui-button-yellow, .game-ui-button-red {
+    -fx-background-color: transparent;
+    -fx-background-repeat: no-repeat;
+    -fx-background-position: center center;
+    -fx-background-size: 100% 100%;
+    -fx-padding: 0 8;
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+.game-ui-button-blue:hover, .game-ui-button-green:hover, .game-ui-button-yellow:hover, .game-ui-button-red:hover { -fx-opacity: 0.89; }
+.game-ui-button-blue:pressed, .game-ui-button-green:pressed, .game-ui-button-yellow:pressed, .game-ui-button-red:pressed { -fx-opacity: 0.65; }
+.game-ui-button-blue:disabled, .game-ui-button-green:disabled, .game-ui-button-yellow:disabled, .game-ui-button-red:disabled { -fx-opacity: 0.40; }
+.game-ui-button-blue {
+    -fx-background-image: url("../assets/ui/kenney/blue/button_rectangle_gradient.png");
+}
+.game-ui-button-green {
+    -fx-background-image: url("../assets/ui/kenney/green/button_rectangle_gradient.png");
+}
+.game-ui-button-yellow {
+    -fx-background-image: url("../assets/ui/kenney/yellow/button_rectangle_gradient.png");
+    -fx-text-fill: #263448;
+}
+.game-ui-button-red {
+    -fx-background-image: url("../assets/ui/kenney/red/button_rectangle_gradient.png");
+}
+.game-ui-badge-ready, .game-ui-badge-waiting, .game-ui-badge-playing {
+    -fx-padding: 5 12;
+    -fx-background-radius: 7;
+    -fx-font-weight: bold;
+}
+.game-ui-badge-ready {
+    -fx-background-color: #164c3d;
+    -fx-text-fill: #72f5b9;
+}
+.game-ui-badge-waiting {
+    -fx-background-color: #4e3918;
+    -fx-text-fill: #ffd182;
+}
+.game-ui-badge-playing {
+    -fx-background-color: #173e5a;
+    -fx-text-fill: #81d7ff;
+}
+.game-ui-list {
+    -fx-background-color: #0c2435;
+    -fx-background-insets: 0;
+    -fx-border-color: #345b6c;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+.game-ui-list .list-cell {
+    -fx-background-color: #0c2435;
+    -fx-text-fill: #eaf3f7;
+    -fx-padding: 9 14;
+}
+.game-ui-list .list-cell:filled:odd { -fx-background-color: #102c40; }
+.game-ui-list .list-cell:filled:hover { -fx-background-color: #1a455a; }
+.game-ui-list .list-cell:filled:selected { -fx-background-color: #245a71; -fx-text-fill: white; }
+.game-ui-dialog {
+    -fx-background-color: #1a3648;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-border-color: #63afbc;
+    -fx-border-width: 1.3;
+    -fx-padding: 14;
+}
