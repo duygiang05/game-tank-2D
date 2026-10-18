@@ -19,6 +19,8 @@ public class RoomDTO {
     private Map<Integer, Boolean> readyStates;
     private Map<String, Boolean> playerReadyMap;
     private int duration;
+    private String mapId = "map_default";
+    private String mapName = "Tropical Warzone";
 
     public RoomDTO() {}
 
@@ -144,5 +146,21 @@ public class RoomDTO {
 
     public void setPlayerReadyMap(Map<String, Boolean> playerReadyMap) {
         this.playerReadyMap = playerReadyMap;
+    }
+
+    public String getMapId() {
+        return mapId;
+    }
+
+    public void setMapId(String mapId) {
+        this.mapId = mapId;
+    }
+
+    public String getMapName() {
+        return mapName;
+    }
+
+    public void setMapName(String mapName) {
+        this.mapName = mapName;
     }
 }

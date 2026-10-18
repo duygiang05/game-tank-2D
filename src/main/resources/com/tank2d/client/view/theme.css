@@ -1,89 +1,241 @@
 /* ========================================================
-   TANK 2D ONLINE - MODERN LIGHT GAMING THEME
+   TANK 2D ONLINE - DIRECT ASSET INTEGRATION THEME
+   Directly applying PNG asset files from UI Component Pack
    ======================================================== */
 
 .root, .root-pane {
-    -fx-background-color: #f1f5f9;
-    -fx-font-family: "Segoe UI", "Arial", sans-serif;
+    -fx-font-family: "Kenney Future", "Segoe UI", "Arial", sans-serif;
 }
 
-/* Khối Card trắng trung tâm ôm khít form */
-.auth-card {
-    -fx-background-color: #ffffff;
-    -fx-background-radius: 18px;
-    -fx-padding: 24px 35px;
-    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.09), 18, 0, 0, 5);
+/* Background trực tiếp từ asset: 01_login_background.png */
+.auth-root {
+    -fx-background-image: url('../assets/ui/backgrounds/01_login_background.png');
+    -fx-background-size: cover;
+    -fx-background-position: center center;
+    -fx-background-repeat: no-repeat;
 }
 
-/* Định dạng ô nhập liệu */
-.auth-field {
-    -fx-background-color: #ffffff;
-    -fx-text-fill: #0f172a;
-    -fx-prompt-text-fill: #94a3b8;
-    -fx-border-color: #cbd5e1;
-    -fx-border-width: 1.4px;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
-    -fx-padding: 0 12px;
-    -fx-font-size: 13.5px;
+.auth-overlay {
+    -fx-background-color: rgba(10, 15, 28, 0.20);
 }
 
-.auth-field:focused {
-    -fx-border-color: #2563eb;
-    -fx-border-width: 1.8px;
-    -fx-background-color: #fafcff;
-    -fx-effect: dropshadow(three-pass-box, rgba(37, 99, 235, 0.18), 8, 0, 0, 0);
+/* Khối Panel Login trực tiếp từ asset: panel_login_empty.png (690x720) */
+.auth-card-login {
+    -fx-background-image: url('../assets/ui/auth/panels/panel_login_empty.png');
+    -fx-background-size: 100% 100%;
+    -fx-background-position: center center;
+    -fx-background-repeat: no-repeat;
+    -fx-background-color: transparent;
+    -fx-padding: 40px 45px 45px 45px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.75), 24, 0.35, 0, 8);
 }
 
-/* Nút chính: Đăng nhập (Màu xanh dương Game) */
+/* Khối Panel Register trực tiếp từ asset: panel_register_empty.png (690x880) */
+.auth-card-register {
+    -fx-background-image: url('../assets/ui/auth/panels/panel_register_empty.png');
+    -fx-background-size: 100% 100%;
+    -fx-background-position: center center;
+    -fx-background-repeat: no-repeat;
+    -fx-background-color: transparent;
+    -fx-padding: 35px 45px 40px 45px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.75), 24, 0.35, 0, 8);
+}
+
+/* Ô nhập Tên đăng nhập trực tiếp từ asset: input_username_normal / focus */
+.auth-field-username {
+    -fx-background-color: transparent;
+    -fx-background-image: url('../assets/ui/auth/inputs/input_username_normal.png');
+    -fx-background-size: 100% 100%;
+    -fx-background-position: center center;
+    -fx-background-repeat: no-repeat;
+    -fx-text-fill: #ffffff;
+    -fx-prompt-text-fill: #64748b;
+    -fx-padding: 0 16px 0 16px;
+    -fx-font-size: 12.5px;
+    -fx-font-family: "Kenney Future", "Segoe UI", sans-serif;
+}
+
+.auth-field-username:focused {
+    -fx-background-image: url('../assets/ui/auth/inputs/input_username_focus.png');
+}
+
+/* Ô nhập Mật khẩu trực tiếp từ asset: input_password_normal / focus */
+.auth-field-password {
+    -fx-background-color: transparent;
+    -fx-background-image: url('../assets/ui/auth/inputs/input_password_normal.png');
+    -fx-background-size: 100% 100%;
+    -fx-background-position: center center;
+    -fx-background-repeat: no-repeat;
+    -fx-text-fill: #ffffff;
+    -fx-prompt-text-fill: #64748b;
+    -fx-padding: 0 34px 0 16px;
+    -fx-font-size: 12.5px;
+    -fx-font-family: "Kenney Future", "Segoe UI", sans-serif;
+}
+
+.auth-field-password:focused {
+    -fx-background-image: url('../assets/ui/auth/inputs/input_password_focus.png');
+}
+
+/* Ô nhập Xác nhận mật khẩu trực tiếp từ asset: input_confirm_password_normal / focus */
+.auth-field-confirm {
+    -fx-background-color: transparent;
+    -fx-background-image: url('../assets/ui/auth/inputs/input_confirm_password_normal.png');
+    -fx-background-size: 100% 100%;
+    -fx-background-position: center center;
+    -fx-background-repeat: no-repeat;
+    -fx-text-fill: #ffffff;
+    -fx-prompt-text-fill: #64748b;
+    -fx-padding: 0 34px 0 16px;
+    -fx-font-size: 12.5px;
+    -fx-font-family: "Kenney Future", "Segoe UI", sans-serif;
+}
+
+.auth-field-confirm:focused {
+    -fx-background-image: url('../assets/ui/auth/inputs/input_confirm_password_focus.png');
+}
+
+/* ========================================================
+   GAME BUTTONS (Directly using Kenney & UI Pack PNG sprites)
+   ======================================================== */
+
+/* Nút chính: Xanh dương trực tiếp từ asset (btn_blue_normal.png) */
 .btn-primary {
-    -fx-background-color: #2563eb;
-    -fx-text-fill: white;
+    -fx-background-color: transparent;
+    -fx-background-image: url('../assets/ui/auth/buttons/btn_blue_normal.png');
+    -fx-background-size: 100% 100%;
+    -fx-background-repeat: no-repeat;
+    -fx-background-position: center center;
+    -fx-text-fill: #ffffff;
+    -fx-font-family: "Kenney Future", "Segoe UI", sans-serif;
     -fx-font-weight: bold;
-    -fx-font-size: 14px;
-    -fx-background-radius: 8px;
-    -fx-border-radius: 8px;
+    -fx-font-size: 13.5px;
     -fx-cursor: hand;
-    -fx-effect: dropshadow(three-pass-box, rgba(37, 99, 235, 0.35), 8, 0, 0, 3);
+    -fx-alignment: center;
+    -fx-padding: 0 10px 4px 10px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 168, 255, 0.4), 8, 0, 0, 3);
 }
 
 .btn-primary:hover {
-    -fx-background-color: #1d4ed8;
-    -fx-effect: dropshadow(three-pass-box, rgba(29, 78, 216, 0.5), 10, 0, 0, 4);
+    -fx-background-image: url('../assets/ui/auth/buttons/btn_blue_hover.png');
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 195, 255, 0.7), 12, 0, 0, 4);
 }
 
 .btn-primary:pressed {
-    -fx-background-color: #1e40af;
+    -fx-background-image: url('../assets/ui/auth/buttons/btn_blue_pressed.png');
+    -fx-padding: 4px 10px 0 10px;
 }
 
-/* Nút chính form Đăng ký: Tạo tài khoản (Xanh lá) */
+.btn-primary:disabled {
+    -fx-background-image: url('../assets/ui/auth/buttons/btn_blue_disabled.png');
+    -fx-opacity: 0.6;
+}
+
+/* Nút Xanh lá trực tiếp từ asset (btn_green_normal.png) */
 .btn-success {
-    -fx-background-color: #16a34a;
-    -fx-text-fill: white;
+    -fx-background-color: transparent;
+    -fx-background-image: url('../assets/ui/auth/buttons/btn_green_normal.png');
+    -fx-background-size: 100% 100%;
+    -fx-background-repeat: no-repeat;
+    -fx-background-position: center center;
+    -fx-text-fill: #ffffff;
+    -fx-font-family: "Kenney Future", "Segoe UI", sans-serif;
     -fx-font-weight: bold;
-    -fx-font-size: 14px;
-    -fx-background-radius: 8px;
-    -fx-border-radius: 8px;
+    -fx-font-size: 13.5px;
     -fx-cursor: hand;
-    -fx-effect: dropshadow(three-pass-box, rgba(22, 163, 74, 0.35), 8, 0, 0, 3);
+    -fx-alignment: center;
+    -fx-padding: 0 10px 4px 10px;
+    -fx-effect: dropshadow(three-pass-box, rgba(46, 213, 115, 0.4), 8, 0, 0, 3);
 }
 
 .btn-success:hover {
-    -fx-background-color: #15803d;
-    -fx-effect: dropshadow(three-pass-box, rgba(21, 128, 61, 0.5), 10, 0, 0, 4);
+    -fx-background-image: url('../assets/ui/auth/buttons/btn_green_hover.png');
+    -fx-effect: dropshadow(three-pass-box, rgba(46, 213, 115, 0.7), 12, 0, 0, 4);
 }
 
 .btn-success:pressed {
-    -fx-background-color: #166534;
+    -fx-background-image: url('../assets/ui/auth/buttons/btn_green_pressed.png');
+    -fx-padding: 4px 10px 0 10px;
 }
 
-/* Nút phụ: Chuyển form (Dạng viền mỏng) */
+.btn-success:disabled {
+    -fx-background-image: url('../assets/ui/auth/buttons/btn_green_disabled.png');
+    -fx-opacity: 0.6;
+}
+
+/* Nút Đỏ trực tiếp từ asset (btn_red_normal.png) */
+.btn-danger {
+    -fx-background-color: transparent;
+    -fx-background-image: url('../assets/ui/auth/buttons/btn_red_normal.png');
+    -fx-background-size: 100% 100%;
+    -fx-background-repeat: no-repeat;
+    -fx-background-position: center center;
+    -fx-text-fill: #ffffff;
+    -fx-font-family: "Kenney Future", "Segoe UI", sans-serif;
+    -fx-font-weight: bold;
+    -fx-font-size: 13.5px;
+    -fx-cursor: hand;
+    -fx-alignment: center;
+    -fx-padding: 0 10px 4px 10px;
+}
+
+.btn-danger:hover {
+    -fx-background-image: url('../assets/ui/auth/buttons/btn_red_hover.png');
+}
+
+.btn-danger:pressed {
+    -fx-background-image: url('../assets/ui/auth/buttons/btn_red_pressed.png');
+    -fx-padding: 4px 10px 0 10px;
+}
+
+/* Nút Vàng Gold trực tiếp từ asset (btn_gold_normal.png) */
+.btn-gold, .btn-warning {
+    -fx-background-color: transparent;
+    -fx-background-image: url('../assets/ui/auth/buttons/btn_gold_normal.png');
+    -fx-background-size: 100% 100%;
+    -fx-background-repeat: no-repeat;
+    -fx-background-position: center center;
+    -fx-text-fill: #1e293b;
+    -fx-font-family: "Kenney Future", "Segoe UI", sans-serif;
+    -fx-font-weight: bold;
+    -fx-font-size: 13.5px;
+    -fx-cursor: hand;
+    -fx-alignment: center;
+    -fx-padding: 0 10px 4px 10px;
+}
+
+.btn-gold:hover, .btn-warning:hover {
+    -fx-background-image: url('../assets/ui/auth/buttons/btn_gold_hover.png');
+}
+
+.btn-gold:pressed, .btn-warning:pressed {
+    -fx-background-image: url('../assets/ui/auth/buttons/btn_gold_pressed.png');
+    -fx-padding: 4px 10px 0 10px;
+}
+
+/* Nút dạng liên kết / chuyển form với font Kenney Future đồng bộ */
+.btn-link {
+    -fx-background-color: transparent;
+    -fx-text-fill: #38bdf8;
+    -fx-font-family: "Kenney Future", "Segoe UI", sans-serif;
+    -fx-font-weight: bold;
+    -fx-font-size: 11px;
+    -fx-cursor: hand;
+    -fx-alignment: center;
+}
+
+.btn-link:hover {
+    -fx-text-fill: #7dd3fc;
+    -fx-effect: dropshadow(three-pass-box, rgba(56, 189, 248, 0.65), 10, 0, 0, 0);
+}
+
+/* Fallback outline */
 .btn-outline {
-    -fx-background-color: #ffffff;
-    -fx-text-fill: #475569;
+    -fx-background-color: rgba(15, 23, 42, 0.75);
+    -fx-text-fill: #94a3b8;
     -fx-font-weight: bold;
     -fx-font-size: 12.5px;
-    -fx-border-color: #cbd5e1;
+    -fx-border-color: rgba(148, 163, 184, 0.35);
     -fx-border-width: 1.5px;
     -fx-border-radius: 8px;
     -fx-background-radius: 8px;
@@ -91,11 +243,7 @@
 }
 
 .btn-outline:hover {
-    -fx-background-color: #f8fafc;
-    -fx-text-fill: #1e293b;
-    -fx-border-color: #94a3b8;
-}
-
-.btn-outline:pressed {
-    -fx-background-color: #f1f5f9;
+    -fx-background-color: rgba(30, 41, 59, 0.9);
+    -fx-text-fill: #38bdf8;
+    -fx-border-color: #38bdf8;
 }

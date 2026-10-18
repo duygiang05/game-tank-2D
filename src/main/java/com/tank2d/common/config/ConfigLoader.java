@@ -47,7 +47,7 @@ public final class ConfigLoader {
         loadConfigs();
     }
 
-    private static Reader getReader(String filePath) {
+    public static Reader getReader(String filePath) {
         File file = new File(filePath);
         if (file.exists()) {
             try {
@@ -168,7 +168,7 @@ public final class ConfigLoader {
      * @return chiều rộng cửa sổ
      */
     public static int getWindowWidth() {
-        return getPropertyInt("window.width", 800);
+        return getPropertyInt("window.width", 960);
     }
 
     /**
@@ -646,5 +646,25 @@ public final class ConfigLoader {
             }
         }
         return matrix;
+    }
+
+    /**
+     * Lấy chủ đề giao diện bản đồ (default, desert, snow, ...).
+     *
+     * @return chuỗi định danh chủ đề
+     */
+    public static String getMapTheme() {
+        return (currentMapConfig != null && currentMapConfig.has("theme"))
+                ? currentMapConfig.get("theme").getAsString() : "default";
+    }
+
+    /**
+     * Lấy tên hiển thị bản đồ hiện tại.
+     *
+     * @return tên bản đồ
+     */
+    public static String getMapName() {
+        return (currentMapConfig != null && currentMapConfig.has("map_name"))
+                ? currentMapConfig.get("map_name").getAsString() : "Tropical Warzone";
     }
 }

@@ -34,7 +34,10 @@ public class MapLoader {
      */
     public static GameMap loadFromFile(String path) {
         Gson gson = new Gson();
-        try (FileReader reader = new FileReader(path, StandardCharsets.UTF_8)) {
+        try (java.io.Reader reader = ConfigLoader.getReader(path)) {
+            if (reader == null) {
+                throw new ConfigException(ErrorCode.MAP_LOAD_ERROR, "Không tìm thấy file bản đồ: " + path);
+            }
             MapFileFormat raw = gson.fromJson(reader, MapFileFormat.class);
             if (raw == null || raw.matrix == null) {
                 throw new ConfigException(ErrorCode.MAP_LOAD_ERROR, "File map rỗng hoặc sai định dạng: " + path);

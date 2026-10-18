@@ -28,9 +28,26 @@ import javafx.scene.effect.GaussianBlur;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 
+import com.tank2d.client.util.ToastUtil;
+import com.tank2d.common.dto.InviteBattleNotifyDTO;
+import com.tank2d.common.dto.InviteBattleRequestDTO;
+import com.tank2d.common.dto.InviteBattleResponseDTO;
+import com.tank2d.common.dto.OnlinePlayerDTO;
 import com.tank2d.common.exception.GameNetworkException;
+import javafx.geometry.Insets;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.Slider;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import com.tank2d.client.util.SoundManager;
+import com.tank2d.common.dto.UserProfileDTO;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -52,6 +69,23 @@ public class LobbyController {
     private ListView<RoomDTO> roomListView;
 
     @FXML
+    private StackPane rootStackPane;
+
+    @FXML
+    private ListView<OnlinePlayerDTO> onlinePlayersListView;
+
+    @FXML
+    private Label onlineCountBadge;
+
+    @FXML
+    private StackPane inviteOverlay;
+
+    @FXML
+    private Label inviteMessageLabel;
+
+    private int pendingInviterUserId = -1;
+
+    @FXML
     private Button createRoomButton;
 
     @FXML
@@ -71,6 +105,16 @@ public class LobbyController {
 
     @FXML
     private Label usernameLabel;
+
+    @FXML
+    private HBox playerBadgeBox;
+
+    @FXML
+    private Button lobbySettingsButton;
+
+    private StackPane activeLobbyOverlay = null;
+    private UserProfileDTO latestUserProfile = null;
+    private VBox profileStatsCardContent = null;
 
     @FXML
     private ComboBox<String> durationFilterComboBox;
@@ -113,17 +157,18 @@ public class LobbyController {
     private void initialize() {
         session.addPacketListener(packetListener);
 
-        durationFilterComboBox.getItems().addAll("Tất cả", "45s", "60s", "90s", "180s");
-        durationFilterComboBox.setValue("Tất cả");
+        durationFilterComboBox.getItems().addAll("ALL", "45S", "60S", "90S", "180S");
+        durationFilterComboBox.setValue("ALL");
         durationFilterComboBox.setOnAction(event -> applyDurationFilter());
 
         if (session.getCurrentUser() != null) {
             usernameLabel.setText(session.getCurrentUser().getUsername());
         } else {
-            usernameLabel.setText("Player");
+            usernameLabel.setText("PLAYER");
         }
 
-        statusLabel.setText("Đang tải danh sách phòng...");
+        statusLabel.setText("LOADING ROOMS...");
+        statusLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #94a3b8; -fx-font-size: 11.5px;");
 
         roomListView.setCellFactory(listView -> new ListCell<RoomDTO>() {
             @Override
@@ -135,30 +180,30 @@ public class LobbyController {
                     setGraphic(null);
                 } else {
                     Label nameLabel = new Label("🎮  " + room.getRoomName());
-                    nameLabel.setPrefWidth(260);
+                    nameLabel.setPrefWidth(290);
                     nameLabel.setAlignment(Pos.CENTER_LEFT);
-                    nameLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #0f172a; -fx-font-size: 13.5px;");
+                    nameLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #38bdf8; -fx-font-size: 12px; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif;");
 
                     Label playersLabel = new Label(room.getCurrentPlayers() + " / " + room.getMaxPlayers());
-                    playersLabel.setPrefWidth(110);
+                    playersLabel.setPrefWidth(95);
                     playersLabel.setAlignment(Pos.CENTER);
-                    playersLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #2563eb; -fx-font-size: 13px;");
+                    playersLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #f8fafc; -fx-font-size: 12px; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif;");
 
-                    Label durationLabel = new Label("⏱ " + room.getDuration() + "s");
-                    durationLabel.setPrefWidth(120);
+                    Label durationLabel = new Label("⏱ " + room.getDuration() + "S");
+                    durationLabel.setPrefWidth(90);
                     durationLabel.setAlignment(Pos.CENTER);
-                    durationLabel.setStyle("-fx-text-fill: #64748b; -fx-font-size: 13px;");
+                    durationLabel.setStyle("-fx-text-fill: #fbbf24; -fx-font-weight: bold; -fx-font-size: 11.5px; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif;");
 
                     String status = room.getStatus() != null ? room.getStatus() : "WAITING";
                     boolean isWaiting = status.equalsIgnoreCase("WAITING") || status.toLowerCase().contains("chờ");
-                    Label statusLabelCell = new Label(isWaiting ? "● Đang chờ" : "▶ Đang chơi");
-                    statusLabelCell.setPrefWidth(140);
+                    Label statusLabelCell = new Label(isWaiting ? "● WAITING" : "▶ IN BATTLE");
+                    statusLabelCell.setPrefWidth(130);
                     statusLabelCell.setAlignment(Pos.CENTER_RIGHT);
 
                     if (isWaiting) {
-                        statusLabelCell.setStyle("-fx-text-fill: #16a34a; -fx-font-weight: bold; -fx-font-size: 12.5px;");
+                        statusLabelCell.setStyle("-fx-text-fill: #4ade80; -fx-font-weight: bold; -fx-font-size: 11px; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif;");
                     } else {
-                        statusLabelCell.setStyle("-fx-text-fill: #dc2626; -fx-font-weight: bold; -fx-font-size: 12.5px;");
+                        statusLabelCell.setStyle("-fx-text-fill: #f87171; -fx-font-weight: bold; -fx-font-size: 11px; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif;");
                     }
 
                     HBox row = new HBox(nameLabel, playersLabel, durationLabel, statusLabelCell);
@@ -170,6 +215,65 @@ public class LobbyController {
                 }
             }
         });
+
+        if (onlinePlayersListView != null) {
+            onlinePlayersListView.setCellFactory(listView -> new ListCell<OnlinePlayerDTO>() {
+                @Override
+                protected void updateItem(OnlinePlayerDTO player, boolean empty) {
+                    super.updateItem(player, empty);
+                    if (empty || player == null) {
+                        setText(null);
+                        setGraphic(null);
+                    } else {
+                        boolean isLobby = "LOBBY".equalsIgnoreCase(player.getStatus());
+
+                        Circle dot = new Circle(3.5);
+                        dot.setFill(isLobby ? Color.web("#4ade80") : Color.web("#f59e0b"));
+
+                        Label nameLbl = new Label(player.getUsername());
+                        nameLbl.setPrefWidth(105);
+                        nameLbl.setAlignment(Pos.CENTER_LEFT);
+                        nameLbl.setStyle("-fx-font-weight: bold; -fx-text-fill: #38bdf8; -fx-font-size: 10.5px; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif;");
+
+                        HBox nameBox = new HBox(5, dot, nameLbl);
+                        nameBox.setAlignment(Pos.CENTER_LEFT);
+                        HBox.setHgrow(nameBox, javafx.scene.layout.Priority.ALWAYS);
+
+                        Button inviteBtn = new Button("INVITE");
+                        inviteBtn.setPrefWidth(60);
+                        inviteBtn.setPrefHeight(24);
+
+                        if (!isLobby) {
+                            inviteBtn.setDisable(true);
+                            inviteBtn.setText("BUSY");
+                            inviteBtn.setStyle("-fx-background-color: rgba(51, 65, 85, 0.7); -fx-text-fill: #94a3b8; -fx-background-radius: 6px; -fx-border-color: rgba(148, 163, 184, 0.3); -fx-border-radius: 6px; -fx-border-width: 1px; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-size: 9px; -fx-font-weight: bold;");
+                        } else {
+                            inviteBtn.setDisable(false);
+                            inviteBtn.setText("INVITE");
+                            inviteBtn.setStyle("-fx-background-image: url('/com/tank2d/client/assets/ui/auth/buttons/btn_green_normal.png'); -fx-background-size: 100% 100%; -fx-background-color: transparent; -fx-border-width: 0; -fx-text-fill: white; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-size: 9.5px; -fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 0 4px 2px 4px;");
+                            inviteBtn.setOnMouseEntered(e -> {
+                                if (!inviteBtn.isDisabled()) {
+                                    inviteBtn.setStyle("-fx-background-image: url('/com/tank2d/client/assets/ui/auth/buttons/btn_green_hover.png'); -fx-background-size: 100% 100%; -fx-background-color: transparent; -fx-border-width: 0; -fx-text-fill: white; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-size: 9.5px; -fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 0 4px 2px 4px;");
+                                }
+                            });
+                            inviteBtn.setOnMouseExited(e -> {
+                                if (!inviteBtn.isDisabled()) {
+                                    inviteBtn.setStyle("-fx-background-image: url('/com/tank2d/client/assets/ui/auth/buttons/btn_green_normal.png'); -fx-background-size: 100% 100%; -fx-background-color: transparent; -fx-border-width: 0; -fx-text-fill: white; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-size: 9.5px; -fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 0 4px 2px 4px;");
+                                }
+                            });
+                            inviteBtn.setOnAction(e -> sendBattleInvite(player));
+                        }
+
+                        HBox row = new HBox(6, nameBox, inviteBtn);
+                        row.setAlignment(Pos.CENTER_LEFT);
+                        row.setStyle("-fx-padding: 2px 4px; -fx-background-color: transparent;");
+
+                        setGraphic(row);
+                        setText(null);
+                    }
+                }
+            });
+        }
 
         loadRooms();
     }
@@ -187,6 +291,9 @@ public class LobbyController {
 
             Packet request = new Packet(PacketType.LOBBY_GET_ROOMS_REQ, "");
             clientSocket.sendPacket(request);
+
+            Packet onlineReq = new Packet(PacketType.ONLINE_PLAYERS_REQ, "");
+            clientSocket.sendPacket(onlineReq);
 
         } catch (GameNetworkException e) {
             showError(e.getMessage());
@@ -253,12 +360,14 @@ public class LobbyController {
         RoomDTO selectedRoom = roomListView.getSelectionModel().getSelectedItem();
 
         if (selectedRoom == null) {
-            statusLabel.setText("Vui lòng chọn một phòng trong danh sách!");
+            statusLabel.setText("PLEASE SELECT A ROOM FROM THE LIST!");
+            statusLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #fbbf24; -fx-font-size: 11.5px; -fx-font-weight: bold;");
             return;
         }
 
         int selectedRoomId = selectedRoom.getRoomId();
-        statusLabel.setText("Đang vào " + selectedRoom.getRoomName() + "...");
+        statusLabel.setText("JOINING " + selectedRoom.getRoomName() + "...");
+        statusLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #38bdf8; -fx-font-size: 11.5px; -fx-font-weight: bold;");
 
         try {
             ClientSocket clientSocket = session.getClientSocket();
@@ -312,6 +421,22 @@ public class LobbyController {
 
             case GAME_RECONNECT_RES:
                 handleReconnectResponse(packet.getData());
+                break;
+
+            case ONLINE_PLAYERS_RES:
+                handleOnlinePlayersUpdate(packet.getData());
+                break;
+
+            case INVITE_BATTLE_NOTIFY:
+                handleInviteBattleNotify(packet.getData());
+                break;
+
+            case INVITE_DECLINED_NOTIFY:
+                handleInviteDeclinedNotify(packet.getData());
+                break;
+
+            case USER_PROFILE_RES:
+                handleUserProfileResponse(packet.getData());
                 break;
 
             default:
@@ -380,6 +505,12 @@ public class LobbyController {
                 }
             });
 
+            try {
+                if (session.getClientSocket() != null && session.getClientSocket().isConnected()) {
+                    session.getClientSocket().sendPacket(new Packet(PacketType.ONLINE_PLAYERS_REQ, ""));
+                }
+            } catch (Exception ignored) {}
+
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "[Lobby] Lỗi cập nhật danh sách phòng", e);
         }
@@ -391,15 +522,15 @@ public class LobbyController {
     private void applyDurationFilter() {
         String selectedFilter = durationFilterComboBox.getValue();
         if (selectedFilter == null) {
-            selectedFilter = "Tất cả";
+            selectedFilter = "ALL";
         }
 
         roomListView.getItems().clear();
 
-        if (selectedFilter.equals("Tất cả")) {
+        if ("ALL".equalsIgnoreCase(selectedFilter) || "Tất cả".equals(selectedFilter)) {
             roomListView.getItems().addAll(allRooms);
         } else {
-            int duration = Integer.parseInt(selectedFilter.replace("s", ""));
+            int duration = Integer.parseInt(selectedFilter.toLowerCase().replace("s", "").trim());
             for (RoomDTO room : allRooms) {
                 if (room.getDuration() == duration) {
                     roomListView.getItems().add(room);
@@ -409,9 +540,11 @@ public class LobbyController {
 
         int count = roomListView.getItems().size();
         if (count == 0) {
-            statusLabel.setText("Hiện không có phòng nào phù hợp.");
+            statusLabel.setText("NO MATCHING ROOMS FOUND.");
+            statusLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #94a3b8; -fx-font-size: 11.5px;");
         } else {
-            statusLabel.setText("Đang hiển thị " + count + " phòng chờ.");
+            statusLabel.setText("DISPLAYING " + count + " WAITING ROOM(S).");
+            statusLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #38bdf8; -fx-font-size: 11.5px;");
         }
     }
 
@@ -658,11 +791,11 @@ public class LobbyController {
     private void showReconnectModal(ReconnectPromptDTO promptDTO) {
         if (promptDTO == null) return;
         if (reconnectRoomLabel != null) {
-            reconnectRoomLabel.setText("Phòng đấu: " + promptDTO.getRoomName());
+            reconnectRoomLabel.setText("ROOM ARENA: " + promptDTO.getRoomName().toUpperCase());
         }
         if (reconnectTimeLabel != null) {
             int remainSec = (int) promptDTO.getRemainingTime();
-            reconnectTimeLabel.setText(String.format("Thời gian còn lại: khoảng %02d:%02d", remainSec / 60, remainSec % 60));
+            reconnectTimeLabel.setText(String.format("TIME REMAINING: %02d:%02d", remainSec / 60, remainSec % 60));
         }
         if (reconnectOverlay != null) {
             reconnectOverlay.setVisible(true);
@@ -670,7 +803,7 @@ public class LobbyController {
         if (mainContentPane != null) {
             mainContentPane.setEffect(new GaussianBlur(12));
         }
-        statusLabel.setText("Bạn đang có một trận đấu dở dang tại " + promptDTO.getRoomName());
+        statusLabel.setText("Active battle detected in " + promptDTO.getRoomName() + ".");
         statusLabel.setStyle("-fx-text-fill: #ea580c; -fx-font-weight: bold;");
     }
 
@@ -685,7 +818,7 @@ public class LobbyController {
         if (mainContentPane != null && !isPenalized) {
             mainContentPane.setEffect(null);
         }
-        statusLabel.setText("Bạn đang có một trận đấu dở dang. Hãy vào lại khi sẵn sàng.");
+        statusLabel.setText("Battle in progress. Reconnect whenever you are ready.");
         statusLabel.setStyle("-fx-text-fill: #ea580c; -fx-font-weight: bold;");
     }
 
@@ -695,7 +828,7 @@ public class LobbyController {
     @FXML
     private void handleConfirmReconnect() {
         try {
-            statusLabel.setText("Đang kết nối lại vào trận đấu...");
+            statusLabel.setText("Reconnecting to battle arena...");
             statusLabel.setStyle("-fx-text-fill: #2563eb; -fx-font-weight: bold;");
             if (reconnectOverlay != null) {
                 reconnectOverlay.setVisible(false);
@@ -722,7 +855,7 @@ public class LobbyController {
         try {
             ReconnectResponseDTO resDTO = gson.fromJson(rawJson, ReconnectResponseDTO.class);
             if (resDTO == null || resDTO.getRoom() == null) {
-                showError("Không thể khôi phục dữ liệu trận đấu!");
+                showError("Unable to restore match session data!");
                 return;
             }
 
@@ -751,7 +884,7 @@ public class LobbyController {
 
                     Scene gameScene = gameCanvasApp.createGameScene();
                     stage.setScene(gameScene);
-                    stage.setTitle("Tank 2D - Game (Đã kết nối lại)");
+                    stage.setTitle("Tank 2D - Game (Reconnected)");
 
                     stage.setResizable(false);
                     stage.sizeToScene();
@@ -776,6 +909,392 @@ public class LobbyController {
      * @param message nội dung thông báo lỗi
      */
     private void showError(String message) {
-        Platform.runLater(() -> statusLabel.setText(message));
+        Platform.runLater(() -> {
+            statusLabel.setText(message);
+            statusLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #f87171; -fx-font-weight: bold; -fx-font-size: 11.5px;");
+        });
+    }
+
+    private void sendBattleInvite(OnlinePlayerDTO player) {
+        if (isPenalized) {
+            penaltyOverlay.setVisible(true);
+            mainContentPane.setEffect(new GaussianBlur(12));
+            return;
+        }
+        if (pendingReconnectMatch != null) {
+            showReconnectModal(pendingReconnectMatch);
+            return;
+        }
+        try {
+            ClientSocket clientSocket = session.getClientSocket();
+            if (clientSocket == null || !clientSocket.isConnected()) {
+                showError("Chưa kết nối tới Server!");
+                return;
+            }
+            Packet request = new Packet(
+                    PacketType.INVITE_BATTLE_REQ,
+                    gson.toJson(new InviteBattleRequestDTO(player.getUserId()))
+            );
+            clientSocket.sendPacket(request);
+            ToastUtil.showInfo(rootStackPane, "INVITATION SENT TO " + player.getUsername().toUpperCase());
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "[Lobby] Failed to send invite", e);
+            ToastUtil.showError(rootStackPane, "FAILED TO SEND INVITATION");
+        }
+    }
+
+    private void handleOnlinePlayersUpdate(String rawJson) {
+        try {
+            Type listType = new TypeToken<List<OnlinePlayerDTO>>() {}.getType();
+            List<OnlinePlayerDTO> players = gson.fromJson(rawJson, listType);
+            if (players == null) return;
+
+            int myUserId = session.getCurrentUser() != null ? session.getCurrentUser().getId() : -1;
+            List<OnlinePlayerDTO> otherPlayers = new ArrayList<>();
+            for (OnlinePlayerDTO p : players) {
+                if (p.getUserId() != myUserId) {
+                    otherPlayers.add(p);
+                }
+            }
+
+            Platform.runLater(() -> {
+                if (onlinePlayersListView != null) {
+                    onlinePlayersListView.getItems().setAll(otherPlayers);
+                }
+                if (onlineCountBadge != null) {
+                    onlineCountBadge.setText(otherPlayers.size() + " ON");
+                }
+            });
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "[Lobby] Error updating online players", e);
+        }
+    }
+
+    private void handleInviteBattleNotify(String rawJson) {
+        try {
+            InviteBattleNotifyDTO notify = gson.fromJson(rawJson, InviteBattleNotifyDTO.class);
+            if (notify == null) return;
+
+            Platform.runLater(() -> {
+                pendingInviterUserId = notify.getInviterUserId();
+                if (inviteMessageLabel != null) {
+                    inviteMessageLabel.setText("OPERATOR " + notify.getInviterUsername().toUpperCase() + " CHALLENGES YOU TO A DUEL!");
+                }
+                if (inviteOverlay != null) {
+                    inviteOverlay.setVisible(true);
+                }
+                if (mainContentPane != null) {
+                    mainContentPane.setEffect(new GaussianBlur(12));
+                }
+            });
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "[Lobby] Error handling invite notification", e);
+        }
+    }
+
+    private void handleInviteDeclinedNotify(String rawJson) {
+        try {
+            String msg = gson.fromJson(rawJson, String.class);
+            Platform.runLater(() -> {
+                ToastUtil.showWarning(rootStackPane, msg != null ? msg : "INVITATION WAS DECLINED");
+            });
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "[Lobby] Error handling invite decline notify", e);
+        }
+    }
+
+    @FXML
+    private void handleDeclineInvite() {
+        if (inviteOverlay != null) {
+            inviteOverlay.setVisible(false);
+        }
+        if (mainContentPane != null && !isPenalized && (reconnectOverlay == null || !reconnectOverlay.isVisible())) {
+            mainContentPane.setEffect(null);
+        }
+
+        if (pendingInviterUserId != -1) {
+            try {
+                ClientSocket clientSocket = session.getClientSocket();
+                if (clientSocket != null && clientSocket.isConnected()) {
+                    Packet packet = new Packet(PacketType.INVITE_BATTLE_RESPONSE,
+                            gson.toJson(new InviteBattleResponseDTO(pendingInviterUserId, false)));
+                    clientSocket.sendPacket(packet);
+                }
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, "[Lobby] Error declining invite", e);
+            }
+            pendingInviterUserId = -1;
+        }
+    }
+
+    @FXML
+    private void handleAcceptInvite() {
+        if (inviteOverlay != null) {
+            inviteOverlay.setVisible(false);
+        }
+        if (mainContentPane != null && !isPenalized && (reconnectOverlay == null || !reconnectOverlay.isVisible())) {
+            mainContentPane.setEffect(null);
+        }
+
+        if (pendingInviterUserId != -1) {
+            try {
+                ClientSocket clientSocket = session.getClientSocket();
+                if (clientSocket != null && clientSocket.isConnected()) {
+                    Packet packet = new Packet(PacketType.INVITE_BATTLE_RESPONSE,
+                            gson.toJson(new InviteBattleResponseDTO(pendingInviterUserId, true)));
+                    clientSocket.sendPacket(packet);
+                    ToastUtil.showSuccess(rootStackPane, "ACCEPTING DUEL... PREPARING BATTLEFIELD!");
+                }
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, "[Lobby] Error accepting invite", e);
+            }
+            pendingInviterUserId = -1;
+        }
+    }
+
+    private void handleUserProfileResponse(String data) {
+        try {
+            UserProfileDTO profile = gson.fromJson(data, UserProfileDTO.class);
+            if (profile != null) {
+                this.latestUserProfile = profile;
+                Platform.runLater(() -> {
+                    if (profileStatsCardContent != null) {
+                        populateProfileStatsGrid(profileStatsCardContent, profile);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "[Lobby] Lỗi giải mã USER_PROFILE_RES", e);
+        }
+    }
+
+    @FXML
+    private void handleViewProfile() {
+        closeActiveLobbyModal();
+        if (rootStackPane == null) return;
+
+        try {
+            int uId = (session.getCurrentUser() != null) ? session.getCurrentUser().getId() : -1;
+            ClientSocket socket = session.getClientSocket();
+            if (socket != null && socket.isConnected()) {
+                socket.sendPacket(new Packet(PacketType.USER_PROFILE_REQ, String.valueOf(uId)));
+            }
+        } catch (Exception ignored) {}
+
+        StackPane overlay = new StackPane();
+        overlay.setStyle("-fx-background-color: rgba(6, 10, 20, 0.78);");
+        overlay.setOnMouseClicked(e -> {
+            if (e.getTarget() == overlay) closeActiveLobbyModal();
+        });
+
+        VBox card = new VBox(14);
+        card.setAlignment(Pos.CENTER);
+        card.setPadding(new Insets(22, 28, 22, 28));
+        card.setMaxWidth(530);
+        card.setStyle("-fx-background-color: rgba(13, 20, 36, 0.98); -fx-background-radius: 18px; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.85), 32, 0.45, 0, 8); -fx-border-color: rgba(56, 189, 248, 0.8); -fx-border-width: 2px; -fx-border-radius: 18px;");
+
+        HBox header = new HBox(14);
+        header.setAlignment(Pos.CENTER_LEFT);
+
+        Label avatarLbl = new Label("🎖");
+        avatarLbl.setStyle("-fx-font-size: 28px;");
+
+        VBox userTitleBox = new VBox(3);
+        String name = (session.getCurrentUser() != null) ? session.getCurrentUser().getUsername() : "PLAYER";
+        Label nameLbl = new Label(name.toUpperCase());
+        nameLbl.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #38bdf8; -fx-font-size: 17px; -fx-font-weight: bold;");
+
+        Label badgeLbl = new Label("PILOT COMMANDER • COMBAT CAREER PROFILE");
+        badgeLbl.setStyle("-fx-font-family: 'Kenney Future Narrow', 'Segoe UI', sans-serif; -fx-text-fill: #94a3b8; -fx-font-size: 10.5px; -fx-font-weight: bold;");
+        userTitleBox.getChildren().addAll(nameLbl, badgeLbl);
+        HBox.setHgrow(userTitleBox, Priority.ALWAYS);
+
+        Button closeBtn = new Button("✕");
+        closeBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #94a3b8; -fx-font-size: 17px; -fx-font-weight: bold; -fx-cursor: hand;");
+        closeBtn.setOnMouseEntered(e -> closeBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #ef4444; -fx-font-size: 17px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        closeBtn.setOnMouseExited(e -> closeBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #94a3b8; -fx-font-size: 17px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        closeBtn.setOnAction(e -> closeActiveLobbyModal());
+
+        header.getChildren().addAll(avatarLbl, userTitleBox, closeBtn);
+
+        profileStatsCardContent = new VBox(10);
+        populateProfileStatsGrid(profileStatsCardContent, latestUserProfile);
+
+        Button okBtn = new Button("✕ CLOSE PROFILE");
+        okBtn.setMaxWidth(Double.MAX_VALUE);
+        okBtn.setPrefHeight(42);
+        okBtn.setStyle("-fx-background-image: url('/com/tank2d/client/assets/ui/auth/buttons/btn_blue_normal.png'); -fx-background-size: 100% 100%; -fx-background-color: transparent; -fx-border-width: 0; -fx-text-fill: white; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand;");
+        okBtn.setOnAction(e -> closeActiveLobbyModal());
+
+        card.getChildren().addAll(header, profileStatsCardContent, okBtn);
+        overlay.getChildren().add(card);
+
+        this.activeLobbyOverlay = overlay;
+        rootStackPane.getChildren().add(overlay);
+    }
+
+    private void populateProfileStatsGrid(VBox container, UserProfileDTO profile) {
+        container.getChildren().clear();
+
+        Label careerTitle = new Label("🏆 CAREER COMBAT PERFORMANCE");
+        careerTitle.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #fbbf24; -fx-font-size: 11px; -fx-font-weight: bold;");
+        container.getChildren().add(careerTitle);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+
+        String rankTier = (profile != null && profile.getRankTier() != null) ? profile.getRankTier().toUpperCase() : "BRONZE";
+        int rankPos = (profile != null) ? profile.getRankPosition() : 1;
+        int points = (profile != null) ? profile.getTotalPoints() : 0;
+        int matches = (profile != null) ? profile.getTotalMatches() : 0;
+        int wins = (profile != null) ? profile.getTotalWins() : 0;
+        int kills = (profile != null) ? profile.getTotalKills() : 0;
+        int hits = (profile != null) ? profile.getTotalHits() : 0;
+        double winRate = (profile != null) ? profile.getWinRate() : 0.0;
+        int losses = Math.max(0, matches - wins);
+
+        grid.add(createStatItem("RANK & LEADERBOARD", rankTier + " (TOP #" + rankPos + ")", "#fbbf24"), 0, 0);
+        grid.add(createStatItem("COMBAT MMR POINTS", points + " PTS", "#38bdf8"), 1, 0);
+        grid.add(createStatItem("TOTAL MATCHES", matches + " BATTLES", "#f1f5f9"), 0, 1);
+        grid.add(createStatItem("VICTORY RATE", String.format("%.1f%%", winRate), "#4ade80"), 1, 1);
+        grid.add(createStatItem("VICTORIES / DEFEATS", wins + " W - " + losses + " L", "#c084fc"), 0, 2);
+        grid.add(createStatItem("TOTAL KILLS / HITS", kills + " K - " + hits + " HITS", "#f87171"), 1, 2);
+
+        container.getChildren().add(grid);
+    }
+
+    private VBox createStatItem(String caption, String value, String colorHex) {
+        VBox box = new VBox(4);
+        box.setPadding(new Insets(8, 14, 8, 14));
+        box.setPrefWidth(228);
+        box.setStyle("-fx-background-color: rgba(30, 41, 59, 0.75); -fx-background-radius: 10px; -fx-border-color: rgba(148, 163, 184, 0.25); -fx-border-radius: 10px; -fx-border-width: 1.2px;");
+
+        Label capLbl = new Label(caption);
+        capLbl.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #94a3b8; -fx-font-size: 8.5px; -fx-font-weight: bold;");
+
+        Label valLbl = new Label(value);
+        valLbl.setStyle("-fx-font-family: 'Kenney Future Narrow', 'Segoe UI', sans-serif; -fx-text-fill: " + colorHex + "; -fx-font-size: 14px; -fx-font-weight: bold;");
+
+        box.getChildren().addAll(capLbl, valLbl);
+        return box;
+    }
+
+    @FXML
+    private void handleOpenSettings() {
+        closeActiveLobbyModal();
+        if (rootStackPane == null) return;
+
+        StackPane overlay = new StackPane();
+        overlay.setStyle("-fx-background-color: rgba(6, 10, 20, 0.78);");
+        overlay.setOnMouseClicked(e -> {
+            if (e.getTarget() == overlay) closeActiveLobbyModal();
+        });
+
+        VBox card = new VBox(14);
+        card.setPadding(new Insets(20, 26, 20, 26));
+        card.setMaxWidth(510);
+        card.setStyle("-fx-background-color: rgba(15, 23, 42, 0.98); -fx-background-radius: 18px; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.85), 32, 0.45, 0, 8); -fx-border-color: rgba(245, 158, 11, 0.8); -fx-border-width: 2px; -fx-border-radius: 18px;");
+
+        HBox header = new HBox(12);
+        header.setAlignment(Pos.CENTER_LEFT);
+        Image setIconImg = com.tank2d.client.util.AssetLoader.getSettingsIcon();
+        javafx.scene.image.ImageView iconView = new javafx.scene.image.ImageView();
+        iconView.setFitWidth(28);
+        iconView.setFitHeight(28);
+        iconView.setPreserveRatio(true);
+        if (setIconImg != null) {
+            iconView.setImage(setIconImg);
+        }
+
+        Label titleLbl = new Label("GAMEPLAY SETTINGS");
+        titleLbl.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #fbbf24; -fx-font-size: 15px; -fx-font-weight: bold;");
+        HBox.setHgrow(titleLbl, Priority.ALWAYS);
+
+        Button closeBtn = new Button("✕");
+        closeBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #94a3b8; -fx-font-size: 17px; -fx-font-weight: bold; -fx-cursor: hand;");
+        closeBtn.setOnMouseEntered(e -> closeBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #ef4444; -fx-font-size: 17px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        closeBtn.setOnMouseExited(e -> closeBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #94a3b8; -fx-font-size: 17px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        closeBtn.setOnAction(e -> closeActiveLobbyModal());
+        header.getChildren().addAll(iconView, titleLbl, closeBtn);
+
+        // Audio controls
+        VBox audioBox = new VBox(10);
+        audioBox.setPadding(new Insets(12, 14, 12, 14));
+        audioBox.setStyle("-fx-background-color: rgba(30, 41, 59, 0.65); -fx-background-radius: 10px; -fx-border-color: rgba(56, 189, 248, 0.3); -fx-border-radius: 10px; -fx-border-width: 1px;");
+
+        Label audioTitle = new Label("🔊 AUDIO & VOLUME PREFERENCES");
+        audioTitle.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #38bdf8; -fx-font-size: 10.5px; -fx-font-weight: bold;");
+
+        HBox sfxRow = new HBox(10);
+        sfxRow.setAlignment(Pos.CENTER_LEFT);
+        Label sfxLbl = new Label("SFX:");
+        sfxLbl.setPrefWidth(50);
+        sfxLbl.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #cbd5e1; -fx-font-size: 10px;");
+        Slider sfxSlider = new Slider(0, 100, SoundManager.getSFXVolume() * 100);
+        HBox.setHgrow(sfxSlider, Priority.ALWAYS);
+        Label sfxVal = new Label((int) (SoundManager.getSFXVolume() * 100) + "%");
+        sfxVal.setPrefWidth(45);
+        sfxVal.setStyle("-fx-font-family: 'Kenney Future Narrow', 'Segoe UI', sans-serif; -fx-text-fill: #4ade80; -fx-font-size: 11px; -fx-font-weight: bold;");
+        sfxSlider.valueProperty().addListener((obs, oldV, newV) -> {
+            SoundManager.setSFXVolume(newV.floatValue() / 100f);
+            sfxVal.setText(newV.intValue() + "%");
+        });
+        sfxSlider.setOnMouseReleased(e -> SoundManager.playSound("tank_hit"));
+        sfxRow.getChildren().addAll(sfxLbl, sfxSlider, sfxVal);
+
+        HBox bgmRow = new HBox(10);
+        bgmRow.setAlignment(Pos.CENTER_LEFT);
+        Label bgmLbl = new Label("BGM:");
+        bgmLbl.setPrefWidth(50);
+        bgmLbl.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #cbd5e1; -fx-font-size: 10px;");
+        Slider bgmSlider = new Slider(0, 100, SoundManager.getBGMVolume() * 100);
+        HBox.setHgrow(bgmSlider, Priority.ALWAYS);
+        Label bgmVal = new Label((int) (SoundManager.getBGMVolume() * 100) + "%");
+        bgmVal.setPrefWidth(45);
+        bgmVal.setStyle("-fx-font-family: 'Kenney Future Narrow', 'Segoe UI', sans-serif; -fx-text-fill: #4ade80; -fx-font-size: 11px; -fx-font-weight: bold;");
+        bgmSlider.valueProperty().addListener((obs, oldV, newV) -> {
+            SoundManager.setBGMVolume(newV.floatValue() / 100f);
+            bgmVal.setText(newV.intValue() + "%");
+        });
+        bgmRow.getChildren().addAll(bgmLbl, bgmSlider, bgmVal);
+
+        CheckBox muteCb = new CheckBox("MUTE ALL SOUNDS (MASTER MUTE)");
+        muteCb.setSelected(SoundManager.isMuted());
+        muteCb.setStyle("-fx-font-family: 'Kenney Future Narrow', 'Segoe UI', sans-serif; -fx-text-fill: #f87171; -fx-font-size: 10.5px; -fx-cursor: hand;");
+        muteCb.setOnAction(e -> SoundManager.setMuted(muteCb.isSelected()));
+
+        audioBox.getChildren().addAll(audioTitle, sfxRow, bgmRow, muteCb);
+
+        // Guide Box
+        VBox guideBox = new VBox(4);
+        guideBox.setPadding(new Insets(10, 14, 10, 14));
+        guideBox.setStyle("-fx-background-color: rgba(30, 41, 59, 0.5); -fx-background-radius: 10px;");
+        Label guideTitle = new Label("⌨ COMBAT CONTROLS REFERENCE");
+        guideTitle.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #94a3b8; -fx-font-size: 9.5px; -fx-font-weight: bold;");
+        Label key1 = new Label("• MOVE: W, A, S, D OR ARROW KEYS");
+        key1.setStyle("-fx-font-family: 'Segoe UI', sans-serif; -fx-text-fill: #cbd5e1; -fx-font-size: 11px;");
+        Label key2 = new Label("• FIRE CANNON: SPACEBAR OR LEFT MOUSE CLICK");
+        key2.setStyle("-fx-font-family: 'Segoe UI', sans-serif; -fx-text-fill: #cbd5e1; -fx-font-size: 11px;");
+        guideBox.getChildren().addAll(guideTitle, key1, key2);
+
+        Button saveBtn = new Button("✔ SAVE & CLOSE");
+        saveBtn.setMaxWidth(Double.MAX_VALUE);
+        saveBtn.setPrefHeight(40);
+        saveBtn.setStyle("-fx-background-image: url('/com/tank2d/client/assets/ui/auth/buttons/btn_gold_normal.png'); -fx-background-size: 100% 100%; -fx-background-color: transparent; -fx-border-width: 0; -fx-text-fill: #0f172a; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 12px; -fx-cursor: hand;");
+        saveBtn.setOnAction(e -> closeActiveLobbyModal());
+
+        card.getChildren().addAll(header, audioBox, guideBox, saveBtn);
+        overlay.getChildren().add(card);
+
+        this.activeLobbyOverlay = overlay;
+        rootStackPane.getChildren().add(overlay);
+    }
+
+    private void closeActiveLobbyModal() {
+        if (activeLobbyOverlay != null && rootStackPane != null) {
+            rootStackPane.getChildren().remove(activeLobbyOverlay);
+            activeLobbyOverlay = null;
+        }
     }
 }

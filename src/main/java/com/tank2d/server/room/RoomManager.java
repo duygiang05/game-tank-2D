@@ -182,6 +182,18 @@ public class RoomManager {
         return room.getDuration();
     }
 
+    public synchronized boolean updateRoomMap(int roomId, int hostId, String mapId) {
+        Room room = rooms.get(roomId);
+        if (room == null || !room.isHost(hostId)) {
+            return false;
+        }
+        boolean ok = room.setMap(mapId);
+        if (ok) {
+            LOGGER.info("[RoomManager] " + room.getRoomName() + " chọn map: " + mapId);
+        }
+        return ok;
+    }
+
     private RoomDTO toRoomDTO(Room room) {
         List<String> playerNames = new ArrayList<>();
         Map<String, Boolean> playerReadyMap = new LinkedHashMap<>();
@@ -190,7 +202,7 @@ public class RoomManager {
             playerReadyMap.put(user.getUsername(), room.isReady(user.getId()));
         }
 
-        return new RoomDTO(
+        RoomDTO dto = new RoomDTO(
                 room.getRoomId(),
                 room.getRoomName(),
                 room.getCurrentPlayers(),
@@ -203,6 +215,9 @@ public class RoomManager {
                 playerReadyMap,
                 room.getDuration()
         );
+        dto.setMapId(room.getMapId());
+        dto.setMapName(room.getMapName());
+        return dto;
     }
 
     /**

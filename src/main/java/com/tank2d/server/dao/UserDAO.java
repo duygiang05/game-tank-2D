@@ -4,6 +4,7 @@ import com.tank2d.common.exception.DatabaseException;
 import com.tank2d.common.exception.ErrorCode;
 import com.tank2d.common.model.User;
 import com.tank2d.common.dto.LeaderboardDTO;
+import com.tank2d.common.dto.UserProfileDTO;
 import com.tank2d.server.db.DatabaseConnection;
 import org.mindrot.jbcrypt.BCrypt;
 
@@ -208,5 +209,58 @@ public class UserDAO {
             LOGGER.log(Level.SEVERE, "[UserDAO] Lỗi khi kiểm tra username tồn tại", e);
             throw new DatabaseException(ErrorCode.DB_QUERY_ERROR, "Lỗi kiểm tra tài khoản tồn tại!", e);
         }
+    }
+
+    /**
+     * Lấy toàn bộ chỉ số thống kê sự nghiệp và cấp bậc xếp hạng của người dùng.
+     *
+     * @param userId mã ID người dùng
+     * @return đối tượng {@link UserProfileDTO} hoặc null nếu không tìm thấy
+     */
+    public UserProfileDTO getUserProfile(int userId) {
+        String sql = "SELECT "
+                + "u.id AS user_id, "
+                + "u.username, "
+                + "COALESCE(s.total_points, 0) AS total_points, "
+                + "COALESCE(s.total_kills, 0) AS total_kills, "
+                + "COALESCE(s.total_wins, 0) AS total_wins, "
+                + "COALESCE(s.total_hits, 0) AS total_hits, "
+                + "(SELECT COUNT(*) FROM match_participants WHERE user_id = u.id) AS total_matches, "
+                + "(SELECT COUNT(*) + 1 FROM user_stats WHERE total_points > COALESCE(s.total_points, 0)) AS rank_pos "
+                + "FROM users u "
+                + "LEFT JOIN user_stats s ON u.id = s.user_id "
+                + "WHERE u.id = ?";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    int id = rs.getInt("user_id");
+                    String username = rs.getString("username");
+                    int totalPoints = rs.getInt("total_points");
+                    int totalKills = rs.getInt("total_kills");
+                    int totalWins = rs.getInt("total_wins");
+                    int totalHits = rs.getInt("total_hits");
+                    int totalMatches = rs.getInt("total_matches");
+                    int rankPos = rs.getInt("rank_pos");
+
+                    double winRate = (totalMatches > 0) ? Math.round((totalWins * 100.0 / totalMatches) * 10.0) / 10.0 : 0.0;
+                    String rankTier;
+                    if (totalPoints >= 2000) rankTier = "MASTER";
+                    else if (totalPoints >= 1200) rankTier = "DIAMOND";
+                    else if (totalPoints >= 700) rankTier = "PLATINUM";
+                    else if (totalPoints >= 350) rankTier = "GOLD";
+                    else if (totalPoints >= 100) rankTier = "SILVER";
+                    else rankTier = "BRONZE";
+
+                    return new UserProfileDTO(id, username, totalPoints, totalKills, totalWins, totalHits, totalMatches, rankPos, rankTier, winRate);
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "[UserDAO] Lỗi khi lấy thông tin hồ sơ userId " + userId, e);
+        }
+        return null;
     }
 }

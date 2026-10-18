@@ -217,6 +217,16 @@ public final class CollisionDetector {
                             CombatEvent.EventType.WALL_HIT
                         ));
                     }
+                } else {
+                    int r = (int) (bullet.getY() / map.getTileSize());
+                    int c = (int) (bullet.getX() / map.getTileSize());
+                    combatEvents.add(new CombatEvent(
+                        bullet.getId(),
+                        bullet.getOwnerId(),
+                        r * 10000 + c,
+                        1,
+                        CombatEvent.EventType.WALL_HIT
+                    ));
                 }
                 bullet.setAlive(false);
             }

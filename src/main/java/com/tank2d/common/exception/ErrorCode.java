@@ -7,11 +7,11 @@ package com.tank2d.common.exception;
 public enum ErrorCode {
 
     /** Miền xác thực người dùng (1000 - 1099) */
-    AUTH_INVALID_CREDENTIALS(1001, "Sai tên tài khoản hoặc mật khẩu!"),
-    AUTH_USER_ALREADY_LOGGED_IN(1002, "Tài khoản đang đăng nhập ở thiết bị hoặc cửa sổ khác!"),
-    AUTH_USERNAME_TAKEN(1003, "Đăng ký thất bại! Tài khoản đã tồn tại trong hệ thống."),
-    AUTH_INVALID_INPUT(1004, "Tên tài khoản hoặc mật khẩu không hợp lệ!"),
-    AUTH_NOT_LOGGED_IN(1005, "Người dùng chưa đăng nhập vào hệ thống!"),
+    AUTH_INVALID_CREDENTIALS(1001, "SAI TÊN ĐĂNG NHẬP HOẶC MẬT KHẨU!"),
+    AUTH_USER_ALREADY_LOGGED_IN(1002, "ACCOUNT IS CURRENTLY LOGGED IN ON ANOTHER DEVICE!"),
+    AUTH_USERNAME_TAKEN(1003, "ĐĂNG KÝ THẤT BẠI: TÊN ĐĂNG NHẬP ĐÃ TỒN TẠI!"),
+    AUTH_INVALID_INPUT(1004, "TÊN TÀI KHOẢN HOẶC MẬT KHẨU KHÔNG ĐÚNG ĐỊNH DẠNG!"),
+    AUTH_NOT_LOGGED_IN(1005, "NGƯỜI DÙNG CHƯA ĐĂNG NHẬP VÀO HỆ THỐNG!"),
 
     /** Miền phòng chơi và sảnh chờ (2000 - 2099) */
     ROOM_NOT_FOUND(2001, "Không tìm thấy phòng chơi yêu cầu!"),

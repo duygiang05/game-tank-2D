@@ -16,6 +16,8 @@ public enum PacketType {
     MATCH_HISTORY_RES,
     MATCH_DETAIL_REQ,
     MATCH_DETAIL_RES,
+    USER_PROFILE_REQ,
+    USER_PROFILE_RES,
     LOGOUT_REQ,
 
     /** Nhóm gói tin quản lý sảnh chờ và phòng đấu */
@@ -29,6 +31,7 @@ public enum PacketType {
     ROOM_LEAVE_REQ,
     ROOM_START_REQ,
     ROOM_DURATION_REQ,
+    ROOM_MAP_REQ,
 
     /** Nhóm gói tin đồng bộ trận đấu, chiến đấu và bản đồ */
     GAME_START_NOTIFY,
@@ -45,5 +48,13 @@ public enum PacketType {
     GAME_RECONNECT_PROMPT,
     GAME_RECONNECT_REQ,
     GAME_RECONNECT_RES,
-    GAME_PENALTY_NOTIFY
+    GAME_PENALTY_NOTIFY,
+
+    /** Nhóm gói tin mời đấu và danh sách người chơi trực tuyến */
+    ONLINE_PLAYERS_REQ,
+    ONLINE_PLAYERS_RES,
+    INVITE_BATTLE_REQ,
+    INVITE_BATTLE_NOTIFY,
+    INVITE_BATTLE_RESPONSE,
+    INVITE_DECLINED_NOTIFY
 }

@@ -24,6 +24,11 @@ public class Tank2DOnline extends Application {
      */
     @Override
     public void start(Stage stage) throws Exception {
+        try {
+            javafx.scene.text.Font.loadFont(getClass().getResourceAsStream("/com/tank2d/client/assets/ui/fonts/Kenney Future.ttf"), 14);
+            javafx.scene.text.Font.loadFont(getClass().getResourceAsStream("/com/tank2d/client/assets/ui/fonts/Kenney Future Narrow.ttf"), 14);
+        } catch (Exception ignored) {}
+
         Parent root = FXMLLoader.load(
                 getClass().getResource("/com/tank2d/client/view/login.fxml")
         );
@@ -31,6 +36,9 @@ public class Tank2DOnline extends Application {
         Scene scene = new Scene(root, WINDOW_WIDTH, WINDOW_HEIGHT);
 
         stage.setTitle("Tank 2D Online");
+        try {
+            stage.getIcons().add(new javafx.scene.image.Image(getClass().getResourceAsStream("/com/tank2d/client/view/tank-logo_1.png")));
+        } catch (Exception ignored) {}
         stage.setScene(scene);
         stage.sizeToScene();
         stage.setResizable(false);

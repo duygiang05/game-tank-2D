@@ -24,6 +24,9 @@ public class SoundManager {
     private static final Map<String, URL> soundResourceCache = new HashMap<>();
     private static Clip bgmClip;
     private static boolean isMuted = false;
+    private static float masterVolume = 1.0f;
+    private static float sfxVolume = 1.0f;
+    private static float bgmVolume = 0.8f;
     private static float sfxVolumeGain = 0.0f;
 
     /**
@@ -32,6 +35,7 @@ public class SoundManager {
     public static void init() {
         loadSound("shoot_normal", "sounds/shoot_normal.wav");
         loadSound("shoot_rocket", "sounds/shoot_rocket.wav");
+        loadSound("tank_hit", "sounds/tank_hit.wav");
         loadSound("wall_break", "sounds/wall_break.wav");
         loadSound("explosion", "sounds/explosion.wav");
         loadSound("item_health", "sounds/item_health.wav");
@@ -86,6 +90,14 @@ public class SoundManager {
         return audioStream;
     }
 
+    private static float linearToDb(float volume) {
+        if (volume <= 0.001f) {
+            return -80.0f;
+        }
+        float db = (float) (20.0 * Math.log10(volume));
+        return Math.max(-80.0f, Math.min(6.0f, db));
+    }
+
     /**
      * Phát hiệu ứng âm thanh (SFX) trên một luồng nền riêng biệt để không ảnh hưởng FPS hiển thị.
      *
@@ -96,6 +108,10 @@ public class SoundManager {
         
         URL url = soundResourceCache.get(key);
         if (url == null) return;
+
+        float effectiveVol = masterVolume * sfxVolume;
+        if (effectiveVol <= 0.001f) return;
+        float gainValue = linearToDb(effectiveVol);
 
         new Thread(() -> {
             try (InputStream is = url.openStream();
@@ -108,7 +124,7 @@ public class SoundManager {
 
                 if (clip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
                     FloatControl gainControl = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
-                    gainControl.setValue(sfxVolumeGain);
+                    gainControl.setValue(gainValue);
                 }
 
                 clip.addLineListener(event -> {
@@ -144,12 +160,28 @@ public class SoundManager {
 
                 bgmClip = AudioSystem.getClip();
                 bgmClip.open(audioStream);
+                applyBGMVolume();
                 bgmClip.loop(Clip.LOOP_CONTINUOUSLY);
                 bgmClip.start();
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "[SoundManager] Lỗi phát BGM", e);
             }
         }).start();
+    }
+
+    /**
+     * Áp dụng âm lượng BGM hiện tại vào Clip nhạc nền.
+     */
+    private static void applyBGMVolume() {
+        if (bgmClip != null && bgmClip.isOpen()) {
+            try {
+                if (bgmClip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+                    FloatControl gainControl = (FloatControl) bgmClip.getControl(FloatControl.Type.MASTER_GAIN);
+                    float eff = isMuted ? 0.0f : (masterVolume * bgmVolume);
+                    gainControl.setValue(linearToDb(eff));
+                }
+            } catch (Exception ignored) {}
+        }
     }
 
     /**
@@ -188,7 +220,44 @@ public class SoundManager {
      */
     public static void setMuted(boolean muted) {
         isMuted = muted;
-        if (muted) stopBGM();
-        else playBGM();
+        if (muted) {
+            applyBGMVolume();
+        } else {
+            if (bgmClip == null || !bgmClip.isRunning()) {
+                playBGM();
+            } else {
+                applyBGMVolume();
+            }
+        }
+    }
+
+    public static boolean isMuted() {
+        return isMuted;
+    }
+
+    public static void setSFXVolume(float volume) {
+        sfxVolume = Math.max(0.0f, Math.min(1.0f, volume));
+    }
+
+    public static float getSFXVolume() {
+        return sfxVolume;
+    }
+
+    public static void setBGMVolume(float volume) {
+        bgmVolume = Math.max(0.0f, Math.min(1.0f, volume));
+        applyBGMVolume();
+    }
+
+    public static float getBGMVolume() {
+        return bgmVolume;
+    }
+
+    public static void setMasterVolume(float volume) {
+        masterVolume = Math.max(0.0f, Math.min(1.0f, volume));
+        applyBGMVolume();
+    }
+
+    public static float getMasterVolume() {
+        return masterVolume;
     }
 }

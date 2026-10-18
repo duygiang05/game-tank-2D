@@ -22,7 +22,10 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.OverrunStyle;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.effect.GaussianBlur;
+import com.tank2d.client.util.AssetLoader;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -103,72 +106,86 @@ public class MatchHistoryController {
                 } else {
                     HBox resultBox = new HBox(6.0);
                     resultBox.setAlignment(Pos.CENTER_LEFT);
-                    resultBox.setPrefWidth(135.0);
-                    resultBox.setMaxWidth(135.0);
+                    resultBox.setPrefWidth(125.0);
+                    resultBox.setMaxWidth(125.0);
 
                     Label badgeLabel = new Label();
-                    badgeLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 11px; -fx-background-radius: 6px; -fx-padding: 3px 7px;");
+                    badgeLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 10px; -fx-background-radius: 6px; -fx-padding: 3px 6px; -fx-border-radius: 6px; -fx-border-width: 1px;");
 
                     Label rankLabel = new Label("#" + match.getRankPosition());
-                    rankLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 12px;");
+                    rankLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 11px;");
+
+                    HBox rankBox = new HBox(4.0);
+                    rankBox.setAlignment(Pos.CENTER_LEFT);
+                    Image medalImg = AssetLoader.getMedalImage(match.getRankPosition());
+                    if (medalImg != null) {
+                        ImageView medalView = new ImageView(medalImg);
+                        medalView.setFitWidth(18);
+                        medalView.setFitHeight(18);
+                        medalView.setPreserveRatio(true);
+                        rankBox.getChildren().add(medalView);
+                    }
+                    rankBox.getChildren().add(rankLabel);
 
                     if ("VICTORY".equalsIgnoreCase(match.getResult())) {
-                        badgeLabel.setText("🏆 THẮNG");
-                        badgeLabel.setStyle(badgeLabel.getStyle() + " -fx-background-color: #dcfce7; -fx-text-fill: #15803d;");
-                        rankLabel.setStyle(rankLabel.getStyle() + " -fx-text-fill: #166534;");
+                        badgeLabel.setText("WIN");
+                        badgeLabel.setStyle(badgeLabel.getStyle() + " -fx-background-color: rgba(16, 185, 129, 0.25); -fx-text-fill: #34d399; -fx-border-color: rgba(16, 185, 129, 0.5);");
+                        rankLabel.setStyle(rankLabel.getStyle() + " -fx-text-fill: #34d399;");
                     } else if ("DRAW".equalsIgnoreCase(match.getResult())) {
-                        badgeLabel.setText("🤝 HÒA");
-                        badgeLabel.setStyle(badgeLabel.getStyle() + " -fx-background-color: #fef3c7; -fx-text-fill: #b45309;");
-                        rankLabel.setStyle(rankLabel.getStyle() + " -fx-text-fill: #92400e;");
+                        badgeLabel.setText("DRAW");
+                        badgeLabel.setStyle(badgeLabel.getStyle() + " -fx-background-color: rgba(245, 158, 11, 0.25); -fx-text-fill: #fbbf24; -fx-border-color: rgba(245, 158, 11, 0.5);");
+                        rankLabel.setStyle(rankLabel.getStyle() + " -fx-text-fill: #fbbf24;");
                     } else {
-                        badgeLabel.setText("💀 THUA");
-                        badgeLabel.setStyle(badgeLabel.getStyle() + " -fx-background-color: #fee2e2; -fx-text-fill: #b91c1c;");
-                        rankLabel.setStyle(rankLabel.getStyle() + " -fx-text-fill: #991b1b;");
+                        badgeLabel.setText("DEFEAT");
+                        badgeLabel.setStyle(badgeLabel.getStyle() + " -fx-background-color: rgba(239, 68, 68, 0.25); -fx-text-fill: #f87171; -fx-border-color: rgba(239, 68, 68, 0.5);");
+                        rankLabel.setStyle(rankLabel.getStyle() + " -fx-text-fill: #f87171;");
                     }
-                    resultBox.getChildren().addAll(badgeLabel, rankLabel);
+                    resultBox.getChildren().addAll(badgeLabel, rankBox);
 
                     VBox roomBox = new VBox(2.0);
                     roomBox.setAlignment(Pos.CENTER_LEFT);
-                    roomBox.setPrefWidth(175.0);
-                    roomBox.setMaxWidth(175.0);
+                    roomBox.setPrefWidth(260.0);
+                    roomBox.setMaxWidth(260.0);
 
                     Label roomNameLabel = new Label(match.getRoomName());
-                    roomNameLabel.setPrefWidth(175.0);
-                    roomNameLabel.setMaxWidth(175.0);
+                    roomNameLabel.setPrefWidth(260.0);
+                    roomNameLabel.setMaxWidth(260.0);
                     roomNameLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
-                    roomNameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #0f172a;");
+                    roomNameLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 11.5px; -fx-text-fill: #38bdf8;");
 
-                    Label durationLabel = new Label("Thời lượng: " + match.getDurationSeconds() + "s");
-                    durationLabel.setStyle("-fx-text-fill: #64748b; -fx-font-size: 11.5px;");
+                    Label durationLabel = new Label("TIME: " + match.getDurationSeconds() + "S");
+                    durationLabel.setStyle("-fx-font-family: 'Kenney Future Narrow', 'Segoe UI', sans-serif; -fx-text-fill: #94a3b8; -fx-font-size: 10px;");
                     roomBox.getChildren().addAll(roomNameLabel, durationLabel);
 
                     Label timeLabel = new Label(match.getPlayedAt());
-                    timeLabel.setPrefWidth(145.0);
-                    timeLabel.setMaxWidth(145.0);
+                    timeLabel.setPrefWidth(140.0);
+                    timeLabel.setMaxWidth(140.0);
                     timeLabel.setAlignment(Pos.CENTER_LEFT);
-                    timeLabel.setStyle("-fx-text-fill: #475569; -fx-font-size: 12.5px; -fx-font-weight: 500;");
+                    timeLabel.setStyle("-fx-font-family: 'Kenney Future Narrow', 'Segoe UI', sans-serif; -fx-text-fill: #cbd5e1; -fx-font-size: 11px;");
 
                     Label combatLabel = new Label("🎯 " + match.getKills() + "   💥 " + match.getHits());
-                    combatLabel.setPrefWidth(110.0);
-                    combatLabel.setMaxWidth(110.0);
+                    combatLabel.setPrefWidth(100.0);
+                    combatLabel.setMaxWidth(100.0);
                     combatLabel.setAlignment(Pos.CENTER_RIGHT);
-                    combatLabel.setStyle("-fx-font-size: 12.5px; -fx-font-weight: bold; -fx-text-fill: #334155;");
+                    combatLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #f1f5f9;");
 
                     int points = match.getPointsEarned();
                     String pointsStr = (points >= 0 ? "+" : "") + points + " XP";
                     Label pointsLabel = new Label(pointsStr);
-                    pointsLabel.setPrefWidth(95.0);
-                    pointsLabel.setMaxWidth(95.0);
+                    pointsLabel.setPrefWidth(100.0);
+                    pointsLabel.setMaxWidth(100.0);
                     pointsLabel.setAlignment(Pos.CENTER_RIGHT);
                     if (points >= 0) {
-                        pointsLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #16a34a;");
+                        pointsLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: #4ade80;");
                     } else {
-                        pointsLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #dc2626;");
+                        pointsLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: #f87171;");
                     }
 
                     HBox row = new HBox(resultBox, roomBox, timeLabel, combatLabel, pointsLabel);
                     row.setAlignment(Pos.CENTER_LEFT);
-                    row.setStyle("-fx-padding: 8px 16px; -fx-background-color: transparent; -fx-cursor: hand;");
+                    row.setStyle("-fx-padding: 8px 16px; -fx-background-color: transparent; -fx-cursor: hand; -fx-border-color: rgba(56, 189, 248, 0.1); -fx-border-width: 0 0 1px 0;");
+                    row.setOnMouseEntered(e -> row.setStyle("-fx-padding: 8px 16px; -fx-background-color: rgba(56, 189, 248, 0.12); -fx-cursor: hand; -fx-border-color: rgba(56, 189, 248, 0.3); -fx-border-width: 0 0 1px 0;"));
+                    row.setOnMouseExited(e -> row.setStyle("-fx-padding: 8px 16px; -fx-background-color: transparent; -fx-cursor: hand; -fx-border-color: rgba(56, 189, 248, 0.1); -fx-border-width: 0 0 1px 0;"));
 
                     setGraphic(row);
                     setText(null);
@@ -196,58 +213,66 @@ public class MatchHistoryController {
                     int myUserId = (session.getCurrentUser() != null) ? session.getCurrentUser().getId() : -1;
                     boolean isMe = (p.getUserId() == myUserId);
 
-                    Label rankLabel = new Label();
-                    rankLabel.setPrefWidth(70.0);
-                    rankLabel.setMaxWidth(70.0);
-                    rankLabel.setAlignment(Pos.CENTER_LEFT);
+                    HBox pRankBox = new HBox(4.0);
+                    pRankBox.setPrefWidth(80.0);
+                    pRankBox.setMaxWidth(80.0);
+                    pRankBox.setAlignment(Pos.CENTER_LEFT);
+
                     int rank = p.getRankPosition();
-                    if (rank == 1) {
-                        rankLabel.setText("🥇 #1");
-                        rankLabel.setStyle("-fx-text-fill: #b45309; -fx-font-weight: bold; -fx-font-size: 13px;");
-                    } else if (rank == 2) {
-                        rankLabel.setText("🥈 #2");
-                        rankLabel.setStyle("-fx-text-fill: #475569; -fx-font-weight: bold; -fx-font-size: 13px;");
-                    } else if (rank == 3) {
-                        rankLabel.setText("🥉 #3");
-                        rankLabel.setStyle("-fx-text-fill: #c2410c; -fx-font-weight: bold; -fx-font-size: 13px;");
-                    } else {
-                        rankLabel.setText("    #" + rank);
-                        rankLabel.setStyle("-fx-text-fill: #64748b; -fx-font-weight: bold; -fx-font-size: 12.5px;");
+                    Image pMedal = AssetLoader.getMedalImage(rank);
+                    if (pMedal != null) {
+                        ImageView pMedalView = new ImageView(pMedal);
+                        pMedalView.setFitWidth(18);
+                        pMedalView.setFitHeight(18);
+                        pMedalView.setPreserveRatio(true);
+                        pRankBox.getChildren().add(pMedalView);
                     }
 
-                    Label nameLabel = new Label(p.getUsername() + (isMe ? " (Bạn)" : ""));
-                    nameLabel.setPrefWidth(190.0);
-                    nameLabel.setMaxWidth(190.0);
+                    Label rankLabel = new Label(pMedal != null ? "#" + rank : (rank <= 3 ? "#" + rank : "    #" + rank));
+                    if (rank == 1) {
+                        rankLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #fbbf24; -fx-font-weight: bold; -fx-font-size: 11.5px;");
+                    } else if (rank == 2) {
+                        rankLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #cbd5e1; -fx-font-weight: bold; -fx-font-size: 11.5px;");
+                    } else if (rank == 3) {
+                        rankLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #f97316; -fx-font-weight: bold; -fx-font-size: 11.5px;");
+                    } else {
+                        rankLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #94a3b8; -fx-font-weight: bold; -fx-font-size: 11px;");
+                    }
+                    pRankBox.getChildren().add(rankLabel);
+
+                    Label nameLabel = new Label(p.getUsername() + (isMe ? " (YOU)" : ""));
+                    nameLabel.setPrefWidth(250.0);
+                    nameLabel.setMaxWidth(250.0);
                     nameLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
                     nameLabel.setAlignment(Pos.CENTER_LEFT);
                     if (isMe) {
-                        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #2563eb;");
+                        nameLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 11.5px; -fx-text-fill: #38bdf8;");
                     } else {
-                        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #0f172a;");
+                        nameLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 11.5px; -fx-text-fill: #f1f5f9;");
                     }
 
                     Label killsLabel = new Label("🎯 " + p.getKills());
-                    killsLabel.setPrefWidth(85.0);
-                    killsLabel.setMaxWidth(85.0);
+                    killsLabel.setPrefWidth(100.0);
+                    killsLabel.setMaxWidth(100.0);
                     killsLabel.setAlignment(Pos.CENTER_RIGHT);
-                    killsLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 12.5px; -fx-text-fill: #334155;");
+                    killsLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: #f1f5f9;");
 
                     Label hitsLabel = new Label("💥 " + p.getHits());
-                    hitsLabel.setPrefWidth(95.0);
-                    hitsLabel.setMaxWidth(95.0);
+                    hitsLabel.setPrefWidth(110.0);
+                    hitsLabel.setMaxWidth(110.0);
                     hitsLabel.setAlignment(Pos.CENTER_RIGHT);
-                    hitsLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 12.5px; -fx-text-fill: #334155;");
+                    hitsLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: #f1f5f9;");
 
                     int pts = p.getPointsEarned();
                     Label ptsLabel = new Label((pts >= 0 ? "+" : "") + pts + " XP");
-                    ptsLabel.setPrefWidth(95.0);
-                    ptsLabel.setMaxWidth(95.0);
+                    ptsLabel.setPrefWidth(110.0);
+                    ptsLabel.setMaxWidth(110.0);
                     ptsLabel.setAlignment(Pos.CENTER_RIGHT);
-                    ptsLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 12.5px; -fx-text-fill: " + (pts >= 0 ? "#16a34a;" : "#dc2626;"));
+                    ptsLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: " + (pts >= 0 ? "#4ade80;" : "#f87171;"));
 
-                    HBox row = new HBox(rankLabel, nameLabel, killsLabel, hitsLabel, ptsLabel);
+                    HBox row = new HBox(pRankBox, nameLabel, killsLabel, hitsLabel, ptsLabel);
                     row.setAlignment(Pos.CENTER_LEFT);
-                    row.setStyle("-fx-padding: 8px 16px; -fx-background-color: " + (isMe ? "#eff6ff;" : "transparent;"));
+                    row.setStyle("-fx-padding: 8px 16px; -fx-background-color: " + (isMe ? "rgba(56, 189, 248, 0.15);" : "transparent;"));
 
                     setGraphic(row);
                     setText(null);
@@ -265,7 +290,7 @@ public class MatchHistoryController {
         try {
             ClientSocket clientSocket = session.getClientSocket();
             if (clientSocket == null || !clientSocket.isConnected()) {
-                showError("Chưa kết nối tới Server!");
+                showError("NOT CONNECTED TO SERVER!");
                 return;
             }
 
@@ -276,7 +301,7 @@ public class MatchHistoryController {
             showError(e.getMessage());
             LOGGER.log(Level.WARNING, "[MatchHistory] Lỗi mạng khi tải lịch sử: " + e.getErrorCode(), e);
         } catch (IOException e) {
-            showError("Không thể kết nối tới Server!");
+            showError("CANNOT CONNECT TO SERVER!");
             LOGGER.log(Level.SEVERE, "[MatchHistory] Lỗi gửi yêu cầu lịch sử đấu", e);
         }
     }
@@ -327,18 +352,18 @@ public class MatchHistoryController {
             Platform.runLater(() -> {
                 if (list == null || list.isEmpty()) {
                     matchHistoryListView.getItems().clear();
-                    statusLabel.setText("Bạn chưa có trận đấu nào được ghi nhận gần đây.");
-                    statusLabel.setStyle("-fx-text-fill: #64748b; -fx-font-size: 12.5px;");
+                    statusLabel.setText("NO RECENT BATTLE RECORDS FOUND.");
+                    statusLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #94a3b8; -fx-font-size: 11px;");
                 } else {
                     matchHistoryListView.getItems().setAll(list);
-                    statusLabel.setText("Hiển thị " + list.size() + " trận đấu gần nhất của bạn.");
-                    statusLabel.setStyle("-fx-text-fill: #16a34a; -fx-font-weight: bold; -fx-font-size: 12.5px;");
+                    statusLabel.setText("DISPLAYING LATEST " + list.size() + " MATCHES.");
+                    statusLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #38bdf8; -fx-font-size: 11px;");
                 }
             });
 
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "[MatchHistory] Lỗi phân tích dữ liệu lịch sử", e);
-            Platform.runLater(() -> showError("Lỗi tải lịch sử đấu từ Server!"));
+            Platform.runLater(() -> showError("FAILED TO LOAD MATCH HISTORY FROM SERVER!"));
         }
     }
 
@@ -353,14 +378,14 @@ public class MatchHistoryController {
             if (detail == null) return;
 
             Platform.runLater(() -> {
-                detailRoomTimeLabel.setText("Phòng: " + detail.getRoomName() + " • " + detail.getDurationSeconds() + "s • " + detail.getPlayedAt());
+                detailRoomTimeLabel.setText("ROOM: " + detail.getRoomName() + " • " + detail.getDurationSeconds() + "S • " + detail.getPlayedAt());
 
                 if (detail.getWinnerUsername() != null && !detail.getWinnerUsername().isEmpty()) {
-                    winnerTextLabel.setText("Người chiến thắng: " + detail.getWinnerUsername());
-                    winnerBanner.setStyle("-fx-background-color: #eff6ff; -fx-padding: 8px 14px; -fx-background-radius: 10px; -fx-border-color: #bfdbfe; -fx-border-radius: 10px;");
+                    winnerTextLabel.setText("VICTOR: " + detail.getWinnerUsername());
+                    winnerBanner.setStyle("-fx-background-color: rgba(234, 179, 8, 0.15); -fx-padding: 8px 16px; -fx-background-radius: 10px; -fx-border-color: rgba(234, 179, 8, 0.4); -fx-border-radius: 10px; -fx-border-width: 1px;");
                 } else {
-                    winnerTextLabel.setText("Kết quả: Trận đấu hòa thời gian (Không có người thắng)");
-                    winnerBanner.setStyle("-fx-background-color: #fefce8; -fx-padding: 8px 14px; -fx-background-radius: 10px; -fx-border-color: #fef08a; -fx-border-radius: 10px;");
+                    winnerTextLabel.setText("RESULT: TIME LIMIT REACHED (DRAW)");
+                    winnerBanner.setStyle("-fx-background-color: rgba(245, 158, 11, 0.15); -fx-padding: 8px 16px; -fx-background-radius: 10px; -fx-border-color: rgba(245, 158, 11, 0.4); -fx-border-radius: 10px; -fx-border-width: 1px;");
                 }
 
                 participantListView.getItems().setAll(detail.getParticipants());
@@ -416,7 +441,7 @@ public class MatchHistoryController {
         } catch (IOException e) {
             session.addPacketListener(packetListener);
             LOGGER.log(Level.SEVERE, "[MatchHistory] Lỗi quay lại Lobby", e);
-            showError("Không thể quay lại sảnh!");
+            showError("FAILED TO RETURN TO LOBBY!");
         }
     }
 
@@ -428,7 +453,7 @@ public class MatchHistoryController {
     private void showError(String message) {
         if (statusLabel != null) {
             statusLabel.setText(message);
-            statusLabel.setStyle("-fx-text-fill: #dc2626; -fx-font-weight: bold; -fx-font-size: 12.5px;");
+            statusLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #f87171; -fx-font-size: 11px;");
         }
     }
 }

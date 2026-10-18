@@ -203,6 +203,10 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
         }
 
         if (event.getType() == CombatEvent.EventType.SHIELD_BLOCKED) {
+            TankEntity targetTank = gameLoop.getTank(event.getTargetTankId());
+            if (targetTank != null) {
+                broadcastEffect(new GameEventEffectDTO("SHIELD_DEFLECT", targetTank.getX(), targetTank.getY(), targetTank.getId()));
+            }
             return;
         }
 
@@ -246,6 +250,8 @@ public class GameStateManager implements CombatEventListener, MapChangeListener,
 
             broadcastEffect(new GameEventEffectDTO("EXPLOSION", targetTank.getX(), targetTank.getY(), targetTank.getId()));
             LOGGER.info("[Combat] Tank " + targetTank.getId() + " bị hạ bởi Tank " + event.getShooterId());
+        } else {
+            broadcastEffect(new GameEventEffectDTO("TANK_HIT", targetTank.getX(), targetTank.getY(), targetTank.getId()));
         }
     }
 

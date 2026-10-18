@@ -72,6 +72,9 @@ public class RoomController {
     @FXML
     private ComboBox<String> durationComboBox;
 
+    @FXML
+    private ComboBox<String> mapComboBox;
+
     private final ClientSession session = ClientSession.getInstance();
     private final Consumer<Packet> packetListener = this::handleServerPacket;
 
@@ -88,6 +91,7 @@ public class RoomController {
         if (room == null) return;
 
         setupDurationComboBox();
+        setupMapComboBox();
         updateRoomUI(room);
 
         if (!listenerRegistered) {
@@ -108,21 +112,30 @@ public class RoomController {
         if (durationComboBox == null) return;
 
         if (durationComboBox.getItems().isEmpty()) {
-            durationComboBox.getItems().addAll("45 giây", "60 giây", "90 giây", "180 giây");
+            durationComboBox.getItems().addAll("45S", "60S", "90S", "180S");
         }
 
         durationComboBox.setOnAction(event -> handleDurationChanged());
+    }
+
+    private void setupMapComboBox() {
+        if (mapComboBox == null) return;
+
+        if (mapComboBox.getItems().isEmpty()) {
+            mapComboBox.getItems().addAll("TROPICAL WARZONE", "DESERT DUNES", "SNOW BLIZZARD");
+        }
+
+        mapComboBox.setOnAction(event -> handleMapChanged());
     }
 
     private void updateRoomUI(RoomDTO room) {
         Platform.runLater(() -> {
             roomNameLabel.setText(room.getRoomName());
 
-            String statusVi = "Đang chờ người chơi";
+            String statusEn = "WAITING FOR OPERATORS";
             roomStatusLabel.setText(
                     room.getCurrentPlayers() + "/" + room.getMaxPlayers()
-                    + " người chơi  •  " + statusVi
-                    + "  •  Thời lượng: " + room.getDuration() + "s"
+                    + " PLAYERS  •  " + statusEn
             );
 
             clearSlots();
@@ -160,6 +173,7 @@ public class RoomController {
             }
 
             updateDurationUI(room);
+            updateMapUI(room);
             updateButton(room);
         });
     }
@@ -173,20 +187,20 @@ public class RoomController {
     }
 
     private void clearSlots() {
-        resetSlot(p1Label, p1StatusBadge, "Chỗ trống P1");
-        resetSlot(p2Label, p2StatusBadge, "Chỗ trống P2");
-        resetSlot(p3Label, p3StatusBadge, "Chỗ trống P3");
-        resetSlot(p4Label, p4StatusBadge, "Chỗ trống P4");
+        resetSlot(p1Label, p1StatusBadge, "OPEN SLOT P1");
+        resetSlot(p2Label, p2StatusBadge, "OPEN SLOT P2");
+        resetSlot(p3Label, p3StatusBadge, "OPEN SLOT P3");
+        resetSlot(p4Label, p4StatusBadge, "OPEN SLOT P4");
     }
 
     private void resetSlot(Label nameLabel, Label badgeLabel, String placeholder) {
         if (nameLabel != null) {
             nameLabel.setText(placeholder);
-            nameLabel.setStyle("-fx-text-fill: #94a3b8; -fx-font-style: italic;");
+            nameLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #64748b; -fx-font-size: 11px;");
         }
         if (badgeLabel != null) {
-            badgeLabel.setText("TRỐNG");
-            badgeLabel.setStyle("-fx-background-color: #f1f5f9; -fx-text-fill: #94a3b8; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
+            badgeLabel.setText("EMPTY");
+            badgeLabel.setStyle("-fx-background-color: rgba(100, 116, 139, 0.2); -fx-text-fill: #64748b; -fx-border-color: #475569; -fx-border-width: 1px; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px; -fx-border-radius: 12px; -fx-font-size: 10px;");
         }
     }
 
@@ -204,17 +218,17 @@ public class RoomController {
         if (nameLabel == null || badgeLabel == null) return;
 
         nameLabel.setText(username);
-        nameLabel.setStyle("-fx-text-fill: #0f172a; -fx-font-weight: bold; -fx-font-style: normal;");
+        nameLabel.setStyle("-fx-text-fill: #38bdf8; -fx-font-weight: bold; -fx-font-size: 13px; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif;");
 
         if (isHost) {
-            badgeLabel.setText("CHỦ PHÒNG");
-            badgeLabel.setStyle("-fx-background-color: #fef3c7; -fx-text-fill: #b45309; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
+            badgeLabel.setText("👑 HOST");
+            badgeLabel.setStyle("-fx-background-color: rgba(245, 158, 11, 0.2); -fx-text-fill: #fbbf24; -fx-border-color: #f59e0b; -fx-border-width: 1px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px; -fx-border-radius: 12px; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-size: 11px;");
         } else if (isReady) {
-            badgeLabel.setText("SẴN SÀNG");
-            badgeLabel.setStyle("-fx-background-color: #dcfce7; -fx-text-fill: #15803d; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
+            badgeLabel.setText("READY");
+            badgeLabel.setStyle("-fx-background-color: rgba(34, 197, 94, 0.2); -fx-text-fill: #4ade80; -fx-border-color: #22c55e; -fx-border-width: 1px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px; -fx-border-radius: 12px; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-size: 11px;");
         } else {
-            badgeLabel.setText("ĐANG CHỜ...");
-            badgeLabel.setStyle("-fx-background-color: #f8fafc; -fx-text-fill: #cbd5e1; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
+            badgeLabel.setText("WAITING");
+            badgeLabel.setStyle("-fx-background-color: rgba(100, 116, 139, 0.2); -fx-text-fill: #94a3b8; -fx-border-color: #64748b; -fx-border-width: 1px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px; -fx-border-radius: 12px; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-size: 11px;");
         }
     }
 
@@ -225,7 +239,7 @@ public class RoomController {
         if (currentUser == null) return;
 
         boolean isHost = isUserHost(room, currentUser);
-        String durationText = room.getDuration() + " giây";
+        String durationText = room.getDuration() + "S";
 
         durationComboBox.setOnAction(null);
 
@@ -247,22 +261,78 @@ public class RoomController {
         String selected = durationComboBox.getValue();
         if (selected == null) return;
 
-        int duration = switch (selected) {
-            case "45 giây" -> 45;
-            case "60 giây" -> 60;
-            case "90 giây" -> 90;
-            case "180 giây" -> 180;
-            default -> 60;
-        };
+        int duration = 60;
+        try {
+            duration = Integer.parseInt(selected.toUpperCase().replace("S", "").trim());
+        } catch (Exception ignored) {}
 
         sendDuration(duration);
+    }
+
+    private void updateMapUI(RoomDTO room) {
+        if (mapComboBox == null) return;
+
+        User currentUser = session.getCurrentUser();
+        if (currentUser == null) return;
+
+        boolean isHost = isUserHost(room, currentUser);
+        String mapId = room.getMapId() != null ? room.getMapId() : "map_default";
+        String mapDisplay;
+        if ("map_desert".equalsIgnoreCase(mapId)) {
+            mapDisplay = "DESERT DUNES";
+        } else if ("map_snow".equalsIgnoreCase(mapId)) {
+            mapDisplay = "SNOW BLIZZARD";
+        } else {
+            mapDisplay = "TROPICAL WARZONE";
+        }
+
+        mapComboBox.setOnAction(null);
+
+        if (!mapComboBox.getItems().contains(mapDisplay)) {
+            mapComboBox.getItems().add(mapDisplay);
+        }
+
+        mapComboBox.setValue(mapDisplay);
+        mapComboBox.setDisable(!isHost);
+
+        mapComboBox.setOnAction(event -> handleMapChanged());
+    }
+
+    private void handleMapChanged() {
+        if (currentRoom == null) return;
+        User currentUser = session.getCurrentUser();
+        if (currentUser == null || !isUserHost(currentRoom, currentUser)) return;
+
+        String selected = mapComboBox.getValue();
+        if (selected == null) return;
+
+        String mapId = "map_default";
+        if (selected.contains("DESERT")) {
+            mapId = "map_desert";
+        } else if (selected.contains("SNOW")) {
+            mapId = "map_snow";
+        }
+
+        sendMap(mapId);
+    }
+
+    private void sendMap(String mapId) {
+        try {
+            ClientSocket clientSocket = session.getClientSocket();
+            if (clientSocket != null && clientSocket.isConnected()) {
+                clientSocket.sendPacket(new Packet(PacketType.ROOM_MAP_REQ, GSON.toJson(mapId)));
+                LOGGER.info("[Room] Đã gửi ROOM_MAP_REQ: " + mapId);
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "[Room] Lỗi gửi cấu hình map", e);
+        }
     }
 
     private void sendDuration(int duration) {
         try {
             ClientSocket clientSocket = session.getClientSocket();
             if (clientSocket == null || !clientSocket.isConnected()) {
-                roomStatusLabel.setText("Chưa kết nối Server!");
+                roomStatusLabel.setText("NOT CONNECTED TO SERVER!");
                 return;
             }
 
@@ -285,7 +355,7 @@ public class RoomController {
         boolean isHost = isUserHost(room, currentUser);
 
         if (isHost) {
-            readyButton.setText("BẮT ĐẦU TRẬN ĐẤU");
+            readyButton.setText("START BATTLE");
 
             boolean canStart = room.getCurrentPlayers() >= 2
                     && room.getCurrentPlayers() <= room.getMaxPlayers()
@@ -294,22 +364,22 @@ public class RoomController {
             readyButton.setDisable(!canStart);
 
             if (canStart) {
-                readyButton.setStyle("-fx-background-color: linear-gradient(to bottom, #22c55e, #15803d); -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px; -fx-background-radius: 8px; -fx-cursor: hand; -fx-effect: dropshadow(three-pass-box, rgba(22,163,74,0.4), 8, 0, 0, 3);");
+                readyButton.setStyle("-fx-background-color: transparent; -fx-background-image: url('/com/tank2d/client/assets/ui/auth/buttons/btn_gold_normal.png'); -fx-background-size: 100% 100%; -fx-background-repeat: no-repeat; -fx-background-position: center center; -fx-text-fill: #1e293b; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 13.5px; -fx-cursor: hand; -fx-effect: dropshadow(three-pass-box, rgba(255,177,0,0.5), 10, 0, 0, 3);");
             } else {
-                readyButton.setStyle("-fx-background-color: #cbd5e1; -fx-text-fill: #64748b; -fx-font-weight: bold; -fx-font-size: 14px; -fx-background-radius: 8px;");
+                readyButton.setStyle("-fx-background-color: transparent; -fx-background-image: url('/com/tank2d/client/assets/ui/auth/buttons/btn_gold_disabled.png'); -fx-background-size: 100% 100%; -fx-background-repeat: no-repeat; -fx-background-position: center center; -fx-text-fill: #64748b; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 13.5px; -fx-opacity: 0.6;");
             }
 
         } else {
             boolean isReady = isCurrentUserReady(room);
 
             if (isReady) {
-                readyButton.setText("HUỶ SẴN SÀNG");
+                readyButton.setText("CANCEL READY");
                 readyButton.setDisable(false);
-                readyButton.setStyle("-fx-background-color: #fee2e2; -fx-text-fill: #dc2626; -fx-font-weight: bold; -fx-font-size: 14px; -fx-border-color: #fca5a5; -fx-border-width: 1.5px; -fx-background-radius: 8px; -fx-border-radius: 8px; -fx-cursor: hand;");
+                readyButton.setStyle("-fx-background-color: transparent; -fx-background-image: url('/com/tank2d/client/assets/ui/auth/buttons/btn_red_normal.png'); -fx-background-size: 100% 100%; -fx-background-repeat: no-repeat; -fx-background-position: center center; -fx-text-fill: #ffffff; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 13.5px; -fx-cursor: hand; -fx-effect: dropshadow(three-pass-box, rgba(239,68,68,0.5), 10, 0, 0, 3);");
             } else {
-                readyButton.setText("SẴN SÀNG");
+                readyButton.setText("READY UP");
                 readyButton.setDisable(false);
-                readyButton.setStyle("-fx-background-color: linear-gradient(to bottom, #3b82f6, #1d4ed8); -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px; -fx-background-radius: 8px; -fx-cursor: hand; -fx-effect: dropshadow(three-pass-box, rgba(37,99,235,0.35), 8, 0, 0, 3);");
+                readyButton.setStyle("-fx-background-color: transparent; -fx-background-image: url('/com/tank2d/client/assets/ui/auth/buttons/btn_green_normal.png'); -fx-background-size: 100% 100%; -fx-background-repeat: no-repeat; -fx-background-position: center center; -fx-text-fill: #ffffff; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 13.5px; -fx-cursor: hand; -fx-effect: dropshadow(three-pass-box, rgba(34,197,94,0.5), 10, 0, 0, 3);");
             }
         }
     }
@@ -398,7 +468,7 @@ public class RoomController {
         try {
             ClientSocket clientSocket = session.getClientSocket();
             if (clientSocket == null || !clientSocket.isConnected()) {
-                roomStatusLabel.setText("Chưa kết nối Server!");
+                roomStatusLabel.setText("NOT CONNECTED TO SERVER!");
                 return;
             }
 
@@ -410,7 +480,7 @@ public class RoomController {
             roomStatusLabel.setText(e.getMessage());
             LOGGER.log(Level.WARNING, "[Room] Lỗi nghiệp vụ Ready: " + e.getErrorCode(), e);
         } catch (IOException e) {
-            roomStatusLabel.setText("Không thể gửi trạng thái Ready!");
+            roomStatusLabel.setText("CANNOT SEND READY STATE!");
             LOGGER.log(Level.SEVERE, "[Room] Lỗi Ready", e);
         }
     }
@@ -423,19 +493,19 @@ public class RoomController {
         try {
             ClientSocket clientSocket = session.getClientSocket();
             if (clientSocket == null || !clientSocket.isConnected()) {
-                roomStatusLabel.setText("Chưa kết nối Server!");
+                roomStatusLabel.setText("NOT CONNECTED TO SERVER!");
                 return;
             }
 
             if (currentRoom == null) return;
 
             if (currentRoom.getCurrentPlayers() < 2) {
-                roomStatusLabel.setText("Cần ít nhất 2 người chơi để bắt đầu!");
+                roomStatusLabel.setText("MINIMUM 2 OPERATORS TO START!");
                 return;
             }
 
             if (!areAllPlayersReady(currentRoom)) {
-                roomStatusLabel.setText("Tất cả người chơi phải bấm Sẵn sàng!");
+                roomStatusLabel.setText("ALL OPERATORS MUST BE READY!");
                 return;
             }
 
@@ -448,7 +518,7 @@ public class RoomController {
             roomStatusLabel.setText(e.getMessage());
             LOGGER.log(Level.WARNING, "[Room] Lỗi nghiệp vụ Start: " + e.getErrorCode(), e);
         } catch (IOException e) {
-            roomStatusLabel.setText("Không thể bắt đầu trận!");
+            roomStatusLabel.setText("CANNOT START BATTLE!");
             LOGGER.log(Level.SEVERE, "[Room] Lỗi Start", e);
         }
     }

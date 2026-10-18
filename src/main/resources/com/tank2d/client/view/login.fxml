@@ -11,16 +11,18 @@
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
-<BorderPane xmlns="http://javafx.com/javafx/21"
-            xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.tank2d.client.controller.LoginController"
-            stylesheets="@theme.css"
-            prefWidth="800.0"
-            prefHeight="600.0"
-            styleClass="root-pane">
+<StackPane fx:id="rootStackPane"
+           xmlns="http://javafx.com/javafx/21"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="com.tank2d.client.controller.LoginController"
+           stylesheets="@theme.css"
+           prefWidth="960.0"
+           prefHeight="600.0"
+           styleClass="root-pane, auth-root">
 
-    <center>
-        <StackPane alignment="CENTER">
+    <BorderPane prefWidth="960.0" prefHeight="600.0">
+        <center>
+            <StackPane alignment="CENTER" styleClass="auth-overlay">
 
             <!-- ============================================== -->
             <!-- 1. LOGIN FORM CARD                             -->
@@ -28,12 +30,14 @@
             <VBox fx:id="loginForm"
                   alignment="CENTER"
                   spacing="10.0"
-                  maxWidth="380.0"
+                  maxWidth="420.0"
+                  prefWidth="420.0"
+                  prefHeight="480.0"
                   maxHeight="-Infinity"
-                  styleClass="auth-card">
+                  styleClass="auth-card-login">
 
-                <ImageView fitWidth="145.0"
-                           fitHeight="90.0"
+                <ImageView fitWidth="135.0"
+                           fitHeight="80.0"
                            preserveRatio="true">
                     <image>
                         <Image url="@tank-logo_1.png"/>
@@ -41,59 +45,57 @@
                 </ImageView>
 
                 <Label text="TANK 2D ONLINE"
-                       style="-fx-text-fill: #1d4ed8; -fx-font-size: 22px; -fx-font-weight: bold;"/>
+                       style="-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #38bdf8; -fx-font-size: 22px; -fx-font-weight: bold; -fx-effect: dropshadow(gaussian, rgba(56, 189, 248, 0.6), 12, 0.4, 0, 0);"/>
 
-                <Label text="Đăng nhập tài khoản"
-                       style="-fx-text-fill: #64748b; -fx-font-size: 14px; -fx-font-weight: bold;"/>
+                <Label text="OPERATOR LOGIN"
+                       style="-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #94a3b8; -fx-font-size: 13px; -fx-font-weight: bold;"/>
 
-                <VBox spacing="10.0" alignment="CENTER" maxWidth="310.0">
+                <VBox spacing="12.0" alignment="CENTER" maxWidth="310.0">
                     <TextField fx:id="usernameField"
-                               prefHeight="42.0"
+                               prefHeight="46.0"
                                maxWidth="310.0"
-                               promptText="Tên đăng nhập"
-                               styleClass="auth-field"/>
+                               promptText="USERNAME"
+                               styleClass="auth-field-username"/>
 
                     <!-- Cụm Mật khẩu Đăng nhập có Mắt xem -->
                     <StackPane alignment="CENTER_RIGHT" maxWidth="310.0">
                         <PasswordField fx:id="passwordField"
-                                       prefHeight="42.0"
+                                       prefHeight="46.0"
                                        maxWidth="310.0"
-                                       promptText="Mật khẩu"
-                                       styleClass="auth-field"
-                                       style="-fx-padding: 0 40px 0 12px;"/>
+                                       promptText="PASSWORD"
+                                       styleClass="auth-field-password"/>
 
                         <TextField fx:id="passwordTextField"
-                                   prefHeight="42.0"
+                                   prefHeight="46.0"
                                    maxWidth="310.0"
-                                   promptText="Mật khẩu"
-                                   styleClass="auth-field"
-                                   style="-fx-padding: 0 40px 0 12px;"
+                                   promptText="PASSWORD"
+                                   styleClass="auth-field-password"
                                    visible="false"
                                    managed="false"/>
 
                         <Button fx:id="togglePasswordBtn"
                                 text="👁"
                                 onAction="#togglePasswordVisibility"
-                                style="-fx-background-color: transparent; -fx-cursor: hand; -fx-font-size: 15px; -fx-text-fill: #64748b; -fx-padding: 0 10px 0 0;"/>
+                                style="-fx-background-color: transparent; -fx-cursor: hand; -fx-font-size: 11.5px; -fx-text-fill: #94a3b8; -fx-padding: 0 10px 0 0;"/>
                     </StackPane>
                 </VBox>
 
-                <VBox spacing="9.0" alignment="CENTER" maxWidth="310.0">
+                <VBox spacing="10.0" alignment="CENTER" maxWidth="310.0">
                     <VBox.margin>
-                        <Insets top="6.0"/>
+                        <Insets top="8.0"/>
                     </VBox.margin>
 
                     <Button fx:id="loginButton"
-                            text="Đăng nhập"
+                            text="LOGIN"
                             maxWidth="310.0"
-                            prefHeight="42.0"
+                            prefHeight="48.0"
                             styleClass="btn-primary"
                             onAction="#handleLogin"/>
 
-                    <Button text="Chưa có tài khoản? Đăng ký ngay"
+                    <Button text="REGISTER NOW"
                             maxWidth="310.0"
-                            prefHeight="38.0"
-                            styleClass="btn-outline"
+                            prefHeight="34.0"
+                            styleClass="btn-link"
                             onAction="#showRegister"/>
                 </VBox>
 
@@ -106,14 +108,16 @@
             <VBox fx:id="registerForm"
                   alignment="CENTER"
                   spacing="9.0"
-                  maxWidth="380.0"
+                  maxWidth="420.0"
+                  prefWidth="420.0"
+                  prefHeight="530.0"
                   maxHeight="-Infinity"
                   visible="false"
                   managed="false"
-                  styleClass="auth-card">
+                  styleClass="auth-card-register">
 
-                <ImageView fitWidth="125.0"
-                           fitHeight="78.0"
+                <ImageView fitWidth="120.0"
+                           fitHeight="70.0"
                            preserveRatio="true">
                     <image>
                         <Image url="@tank-logo_1.png"/>
@@ -121,82 +125,78 @@
                 </ImageView>
 
                 <Label text="TANK 2D ONLINE"
-                       style="-fx-text-fill: #1d4ed8; -fx-font-size: 21px; -fx-font-weight: bold;"/>
+                       style="-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #38bdf8; -fx-font-size: 21px; -fx-font-weight: bold; -fx-effect: dropshadow(gaussian, rgba(56, 189, 248, 0.6), 12, 0.4, 0, 0);"/>
 
-                <Label text="Đăng ký tài khoản mới"
-                       style="-fx-text-fill: #64748b; -fx-font-size: 14px; -fx-font-weight: bold;"/>
+                <Label text="NEW OPERATOR"
+                       style="-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #94a3b8; -fx-font-size: 13px; -fx-font-weight: bold;"/>
 
-                <VBox spacing="8.0" alignment="CENTER" maxWidth="310.0">
+                <VBox spacing="10.0" alignment="CENTER" maxWidth="310.0">
                     <TextField fx:id="registerUsernameField"
-                               prefHeight="39.0"
+                               prefHeight="45.0"
                                maxWidth="310.0"
-                               promptText="Tên đăng nhập mới"
-                               styleClass="auth-field"/>
+                               promptText="NEW USERNAME"
+                               styleClass="auth-field-username"/>
 
                     <!-- Mật khẩu đăng ký -->
                     <StackPane alignment="CENTER_RIGHT" maxWidth="310.0">
                         <PasswordField fx:id="registerPasswordField"
-                                       prefHeight="39.0"
+                                       prefHeight="45.0"
                                        maxWidth="310.0"
-                                       promptText="Mật khẩu"
-                                       styleClass="auth-field"
-                                       style="-fx-padding: 0 40px 0 12px;"/>
+                                       promptText="PASSWORD"
+                                       styleClass="auth-field-password"/>
 
                         <TextField fx:id="registerPasswordTextField"
-                                   prefHeight="39.0"
+                                   prefHeight="45.0"
                                    maxWidth="310.0"
-                                   promptText="Mật khẩu"
-                                   styleClass="auth-field"
-                                   style="-fx-padding: 0 40px 0 12px;"
+                                   promptText="PASSWORD"
+                                   styleClass="auth-field-password"
                                    visible="false"
                                    managed="false"/>
 
                         <Button fx:id="toggleRegisterPasswordBtn"
                                 text="👁"
                                 onAction="#toggleRegisterPasswordVisibility"
-                                style="-fx-background-color: transparent; -fx-cursor: hand; -fx-font-size: 15px; -fx-text-fill: #64748b; -fx-padding: 0 10px 0 0;"/>
+                                style="-fx-background-color: transparent; -fx-cursor: hand; -fx-font-size: 11.5px; -fx-text-fill: #94a3b8; -fx-padding: 0 10px 0 0;"/>
                     </StackPane>
 
                     <!-- Xác nhận mật khẩu đăng ký -->
                     <StackPane alignment="CENTER_RIGHT" maxWidth="310.0">
                         <PasswordField fx:id="confirmPasswordField"
-                                       prefHeight="39.0"
+                                       prefHeight="45.0"
                                        maxWidth="310.0"
-                                       promptText="Xác nhận mật khẩu"
-                                       styleClass="auth-field"
-                                       style="-fx-padding: 0 40px 0 12px;"/>
+                                       promptText="CONFIRM PASSWORD"
+                                       styleClass="auth-field-confirm"/>
 
                         <TextField fx:id="confirmPasswordTextField"
-                                   prefHeight="39.0"
+                                   prefHeight="45.0"
                                    maxWidth="310.0"
-                                   promptText="Xác nhận mật khẩu"
-                                   styleClass="auth-field"
-                                   style="-fx-padding: 0 40px 0 12px;"
+                                   promptText="CONFIRM PASSWORD"
+                                   styleClass="auth-field-confirm"
                                    visible="false"
                                    managed="false"/>
 
                         <Button fx:id="toggleConfirmPasswordBtn"
                                 text="👁"
                                 onAction="#toggleConfirmPasswordVisibility"
-                                style="-fx-background-color: transparent; -fx-cursor: hand; -fx-font-size: 15px; -fx-text-fill: #64748b; -fx-padding: 0 10px 0 0;"/>
+                                style="-fx-background-color: transparent; -fx-cursor: hand; -fx-font-size: 11.5px; -fx-text-fill: #94a3b8; -fx-padding: 0 10px 0 0;"/>
                     </StackPane>
                 </VBox>
 
-                <VBox spacing="8.0" alignment="CENTER" maxWidth="310.0">
+                <VBox spacing="9.0" alignment="CENTER" maxWidth="310.0">
                     <VBox.margin>
-                        <Insets top="6.0"/>
+                        <Insets top="8.0"/>
                     </VBox.margin>
 
-                    <Button text="Tạo tài khoản"
+                    <Button text="CREATE ACCOUNT"
                             maxWidth="310.0"
-                            prefHeight="42.0"
+                            prefHeight="48.0"
                             styleClass="btn-success"
                             onAction="#handleRegister"/>
 
-                    <Button text="← Đã có tài khoản? Đăng nhập"
+                    <Button text="BACK TO LOGIN"
                             maxWidth="310.0"
-                            prefHeight="38.0"
-                            styleClass="btn-outline"
+                            prefHeight="34.0"
+                            styleClass="btn-link"
                             onAction="#showLogin"/>
                 </VBox>
 
@@ -204,5 +204,6 @@
 
         </StackPane>
     </center>
+    </BorderPane>
 
-</BorderPane>
+</StackPane>

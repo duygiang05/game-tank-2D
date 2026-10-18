@@ -30,6 +30,8 @@ public class Room {
     private final int maxPlayers;
     private int hostId;
     private int duration = 60;
+    private String mapId = "map_default";
+    private String mapName = "Tropical Warzone";
 
     private final List<User> players;
     private final Map<Integer, Boolean> readyStates;
@@ -243,6 +245,31 @@ public class Room {
         }
         this.duration = duration;
         return true;
+    }
+
+    public synchronized String getMapId() {
+        return mapId;
+    }
+
+    public synchronized String getMapName() {
+        return mapName;
+    }
+
+    public synchronized boolean setMap(String mapId) {
+        if ("map_default".equalsIgnoreCase(mapId)) {
+            this.mapId = "map_default";
+            this.mapName = "Tropical Warzone";
+            return true;
+        } else if ("map_desert".equalsIgnoreCase(mapId)) {
+            this.mapId = "map_desert";
+            this.mapName = "Desert Dunes";
+            return true;
+        } else if ("map_snow".equalsIgnoreCase(mapId)) {
+            this.mapId = "map_snow";
+            this.mapName = "Snow Blizzard";
+            return true;
+        }
+        return false;
     }
 
     public synchronized GameLoop getGameLoop() {

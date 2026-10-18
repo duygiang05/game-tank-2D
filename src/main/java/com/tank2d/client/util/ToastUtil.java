@@ -4,7 +4,9 @@ import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.control.Label;
+import javafx.scene.layout.HBox;
 import javafx.stage.Popup;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -56,45 +58,65 @@ public class ToastUtil {
                     return;
                 }
 
-                Popup popup = new Popup();
-                popup.setAutoFix(true);
+                Parent root = targetWindow.getScene().getRoot();
+                if (root instanceof javafx.scene.layout.Pane parentPane) {
+                    parentPane.getChildren().removeIf(node -> "in-scene-toast".equals(node.getId()));
 
-                Label label = new Label(message);
-                label.setWrapText(true);
-                label.setMaxWidth(400);
+                    HBox toastCard = new HBox(6);
+                    toastCard.setId("in-scene-toast");
+                    toastCard.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+                    toastCard.setMaxSize(javafx.scene.layout.Region.USE_PREF_SIZE, javafx.scene.layout.Region.USE_PREF_SIZE);
+                    toastCard.setPrefHeight(24);
+                    toastCard.setMouseTransparent(true);
 
-                String bgColor = isSuccess ? "rgba(22, 101, 52, 0.95)" : "rgba(185, 28, 28, 0.95)";
-                String borderColor = isSuccess ? "#4ade80" : "#f87171";
+                    String icon = isSuccess ? "✔ " : "✖ ";
+                    Label label = new Label(icon + message);
+                    label.setWrapText(false);
 
-                label.setStyle(
-                        "-fx-background-color: " + bgColor + ";"
-                        + "-fx-text-fill: white;"
-                        + "-fx-font-size: 13.5px;"
-                        + "-fx-font-weight: bold;"
-                        + "-fx-padding: 12px 20px;"
-                        + "-fx-background-radius: 8px;"
-                        + "-fx-border-color: " + borderColor + ";"
-                        + "-fx-border-width: 1.5px;"
-                        + "-fx-border-radius: 8px;"
-                        + "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.4), 10, 0, 0, 4);"
-                );
+                    String textColor = isSuccess ? "#4ade80" : "#f87171";
+                    String bgColor = isSuccess ? "rgba(34, 197, 94, 0.04)" : "rgba(239, 68, 68, 0.04)";
+                    String borderColor = isSuccess ? "rgba(74, 222, 128, 0.30)" : "rgba(248, 113, 113, 0.30)";
 
-                popup.getContent().add(label);
-                popup.show(targetWindow);
+                    toastCard.setStyle(
+                            "-fx-background-color: " + bgColor + ";"
+                            + "-fx-padding: 3px 10px;"
+                            + "-fx-background-radius: 6px;"
+                            + "-fx-border-color: " + borderColor + ";"
+                            + "-fx-border-width: 1px;"
+                            + "-fx-border-radius: 6px;"
+                    );
+                    label.setStyle("-fx-text-fill: " + textColor + "; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-size: 9.5px; -fx-font-weight: bold;");
+                    toastCard.getChildren().add(label);
 
-                popup.setX(targetWindow.getX() + (targetWindow.getWidth() - label.getWidth()) / 2.0);
-                popup.setY(targetWindow.getY() + 65.0);
+                    if (parentPane instanceof javafx.scene.layout.StackPane stackPane) {
+                        javafx.scene.layout.StackPane.setAlignment(toastCard, javafx.geometry.Pos.TOP_RIGHT);
+                        javafx.scene.layout.StackPane.setMargin(toastCard, new javafx.geometry.Insets(12, 14, 0, 0));
+                        stackPane.getChildren().add(toastCard);
+                        toastCard.toFront();
+                    } else {
+                        toastCard.setLayoutX(Math.max(20, parentPane.getWidth() - 320));
+                        toastCard.setLayoutY(12);
+                        parentPane.getChildren().add(toastCard);
+                        toastCard.toFront();
+                    }
 
-                double displayTime = Math.max(1.0, durationSeconds - 0.5);
-                PauseTransition visiblePause = new PauseTransition(Duration.seconds(displayTime));
-                visiblePause.setOnFinished(e -> {
-                    FadeTransition fade = new FadeTransition(Duration.millis(500), label);
-                    fade.setFromValue(1.0);
-                    fade.setToValue(0.0);
-                    fade.setOnFinished(f -> popup.hide());
-                    fade.play();
-                });
-                visiblePause.play();
+                    toastCard.setOpacity(0.0);
+                    FadeTransition fadeIn = new FadeTransition(Duration.millis(250), toastCard);
+                    fadeIn.setFromValue(0.0);
+                    fadeIn.setToValue(1.0);
+
+                    PauseTransition stay = new PauseTransition(Duration.seconds(durationSeconds));
+                    stay.setOnFinished(e -> {
+                        FadeTransition fadeOut = new FadeTransition(Duration.millis(400), toastCard);
+                        fadeOut.setFromValue(1.0);
+                        fadeOut.setToValue(0.0);
+                        fadeOut.setOnFinished(f -> parentPane.getChildren().remove(toastCard));
+                        fadeOut.play();
+                    });
+
+                    fadeIn.setOnFinished(e -> stay.play());
+                    fadeIn.play();
+                }
 
             } catch (Exception ignored) {}
         });
@@ -108,10 +130,30 @@ public class ToastUtil {
      * @param isSuccess true nếu thông báo thành công, false nếu là thông báo lỗi
      */
     public static void showToast(Node node, String message, boolean isSuccess) {
+        showToast(node, message, isSuccess, 5.0);
+    }
+
+    public static void showToast(Node node, String message, boolean isSuccess, double durationSeconds) {
         if (node != null && node.getScene() != null) {
-            showToast(node.getScene().getWindow(), message, isSuccess);
+            showToast(node.getScene().getWindow(), message, isSuccess, durationSeconds);
         } else {
-            showToast((Window) null, message, isSuccess);
+            showToast((Window) null, message, isSuccess, durationSeconds);
         }
+    }
+
+    public static void showInfo(Node node, String message) {
+        showToast(node, message, true, 4.0);
+    }
+
+    public static void showSuccess(Node node, String message) {
+        showToast(node, message, true, 4.0);
+    }
+
+    public static void showWarning(Node node, String message) {
+        showToast(node, message, false, 4.0);
+    }
+
+    public static void showError(Node node, String message) {
+        showToast(node, message, false, 5.0);
     }
 }

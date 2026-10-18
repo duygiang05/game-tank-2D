@@ -10,16 +10,14 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.shape.Circle?>
-<?import javafx.scene.shape.Rectangle?>
 
 <BorderPane xmlns="http://javafx.com/javafx/21"
             xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.tank2d.client.controller.RoomController"
             stylesheets="@lobby.css"
-            prefWidth="800.0"
+            prefWidth="960.0"
             prefHeight="600.0"
-            style="-fx-background-color: #f1f5f9;">
+            styleClass="room-root">
 
     <!-- ============================================== -->
     <!-- TOP: THANH HEADER PHÒNG CHỜ                    -->
@@ -27,15 +25,15 @@
     <top>
         <VBox spacing="10.0">
             <padding>
-                <Insets top="16.0" right="35.0" bottom="10.0" left="35.0"/>
+                <Insets top="14.0" right="24.0" bottom="8.0" left="24.0"/>
             </padding>
 
             <HBox alignment="CENTER_LEFT"
-                  style="-fx-background-color: white; -fx-background-radius: 14px; -fx-padding: 14px 24px; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.06), 14, 0, 0, 3);">
+                  style="-fx-background-color: rgba(13, 20, 36, 0.45); -fx-background-radius: 14px; -fx-border-color: rgba(56, 189, 248, 0.35); -fx-border-width: 1.5px; -fx-border-radius: 14px; -fx-padding: 8px 18px; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.6), 16, 0.3, 0, 4);">
 
                 <!-- Icon xe tăng + Tên phòng + Trạng thái -->
-                <HBox alignment="CENTER_LEFT" spacing="14.0">
-                    <ImageView fitWidth="50.0" fitHeight="34.0" preserveRatio="true">
+                <HBox alignment="CENTER_LEFT" spacing="12.0">
+                    <ImageView fitWidth="48.0" fitHeight="34.0" preserveRatio="true">
                         <image>
                             <Image url="@tank-logo_1.png"/>
                         </image>
@@ -43,25 +41,35 @@
 
                     <VBox spacing="2.0">
                         <Label fx:id="roomNameLabel"
-                               text="Phòng đấu #01"
-                               style="-fx-text-fill: #1d4ed8; -fx-font-size: 20px; -fx-font-weight: bold;"/>
+                               text="ROOM #01"
+                               style="-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #38bdf8; -fx-font-size: 17px; -fx-font-weight: bold;"/>
                         <Label fx:id="roomStatusLabel"
-                               text="Đang chờ người chơi..."
-                               style="-fx-text-fill: #64748b; -fx-font-size: 13px; -fx-font-weight: bold;"/>
+                               text="WAITING FOR OPERATORS..."
+                               style="-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #94a3b8; -fx-font-size: 10.5px; -fx-font-weight: bold;"/>
                     </VBox>
                 </HBox>
 
                 <HBox HBox.hgrow="ALWAYS"/>
 
-                <!-- Cài đặt thời lượng -->
+                <!-- Cài đặt bản đồ & thời lượng -->
                 <HBox alignment="CENTER_RIGHT" spacing="10.0">
-                    <Label text="⏱ Thời lượng:"
-                           style="-fx-text-fill: #334155; -fx-font-size: 13.5px; -fx-font-weight: bold;"/>
+                    <Label text="MAP:"
+                           style="-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #94a3b8; -fx-font-size: 10.5px; -fx-font-weight: bold;"/>
+
+                    <ComboBox fx:id="mapComboBox"
+                              prefWidth="145.0"
+                              prefHeight="34.0"
+                              styleClass="combo-box"
+                              promptText="Select Map"/>
+
+                    <Label text="DURATION:"
+                           style="-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #94a3b8; -fx-font-size: 10.5px; -fx-font-weight: bold;"/>
 
                     <ComboBox fx:id="durationComboBox"
-                              prefWidth="130.0"
-                              prefHeight="36.0"
-                              promptText="Chọn thời gian"/>
+                              prefWidth="90.0"
+                              prefHeight="34.0"
+                              styleClass="combo-box"
+                              promptText="Select"/>
                 </HBox>
             </HBox>
         </VBox>
@@ -76,122 +84,130 @@
                 <Insets top="8.0" right="35.0" bottom="8.0" left="35.0"/>
             </padding>
 
-            <Label text="VỊ TRÍ CHIẾN ĐẤU &amp; XE TĂNG XUẤT PHÁT"
-                   style="-fx-text-fill: #475569; -fx-font-size: 14px; -fx-font-weight: bold; -fx-letter-spacing: 0.5px;"/>
+            <Label text="COMBAT SLOTS &amp; VEHICLE PREVIEW"
+                   style="-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #38bdf8; -fx-font-size: 14px; -fx-font-weight: bold; -fx-letter-spacing: 0.5px;"/>
 
             <!-- 4 Thẻ Slot Player -->
-            <HBox alignment="CENTER" spacing="16.0">
+            <HBox alignment="CENTER" spacing="20.0">
 
-                <!-- SLOT P1 (Xanh lục / Green) -->
+                <!-- SLOT P1 (Green Tank) -->
                 <VBox fx:id="slotP1"
                       alignment="CENTER"
-                      spacing="9.0"
-                      prefWidth="165.0"
-                      prefHeight="235.0"
-                      style="-fx-background-color: white; -fx-background-radius: 14px; -fx-border-color: #22c55e; -fx-border-width: 2px; -fx-border-radius: 14px; -fx-padding: 14px; -fx-effect: dropshadow(three-pass-box, rgba(34,197,94,0.18), 12, 0, 0, 4);">
+                      spacing="12.0"
+                      prefWidth="205.0"
+                      prefHeight="265.0"
+                      style="-fx-background-color: rgba(13, 20, 36, 0.42); -fx-background-radius: 14px; -fx-border-color: #22c55e; -fx-border-width: 2px; -fx-border-radius: 14px; -fx-padding: 16px; -fx-effect: dropshadow(gaussian, rgba(34,197,94,0.3), 16, 0.25, 0, 4);">
 
-                    <Label text="P1 • GÓC TRÊN TRÁI"
-                           style="-fx-text-fill: #15803d; -fx-font-size: 11.5px; -fx-font-weight: bold;"/>
+                    <Label text="P1 • NORTH WEST"
+                           style="-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #22c55e; -fx-font-size: 11px; -fx-font-weight: bold;"/>
 
-                    <!-- Mô hình Xe Tăng Chiến Đấu P1 (Green Tank) -->
-                    <StackPane prefWidth="85.0" prefHeight="75.0"
-                               style="-fx-background-color: #f0fdf4; -fx-background-radius: 12px;">
-                        <Rectangle width="50.0" height="34.0" arcWidth="8.0" arcHeight="8.0" fill="#22c55e"/>
-                        <Circle radius="12.0" fill="#16a34a"/>
-                        <Rectangle width="22.0" height="6.0" arcWidth="3.0" arcHeight="3.0" fill="#166534" translateX="14.0"/>
+                    <!-- Mô hình Xe Tăng P1 -->
+                    <StackPane prefWidth="110.0" prefHeight="90.0"
+                               style="-fx-background-color: rgba(34,197,94,0.12); -fx-background-radius: 12px; -fx-border-color: rgba(34,197,94,0.25); -fx-border-radius: 12px;">
+                        <ImageView fitWidth="54.0" fitHeight="54.0" preserveRatio="true" rotate="180.0">
+                            <image>
+                                <Image url="@../assets/battlefield/tanks/tank_green.png"/>
+                            </image>
+                        </ImageView>
                     </StackPane>
 
                     <Label fx:id="p1Label"
-                           text="Chờ..."
-                           style="-fx-text-fill: #0f172a; -fx-font-size: 14px; -fx-font-weight: bold; -fx-alignment: CENTER;"/>
+                           text="WAITING..."
+                           style="-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #38bdf8; -fx-font-size: 12.5px; -fx-font-weight: bold; -fx-alignment: CENTER;"/>
 
                     <Label fx:id="p1StatusBadge"
-                           text="👑 CHỦ PHÒNG"
-                           style="-fx-background-color: #dcfce7; -fx-text-fill: #15803d; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;"/>
+                           text="👑 HOST"
+                           style="-fx-background-color: rgba(245, 158, 11, 0.2); -fx-text-fill: #fbbf24; -fx-border-color: #f59e0b; -fx-border-width: 1px; -fx-font-size: 10.5px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px; -fx-border-radius: 12px; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif;"/>
                 </VBox>
 
-                <!-- SLOT P2 (Đỏ rực lửa) -->
+                <!-- SLOT P2 (Red Tank) -->
                 <VBox fx:id="slotP2"
                       alignment="CENTER"
-                      spacing="9.0"
-                      prefWidth="165.0"
-                      prefHeight="235.0"
-                      style="-fx-background-color: white; -fx-background-radius: 14px; -fx-border-color: #e2e8f0; -fx-border-width: 1.5px; -fx-border-radius: 14px; -fx-padding: 14px; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.05), 10, 0, 0, 3);">
+                      spacing="12.0"
+                      prefWidth="205.0"
+                      prefHeight="265.0"
+                      style="-fx-background-color: rgba(13, 20, 36, 0.42); -fx-background-radius: 14px; -fx-border-color: #ef4444; -fx-border-width: 1.5px; -fx-border-radius: 14px; -fx-padding: 16px; -fx-effect: dropshadow(gaussian, rgba(239,68,68,0.2), 14, 0.2, 0, 4);">
 
-                    <Label text="P2 • GÓC TRÊN PHẢI"
-                           style="-fx-text-fill: #dc2626; -fx-font-size: 11.5px; -fx-font-weight: bold;"/>
+                    <Label text="P2 • NORTH EAST"
+                           style="-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #ef4444; -fx-font-size: 11px; -fx-font-weight: bold;"/>
 
-                    <!-- Mô hình Xe Tăng Chiến Đấu P2 (Red Tank) -->
-                    <StackPane prefWidth="85.0" prefHeight="75.0"
-                               style="-fx-background-color: #fef2f2; -fx-background-radius: 12px;">
-                        <Rectangle width="50.0" height="34.0" arcWidth="8.0" arcHeight="8.0" fill="#ef4444"/>
-                        <Circle radius="12.0" fill="#dc2626"/>
-                        <Rectangle width="22.0" height="6.0" arcWidth="3.0" arcHeight="3.0" fill="#991b1b" translateX="14.0"/>
+                    <!-- Mô hình Xe Tăng P2 -->
+                    <StackPane prefWidth="110.0" prefHeight="90.0"
+                               style="-fx-background-color: rgba(239,68,68,0.12); -fx-background-radius: 12px; -fx-border-color: rgba(239,68,68,0.25); -fx-border-radius: 12px;">
+                        <ImageView fitWidth="50.0" fitHeight="54.0" preserveRatio="true" rotate="180.0">
+                            <image>
+                                <Image url="@../assets/battlefield/tanks/tank_red.png"/>
+                            </image>
+                        </ImageView>
                     </StackPane>
 
                     <Label fx:id="p2Label"
-                           text="Trống"
-                           style="-fx-text-fill: #94a3b8; -fx-font-size: 14px; -fx-font-weight: bold; -fx-alignment: CENTER;"/>
+                           text="EMPTY"
+                           style="-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #64748b; -fx-font-size: 12.5px; -fx-font-weight: bold; -fx-alignment: CENTER;"/>
 
                     <Label fx:id="p2StatusBadge"
-                           text="CHƯA SẴN SÀNG"
-                           style="-fx-background-color: #f1f5f9; -fx-text-fill: #64748b; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;"/>
+                           text="WAITING"
+                           style="-fx-background-color: rgba(100, 116, 139, 0.2); -fx-text-fill: #94a3b8; -fx-border-color: #64748b; -fx-border-width: 1px; -fx-font-size: 10.5px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px; -fx-border-radius: 12px; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif;"/>
                 </VBox>
 
-                <!-- SLOT P3 (Tím thần bí / Purple) -->
+                <!-- SLOT P3 (Blue Tank) -->
                 <VBox fx:id="slotP3"
                       alignment="CENTER"
-                      spacing="9.0"
-                      prefWidth="165.0"
-                      prefHeight="235.0"
-                      style="-fx-background-color: white; -fx-background-radius: 14px; -fx-border-color: #e2e8f0; -fx-border-width: 1.5px; -fx-border-radius: 14px; -fx-padding: 14px; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.05), 10, 0, 0, 3);">
+                      spacing="12.0"
+                      prefWidth="205.0"
+                      prefHeight="265.0"
+                      style="-fx-background-color: rgba(13, 20, 36, 0.42); -fx-background-radius: 14px; -fx-border-color: #3b82f6; -fx-border-width: 1.5px; -fx-border-radius: 14px; -fx-padding: 16px; -fx-effect: dropshadow(gaussian, rgba(59,130,246,0.2), 14, 0.2, 0, 4);">
 
-                    <Label text="P3 • GÓC DƯỚI TRÁI"
-                           style="-fx-text-fill: #9333ea; -fx-font-size: 11.5px; -fx-font-weight: bold;"/>
+                    <Label text="P3 • SOUTH WEST"
+                           style="-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #3b82f6; -fx-font-size: 11px; -fx-font-weight: bold;"/>
 
-                    <!-- Mô hình Xe Tăng Chiến Đấu P3 (Purple Tank) -->
-                    <StackPane prefWidth="85.0" prefHeight="75.0"
-                               style="-fx-background-color: #faf5ff; -fx-background-radius: 12px;">
-                        <Rectangle width="50.0" height="34.0" arcWidth="8.0" arcHeight="8.0" fill="#a855f7"/>
-                        <Circle radius="12.0" fill="#9333ea"/>
-                        <Rectangle width="22.0" height="6.0" arcWidth="3.0" arcHeight="3.0" fill="#6b21a8" translateX="14.0"/>
+                    <!-- Mô hình Xe Tăng P3 -->
+                    <StackPane prefWidth="110.0" prefHeight="90.0"
+                               style="-fx-background-color: rgba(59,130,246,0.12); -fx-background-radius: 12px; -fx-border-color: rgba(59,130,246,0.25); -fx-border-radius: 12px;">
+                        <ImageView fitWidth="54.0" fitHeight="54.0" preserveRatio="true" rotate="180.0">
+                            <image>
+                                <Image url="@../assets/battlefield/tanks/tank_blue.png"/>
+                            </image>
+                        </ImageView>
                     </StackPane>
 
                     <Label fx:id="p3Label"
-                           text="Trống"
-                           style="-fx-text-fill: #94a3b8; -fx-font-size: 14px; -fx-font-weight: bold; -fx-alignment: CENTER;"/>
+                           text="EMPTY"
+                           style="-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #64748b; -fx-font-size: 12.5px; -fx-font-weight: bold; -fx-alignment: CENTER;"/>
 
                     <Label fx:id="p3StatusBadge"
-                           text="CHƯA SẴN SÀNG"
-                           style="-fx-background-color: #f1f5f9; -fx-text-fill: #64748b; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;"/>
+                           text="WAITING"
+                           style="-fx-background-color: rgba(100, 116, 139, 0.2); -fx-text-fill: #94a3b8; -fx-border-color: #64748b; -fx-border-width: 1px; -fx-font-size: 10.5px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px; -fx-border-radius: 12px; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif;"/>
                 </VBox>
 
-                <!-- SLOT P4 (Vàng sa mạc) -->
+                <!-- SLOT P4 (Sand Tank) -->
                 <VBox fx:id="slotP4"
                       alignment="CENTER"
-                      spacing="9.0"
-                      prefWidth="165.0"
-                      prefHeight="235.0"
-                      style="-fx-background-color: white; -fx-background-radius: 14px; -fx-border-color: #e2e8f0; -fx-border-width: 1.5px; -fx-border-radius: 14px; -fx-padding: 14px; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.05), 10, 0, 0, 3);">
+                      spacing="12.0"
+                      prefWidth="205.0"
+                      prefHeight="265.0"
+                      style="-fx-background-color: rgba(13, 20, 36, 0.42); -fx-background-radius: 14px; -fx-border-color: #eab308; -fx-border-width: 1.5px; -fx-border-radius: 14px; -fx-padding: 16px; -fx-effect: dropshadow(gaussian, rgba(234,179,8,0.2), 14, 0.2, 0, 4);">
 
-                    <Label text="P4 • GÓC DƯỚI PHẢI"
-                           style="-fx-text-fill: #d97706; -fx-font-size: 11.5px; -fx-font-weight: bold;"/>
+                    <Label text="P4 • SOUTH EAST"
+                           style="-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #eab308; -fx-font-size: 11px; -fx-font-weight: bold;"/>
 
-                    <!-- Mô hình Xe Tăng Chiến Đấu P4 (Yellow Tank) -->
-                    <StackPane prefWidth="85.0" prefHeight="75.0"
-                               style="-fx-background-color: #fffbeb; -fx-background-radius: 12px;">
-                        <Rectangle width="50.0" height="34.0" arcWidth="8.0" arcHeight="8.0" fill="#eab308"/>
-                        <Circle radius="12.0" fill="#ca8a04"/>
-                        <Rectangle width="22.0" height="6.0" arcWidth="3.0" arcHeight="3.0" fill="#854d0e" translateX="14.0"/>
+                    <!-- Mô hình Xe Tăng P4 -->
+                    <StackPane prefWidth="110.0" prefHeight="90.0"
+                               style="-fx-background-color: rgba(234,179,8,0.12); -fx-background-radius: 12px; -fx-border-color: rgba(234,179,8,0.25); -fx-border-radius: 12px;">
+                        <ImageView fitWidth="54.0" fitHeight="54.0" preserveRatio="true" rotate="180.0">
+                            <image>
+                                <Image url="@../assets/battlefield/tanks/tank_sand.png"/>
+                            </image>
+                        </ImageView>
                     </StackPane>
 
                     <Label fx:id="p4Label"
-                           text="Trống"
-                           style="-fx-text-fill: #94a3b8; -fx-font-size: 14px; -fx-font-weight: bold; -fx-alignment: CENTER;"/>
+                           text="EMPTY"
+                           style="-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #64748b; -fx-font-size: 12.5px; -fx-font-weight: bold; -fx-alignment: CENTER;"/>
 
                     <Label fx:id="p4StatusBadge"
-                           text="CHƯA SẴN SÀNG"
-                           style="-fx-background-color: #f1f5f9; -fx-text-fill: #64748b; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;"/>
+                           text="WAITING"
+                           style="-fx-background-color: rgba(100, 116, 139, 0.2); -fx-text-fill: #94a3b8; -fx-border-color: #64748b; -fx-border-width: 1px; -fx-font-size: 10.5px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px; -fx-border-radius: 12px; -fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif;"/>
                 </VBox>
 
             </HBox>
@@ -202,23 +218,23 @@
     <!-- BOTTOM: CÁC NÚT ĐIỀU KHIỂN PHÒNG CHỜ           -->
     <!-- ============================================== -->
     <bottom>
-        <HBox alignment="CENTER" spacing="22.0">
+        <HBox alignment="CENTER" spacing="28.0">
             <padding>
                 <Insets top="10.0" right="35.0" bottom="24.0" left="35.0"/>
             </padding>
 
             <Button fx:id="leaveButton"
-                    text="← Rời phòng"
-                    prefWidth="180.0"
-                    prefHeight="44.0"
-                    style="-fx-background-color: white; -fx-text-fill: #dc2626; -fx-font-weight: bold; -fx-font-size: 14px; -fx-border-color: #fca5a5; -fx-border-width: 1.5px; -fx-border-radius: 8px; -fx-background-radius: 8px; -fx-cursor: hand;"
+                    text="← LEAVE ROOM"
+                    prefWidth="200.0"
+                    prefHeight="46.0"
+                    styleClass="btn-danger"
                     onAction="#handleLeave"/>
 
             <Button fx:id="readyButton"
-                    text="SẴN SÀNG"
-                    prefWidth="220.0"
-                    prefHeight="44.0"
-                    styleClass="btn-create-room"
+                    text="READY"
+                    prefWidth="240.0"
+                    prefHeight="46.0"
+                    styleClass="btn-success"
                     onAction="#handleReady"/>
         </HBox>
     </bottom>

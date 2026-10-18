@@ -179,7 +179,11 @@ public class GameLoop implements Runnable {
             return false;
         }
 
-        spawnBullet(tank.getId(), tank.getX(), tank.getY(), result.vx, result.vy, result.type);
+        double radians = Math.toRadians(tank.getAngle());
+        double muzzleOffset = tankSize * 0.55;
+        double spawnX = tank.getX() + muzzleOffset * Math.cos(radians);
+        double spawnY = tank.getY() + muzzleOffset * Math.sin(radians);
+        spawnBullet(tank.getId(), spawnX, spawnY, result.vx, result.vy, result.type);
         return true;
     }
 

@@ -13,3 +13,6 @@ nbproject/private/
 .vscode/
 *.log
 nbactions.xml
+
+# Thư mục chứa asset thô / file nén ban đầu
+asset/

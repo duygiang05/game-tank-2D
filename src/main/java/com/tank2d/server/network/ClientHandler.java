@@ -5,6 +5,10 @@ import com.tank2d.common.config.ConfigLoader;
 import com.tank2d.common.dto.LoginRequest;
 import com.tank2d.common.dto.LoginResponse;
 import com.tank2d.common.dto.RegisterResponse;
+import com.tank2d.common.dto.OnlinePlayerDTO;
+import com.tank2d.common.dto.InviteBattleRequestDTO;
+import com.tank2d.common.dto.InviteBattleNotifyDTO;
+import com.tank2d.common.dto.InviteBattleResponseDTO;
 import com.tank2d.common.dto.game.PlayerShootRequestDTO;
 import com.tank2d.common.dto.game.ReconnectPromptDTO;
 import com.tank2d.common.dto.game.ReconnectResponseDTO;
@@ -119,18 +123,23 @@ public class ClientHandler implements Runnable {
             case LEADERBOARD_REQ -> handleLeaderboard();
             case MATCH_HISTORY_REQ -> handleMatchHistory();
             case MATCH_DETAIL_REQ -> handleMatchDetail(packet.getData());
+            case USER_PROFILE_REQ -> handleUserProfile(packet.getData());
             case LOGOUT_REQ -> handleLogout();
             case LOBBY_GET_ROOMS_REQ -> handleGetRooms();
             case ROOM_CREATE_REQ -> handleCreateRoom();
             case ROOM_JOIN_REQ -> handleJoinRoom(packet.getData());
             case ROOM_READY_REQ -> handleReady(packet.getData());
             case ROOM_DURATION_REQ -> handleRoomDuration(packet.getData());
+            case ROOM_MAP_REQ -> handleRoomMap(packet.getData());
             case ROOM_START_REQ -> handleStartGame();
             case ROOM_LEAVE_REQ -> handleLeaveRoom();
             case GAME_RECONNECT_REQ -> handleReconnectGame();
             case TANK_PLAYER_INFO_REQ -> handleTankPlayerInfo();
             case PLAYER_INPUT -> handlePlayerInput(packet.getData());
             case PLAYER_SHOOT_REQ -> handlePlayerShoot(packet.getData());
+            case ONLINE_PLAYERS_REQ -> handleGetOnlinePlayers();
+            case INVITE_BATTLE_REQ -> handleInviteBattle(packet.getData());
+            case INVITE_BATTLE_RESPONSE -> handleInviteBattleResponse(packet.getData());
             default -> LOGGER.info("[ClientHandler] Nhận packet chưa hỗ trợ: " + packet.getType());
         }
     }
@@ -172,6 +181,7 @@ public class ClientHandler implements Runnable {
             }
 
             currentUser = null;
+            broadcastOnlinePlayers();
             LOGGER.info("[ClientHandler] Client đăng xuất thành công.");
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "[ClientHandler] Lỗi khi đăng xuất", e);
@@ -218,6 +228,7 @@ public class ClientHandler implements Runnable {
             NetworkUtil.sendPacket(dos, new Packet(PacketType.AUTH_LOGIN_RES, gson.toJson(res)));
 
             if (currentUser != null) {
+                broadcastOnlinePlayers();
                 if (!checkUserPenalized()) {
                     Room playingRoom = roomManager.getPlayingRoomByUserId(currentUser.getId());
                     if (playingRoom != null && playingRoom.getGameStateManager() != null && !playingRoom.getGameStateManager().isGameOver()) {
@@ -306,6 +317,26 @@ public class ClientHandler implements Runnable {
         }
     }
 
+    private void handleUserProfile(String rawJson) {
+        try {
+            int targetUserId = (currentUser != null) ? currentUser.getId() : -1;
+            if (rawJson != null && !rawJson.trim().isEmpty() && !rawJson.equals("\"\"") && !rawJson.equals("{}")) {
+                try {
+                    int parsed = gson.fromJson(rawJson, Integer.class);
+                    if (parsed > 0) targetUserId = parsed;
+                } catch (Exception ignored) {}
+            }
+            if (targetUserId > 0) {
+                com.tank2d.common.dto.UserProfileDTO profile = userDAO.getUserProfile(targetUserId);
+                if (profile != null) {
+                    NetworkUtil.sendPacket(dos, new Packet(PacketType.USER_PROFILE_RES, gson.toJson(profile)));
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "[UserProfile] Lỗi gửi thông tin hồ sơ", e);
+        }
+    }
+
     private void handleGetRooms() {
         try {
             Packet response = new Packet(PacketType.LOBBY_ROOMS_RES, gson.toJson(roomManager.getAllRooms()));
@@ -347,6 +378,7 @@ public class ClientHandler implements Runnable {
             NetworkUtil.sendPacket(dos, response);
 
             broadcastLobbyRooms();
+            broadcastOnlinePlayers();
         } catch (IOException ignored) {}
     }
 
@@ -373,6 +405,7 @@ public class ClientHandler implements Runnable {
                 currentRoomId = roomId;
                 broadcastRoomState();
                 broadcastLobbyRooms();
+                broadcastOnlinePlayers();
             } else {
                 LOGGER.info("[Room] Từ chối " + currentUser.getUsername() + " vào phòng " + roomId);
                 Packet packet = new Packet(PacketType.ROOM_LIST_UPDATE, gson.toJson(roomManager.getAllRooms()));
@@ -435,10 +468,16 @@ public class ClientHandler implements Runnable {
                     ? ConfigLoader.getPhysicsStats().get("server_tick_rate").getAsInt() : 30;
             GameLoop gameLoop = new GameLoop(serverTickRate);
 
+            String mapId = (room.getMapId() != null) ? room.getMapId() : "map_default";
             try {
-                gameLoop.setGameMap(MapLoader.loadFromFile("config/maps/map_default.json"));
+                gameLoop.setGameMap(MapLoader.loadFromFile("config/maps/" + mapId + ".json"));
             } catch (Exception e) {
-                LOGGER.log(Level.SEVERE, "[Game] Lỗi nạp map", e);
+                LOGGER.log(Level.SEVERE, "[Game] Lỗi nạp map " + mapId + ", dùng fallback mặc định", e);
+                try {
+                    gameLoop.setGameMap(MapLoader.loadFromFile("config/maps/map_default.json"));
+                } catch (Exception ex) {
+                    LOGGER.log(Level.SEVERE, "[Game] Lỗi nạp fallback map", ex);
+                }
             }
 
             double matchDuration = room.getDuration();
@@ -457,6 +496,7 @@ public class ClientHandler implements Runnable {
                 roomManager.resetRoomAfterMatch(targetRoomId);
                 broadcastRoomStateForRoom(targetRoomId);
                 broadcastLobbyRooms();
+                broadcastOnlinePlayers();
             });
 
             double speed = ConfigLoader.getTankSpeedPerSecond();
@@ -523,6 +563,9 @@ public class ClientHandler implements Runnable {
             loopThread.setName("GameLoop-Room-" + finalRoomId);
             loopThread.start();
 
+            broadcastLobbyRooms();
+            broadcastOnlinePlayers();
+
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "[Game] Lỗi xử lý ROOM_START_REQ", e);
         }
@@ -573,6 +616,32 @@ public class ClientHandler implements Runnable {
 
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "[Room] Lỗi xử lý ROOM_DURATION_REQ", e);
+        }
+    }
+
+    /**
+     * Xử lý yêu cầu thay đổi bản đồ thi đấu từ chủ phòng.
+     *
+     * @param rawJson chuỗi JSON chứa mã định danh bản đồ (mapId)
+     */
+    private void handleRoomMap(String rawJson) {
+        try {
+            if (currentUser == null || currentRoomId == -1) return;
+
+            Room room = roomManager.getRoom(currentRoomId);
+            if (room == null || !room.isHost(currentUser.getId())) return;
+
+            String mapId = gson.fromJson(rawJson, String.class);
+            if (mapId == null) return;
+
+            boolean success = roomManager.updateRoomMap(currentRoomId, currentUser.getId(), mapId);
+            if (success) {
+                LOGGER.info("[Room] Host " + currentUser.getUsername() + " chọn map: " + mapId);
+                broadcastRoomState();
+                broadcastLobbyRooms();
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "[Room] Lỗi xử lý ROOM_MAP_REQ", e);
         }
     }
 
@@ -655,6 +724,7 @@ public class ClientHandler implements Runnable {
                     currentRoomId = -1;
                     broadcastRoomStateForRoom(leaverRoomId);
                     broadcastLobbyRooms();
+                    broadcastOnlinePlayers();
                 }
 
                 Room targetRoom = roomManager.getRoom(leaverRoomId);
@@ -685,6 +755,7 @@ public class ClientHandler implements Runnable {
                 }
                 broadcastRoomStateForRoom(roomId);
                 broadcastLobbyRooms();
+                broadcastOnlinePlayers();
             }
 
         } catch (Exception e) {
@@ -770,6 +841,7 @@ public class ClientHandler implements Runnable {
         }
 
         broadcastLobbyRooms();
+        broadcastOnlinePlayers();
 
         try {
             if (dis != null) dis.close();
@@ -822,6 +894,126 @@ public class ClientHandler implements Runnable {
                     NetworkUtil.sendPacket(client.dos, packet);
                 } catch (IOException ignored) {}
             }
+        }
+    }
+
+    public static void broadcastOnlinePlayers() {
+        List<OnlinePlayerDTO> onlineList = new ArrayList<>();
+        for (ClientHandler client : connectedClients) {
+            if (client.currentUser != null) {
+                String status = client.currentRoomId == -1 ? "LOBBY" : (client.currentGameLoop != null ? "IN_GAME" : "IN_ROOM");
+                onlineList.add(new OnlinePlayerDTO(client.currentUser.getId(), client.currentUser.getUsername(), status, client.currentRoomId));
+            }
+        }
+        String json = new Gson().toJson(onlineList);
+        Packet packet = new Packet(PacketType.ONLINE_PLAYERS_RES, json);
+
+        networkBroadcastPool.submit(() -> {
+            for (ClientHandler client : connectedClients) {
+                if (client.currentRoomId == -1 && client.dos != null) {
+                    try {
+                        NetworkUtil.sendPacket(client.dos, packet);
+                    } catch (Exception ignored) {}
+                }
+            }
+        });
+    }
+
+    private void handleGetOnlinePlayers() {
+        try {
+            if (currentUser == null) return;
+            List<OnlinePlayerDTO> onlineList = new ArrayList<>();
+            for (ClientHandler client : connectedClients) {
+                if (client.currentUser != null) {
+                    String status = client.currentRoomId == -1 ? "LOBBY" : (client.currentGameLoop != null ? "IN_GAME" : "IN_ROOM");
+                    onlineList.add(new OnlinePlayerDTO(client.currentUser.getId(), client.currentUser.getUsername(), status, client.currentRoomId));
+                }
+            }
+            Packet packet = new Packet(PacketType.ONLINE_PLAYERS_RES, gson.toJson(onlineList));
+            NetworkUtil.sendPacket(dos, packet);
+        } catch (Exception ignored) {}
+    }
+
+    private void handleInviteBattle(String rawJson) {
+        try {
+            if (currentUser == null || currentRoomId != -1) return;
+            InviteBattleRequestDTO req = gson.fromJson(rawJson, InviteBattleRequestDTO.class);
+            if (req == null) return;
+
+            ClientHandler targetClient = null;
+            for (ClientHandler c : connectedClients) {
+                if (c.currentUser != null && c.currentUser.getId() == req.getTargetUserId()) {
+                    targetClient = c;
+                    break;
+                }
+            }
+
+            if (targetClient == null || targetClient.currentUser == null) {
+                return;
+            }
+
+            if (targetClient.currentRoomId != -1) {
+                NetworkUtil.sendPacket(dos, new Packet(PacketType.INVITE_DECLINED_NOTIFY,
+                        gson.toJson(targetClient.currentUser.getUsername() + " IS CURRENTLY IN BATTLE!")));
+                return;
+            }
+
+            InviteBattleNotifyDTO notifyDTO = new InviteBattleNotifyDTO(currentUser.getId(), currentUser.getUsername());
+            NetworkUtil.sendPacket(targetClient.dos, new Packet(PacketType.INVITE_BATTLE_NOTIFY, gson.toJson(notifyDTO)));
+
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "[Invite] Error sending battle invitation", e);
+        }
+    }
+
+    private void handleInviteBattleResponse(String rawJson) {
+        try {
+            if (currentUser == null) return;
+            InviteBattleResponseDTO res = gson.fromJson(rawJson, InviteBattleResponseDTO.class);
+            if (res == null) return;
+
+            ClientHandler inviterClient = null;
+            for (ClientHandler c : connectedClients) {
+                if (c.currentUser != null && c.currentUser.getId() == res.getInviterUserId()) {
+                    inviterClient = c;
+                    break;
+                }
+            }
+
+            if (inviterClient == null || inviterClient.currentUser == null) {
+                return;
+            }
+
+            if (!res.isAccepted()) {
+                NetworkUtil.sendPacket(inviterClient.dos, new Packet(PacketType.INVITE_DECLINED_NOTIFY,
+                        gson.toJson(currentUser.getUsername() + " DECLINED YOUR INVITATION.")));
+                return;
+            }
+
+            if (inviterClient.currentRoomId != -1 || this.currentRoomId != -1) {
+                NetworkUtil.sendPacket(inviterClient.dos, new Packet(PacketType.INVITE_DECLINED_NOTIFY,
+                        gson.toJson("CANNOT CREATE MATCH: ONE OF THE OPERATORS IS ALREADY IN A ROOM.")));
+                return;
+            }
+
+            // Tạo phòng mới do Inviter làm Host
+            Room room = roomManager.createRoom(inviterClient.currentUser);
+            inviterClient.currentRoomId = room.getRoomId();
+
+            // Cho Invitee tham gia vào phòng
+            roomManager.joinRoom(room.getRoomId(), this.currentUser);
+            this.currentRoomId = room.getRoomId();
+
+            // Gửi ROOM_STATE_UPDATE đến cả 2
+            Packet roomPacket = new Packet(PacketType.ROOM_STATE_UPDATE, gson.toJson(roomManager.getRoomDTO(room.getRoomId())));
+            NetworkUtil.sendPacket(inviterClient.dos, roomPacket);
+            NetworkUtil.sendPacket(this.dos, roomPacket);
+
+            broadcastLobbyRooms();
+            broadcastOnlinePlayers();
+
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "[Invite] Error processing invite response", e);
         }
     }
 }

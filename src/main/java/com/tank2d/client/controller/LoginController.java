@@ -88,13 +88,27 @@ public class LoginController {
     public void initialize() {
         if (passwordField != null && passwordTextField != null) {
             passwordTextField.textProperty().bindBidirectional(passwordField.textProperty());
+            setupPasswordDotStyle(passwordField);
         }
         if (registerPasswordField != null && registerPasswordTextField != null) {
             registerPasswordTextField.textProperty().bindBidirectional(registerPasswordField.textProperty());
+            setupPasswordDotStyle(registerPasswordField);
         }
         if (confirmPasswordField != null && confirmPasswordTextField != null) {
             confirmPasswordTextField.textProperty().bindBidirectional(confirmPasswordField.textProperty());
+            setupPasswordDotStyle(confirmPasswordField);
         }
+    }
+
+    private void setupPasswordDotStyle(PasswordField pf) {
+        pf.textProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal == null || newVal.isEmpty()) {
+                pf.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-size: 12.5px;");
+            } else {
+                pf.setStyle("-fx-font-family: 'Segoe UI', Arial, sans-serif; -fx-font-size: 8.5px;");
+            }
+        });
+        pf.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-size: 12.5px;");
     }
 
     @FXML
@@ -146,7 +160,7 @@ public class LoginController {
         String password = passwordField.getText().trim();
 
         if (username.isEmpty() || password.isEmpty()) {
-            showToast("Vui lòng nhập đầy đủ Username và Password!", false);
+            showToast("PLEASE ENTER BOTH USERNAME AND PASSWORD!", false);
             return;
         }
 
@@ -156,7 +170,7 @@ public class LoginController {
                 ClientSocket clientSocket = session.getClientSocket();
 
                 if (clientSocket == null || !clientSocket.isConnected()) {
-                    showToast("Không thể kết nối tới Server!", false);
+                    showToast("CANNOT CONNECT TO SERVER!", false);
                     return;
                 }
 
@@ -175,7 +189,7 @@ public class LoginController {
                 LOGGER.log(Level.WARNING, "[Login] Lỗi nghiệp vụ mạng: " + e.getErrorCode(), e);
             } catch (IOException e) {
                 session.removePacketListener(packetListener);
-                showToast("Không thể kết nối tới Server!\nVui lòng kiểm tra Server đang chạy.", false);
+                showToast("UNABLE TO CONNECT TO SERVER!\nPLEASE VERIFY SERVER IS RUNNING.", false);
                 LOGGER.log(Level.SEVERE, "[Login] Lỗi kết nối", e);
             }
         });
@@ -207,21 +221,29 @@ public class LoginController {
                     session.setCurrentUser(new User(response.getUserId(), response.getUsername()));
                     LOGGER.info("[Login] Đăng nhập thành công: " + response.getUsername());
 
-                    showToast("Đăng nhập thành công! Đang vào sảnh...", true);
+                    showToast("LOGIN SUCCESSFUL! ENTERING LOBBY...", true);
 
                     PauseTransition delay = new PauseTransition(Duration.seconds(1));
                     delay.setOnFinished(e -> openLobby());
                     delay.play();
 
                 } else {
-                    showToast(response.getMessage() != null ? response.getMessage() : "Sai tài khoản hoặc mật khẩu!", false);
+                    String msg = response.getMessage();
+                    if (msg == null || msg.isBlank()) {
+                        msg = "INVALID USERNAME OR PASSWORD!";
+                    } else if (msg.contains("đang đăng nhập") || msg.toLowerCase().contains("already logged in")) {
+                        msg = "ACCOUNT IS CURRENTLY LOGGED IN ON ANOTHER DEVICE!";
+                    } else {
+                        msg = msg.toUpperCase();
+                    }
+                    showToast(msg, false);
                 }
             });
 
         } catch (Exception e) {
             session.removePacketListener(packetListener);
             LOGGER.log(Level.SEVERE, "[Login] Lỗi xử lý AUTH_LOGIN_RES", e);
-            showToast("Không thể xử lý phản hồi đăng nhập!", false);
+            showToast("FAILED TO PROCESS LOGIN RESPONSE!", false);
         }
     }
 
@@ -235,12 +257,12 @@ public class LoginController {
         String confirmPassword = confirmPasswordField.getText().trim();
 
         if (username.isEmpty() || password.isEmpty() || confirmPassword.isEmpty()) {
-            showToast("Vui lòng nhập đầy đủ thông tin đăng ký!", false);
+            showToast("PLEASE FILL IN ALL REGISTRATION FIELDS!", false);
             return;
         }
 
         if (!password.equals(confirmPassword)) {
-            showToast("Mật khẩu xác nhận không khớp!", false);
+            showToast("PASSWORDS DO NOT MATCH!", false);
             return;
         }
 
@@ -257,7 +279,7 @@ public class LoginController {
 
                 Packet responsePacket = clientSocket.receivePacket();
                 if (responsePacket == null || responsePacket.getType() != PacketType.AUTH_REGISTER_RES) {
-                    showToast("Không nhận được phản hồi hợp lệ từ Server!", false);
+                    showToast("INVALID RESPONSE FROM SERVER!", false);
                     return;
                 }
 
@@ -265,7 +287,7 @@ public class LoginController {
 
                 Platform.runLater(() -> {
                     if (response.isSuccess()) {
-                        showToast(response.getMessage() != null ? response.getMessage() : "Đăng ký thành công!", true);
+                        showToast(response.getMessage() != null ? response.getMessage() : "REGISTRATION SUCCESSFUL!", true);
 
                         registerUsernameField.clear();
                         registerPasswordField.clear();
@@ -273,7 +295,7 @@ public class LoginController {
 
                         showLogin(null);
                     } else {
-                        showToast(response.getMessage() != null ? response.getMessage() : "Đăng ký thất bại!", false);
+                        showToast(response.getMessage() != null ? response.getMessage() : "REGISTRATION FAILED!", false);
                     }
                 });
 
@@ -281,7 +303,7 @@ public class LoginController {
                 showToast(e.getMessage(), false);
                 LOGGER.log(Level.WARNING, "[Register] Lỗi nghiệp vụ mạng: " + e.getErrorCode(), e);
             } catch (IOException e) {
-                showToast("Không thể kết nối tới Server để đăng ký!", false);
+                showToast("CANNOT CONNECT TO SERVER TO REGISTER!", false);
                 LOGGER.log(Level.SEVERE, "[Register] Lỗi kết nối", e);
             } finally {
                 clientSocket.close();
