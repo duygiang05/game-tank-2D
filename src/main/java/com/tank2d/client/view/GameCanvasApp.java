@@ -335,6 +335,8 @@ public class GameCanvasApp extends Application {
 
         canvas = new Canvas(canvasWidth, canvasHeight);
         gc = canvas.getGraphicsContext2D();
+        // Kenney tanks are pixel art; preserve hard pixel edges when scaled.
+        gc.setImageSmoothing(false);
 
         HBox mainLayout = new HBox();
         mainLayout.setPrefSize(windowWidth, windowHeight);
@@ -889,12 +891,12 @@ public class GameCanvasApp extends Application {
 
     private void renderTanks() {
         String[] tankImageAssets = {
-            "tiles/green_tank.png", "tiles/red_tank.png",
-            "tiles/purple_tank.png", "tiles/yellow_tank.png"
+            "kenney/tanks/tank_green.png", "kenney/tanks/tank_red.png",
+            "kenney/tanks/tank_blue.png", "kenney/tanks/tank_sand.png"
         };
         Color[] fallbackColors = {
-            Color.web("#4CAF50"), Color.web("#F44336"),
-            Color.web("#9C27B0"), Color.web("#FFC107")
+            Color.web("#22C55E"), Color.web("#EF4444"),
+            Color.web("#38BDF8"), Color.web("#E5C98D")
         };
 
         for (TankSnapshotDTO tank : displayTanks.values()) {
@@ -929,7 +931,9 @@ public class GameCanvasApp extends Application {
             }
 
             gc.translate(tank.getX(), tank.getY());
-            gc.rotate(tank.getAngle() + 90.0);
+            // Kenney tank PNG points opposite to the legacy sprite orientation.
+            // Flip only the sprite by 180 degrees; keep network angles and Nitro effect intact.
+            gc.rotate(tank.getAngle() - 90.0);
 
             if (tankSprite != null && !tankSprite.isError()) {
                 gc.drawImage(tankSprite, -tankSize / 2.0, -tankSize / 2.0, tankSize, tankSize);
@@ -1018,8 +1022,8 @@ public class GameCanvasApp extends Application {
         Platform.runLater(() -> {
             hudScoreBox.getChildren().clear();
 
-            String[] tankBadgeColors = {"#22c55e", "#ef4444", "#a855f7", "#eab308"};
-            String[] tankBgColors = {"rgba(34,197,94,0.15)", "rgba(239,68,68,0.15)", "rgba(168,85,247,0.15)", "rgba(234,179,8,0.15)"};
+            String[] tankBadgeColors = {"#22c55e", "#ef4444", "#38bdf8", "#e5c98d"};
+            String[] tankBgColors = {"rgba(34,197,94,0.15)", "rgba(239,68,68,0.15)", "rgba(56,189,248,0.15)", "rgba(229,201,141,0.15)"};
 
             if (tankPlayers.isEmpty()) {
                 Label loadingLbl = new Label("Đang kết nối...");

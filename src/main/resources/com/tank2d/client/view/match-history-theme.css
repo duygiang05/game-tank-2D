@@ -1,0 +1,62 @@
+/* Sprint 5B. Scoped, isolated dark history UI; Kenney controls. */
+.history-root, .history-main { -fx-background-color: #0b1928; -fx-font-family: "Segoe UI", "Arial"; }
+.history-top, .history-panel, .history-detail-card {
+    -fx-background-color: #152d40; -fx-background-radius: 16;
+    -fx-border-color: #3c7086; -fx-border-width: 1.5; -fx-border-radius: 16;
+}
+.history-top { -fx-padding: 13 22; }
+.history-panel { -fx-padding: 13; }
+.history-brand { -fx-text-fill: #f5b952; -fx-font-size: 24px; -fx-font-weight: bold; }
+.history-title { -fx-text-fill: #eef8fa; -fx-font-size: 16px; -fx-font-weight: bold; }
+.history-subtitle { -fx-text-fill: #8ab9c9; -fx-font-size: 10px; -fx-font-weight: bold; }
+.history-header, .history-participants-header {
+    -fx-background-color: #25485b; -fx-background-radius: 8; -fx-padding: 11 12;
+}
+.history-header .label, .history-participants-header .label {
+    -fx-text-fill: #d3edf4; -fx-font-weight: bold; -fx-font-size: 11.5px;
+}
+.history-list, .history-participant-list {
+    -fx-background-color: #10283a; -fx-background-insets: 0;
+    -fx-border-color: #33576a; -fx-border-radius: 8; -fx-padding: 0;
+}
+.history-list .list-cell, .history-participant-list .list-cell {
+    -fx-background-color: #10283a; -fx-padding: 4;
+}
+.history-list .list-cell:filled:hover, .history-participant-list .list-cell:filled:hover { -fx-background-color: #1a4056; }
+.history-list .list-cell:filled:selected, .history-participant-list .list-cell:filled:selected { -fx-background-color: #235369; }
+.history-row, .history-participant-row { -fx-padding: 10 12; -fx-background-color: #19384d; -fx-background-radius: 8; }
+.history-row .label, .history-participant-row .label { -fx-font-weight: bold; }
+.history-room-name, .history-player { -fx-text-fill: #f2f8fa; -fx-font-size: 13px; }
+.history-player-me { -fx-text-fill: #7bd5ef; -fx-font-size: 13px; }
+.history-own-row { -fx-background-color: #234c61; }
+.history-secondary, .history-date { -fx-text-fill: #a9c6d2; -fx-font-size: 11.5px; }
+.history-combat { -fx-text-fill: #e5eef5; -fx-font-size: 12px; }
+.history-xp-positive { -fx-text-fill: #68e7b3; -fx-font-size: 12px; }
+.history-xp-negative { -fx-text-fill: #ff968c; -fx-font-size: 12px; }
+.history-rank { -fx-text-fill: #d9e8ef; -fx-font-size: 12px; }
+.history-badge { -fx-background-radius: 6; -fx-padding: 6 10; -fx-font-size: 11px; }
+.history-win { -fx-background-color: #194c3a; -fx-text-fill: #8bf4bb; }
+.history-draw { -fx-background-color: #59411f; -fx-text-fill: #ffe0a0; }
+.history-lose { -fx-background-color: #562d38; -fx-text-fill: #ffb0b3; }
+.history-status { -fx-text-fill: #9cc6d7; -fx-font-size: 12px; }
+.history-error { -fx-text-fill: #ff9590; }
+.history-hint { -fx-text-fill: #77bacd; -fx-font-size: 11px; }
+.history-button-blue, .history-button-red {
+    -fx-background-color: transparent; -fx-background-size: 100% 100%;
+    -fx-background-repeat: no-repeat; -fx-text-fill: white;
+    -fx-font-size: 13px; -fx-font-weight: bold; -fx-cursor: hand;
+}
+.history-button-blue { -fx-background-image: url("../assets/ui/kenney/blue/button_rectangle_gradient.png"); }
+.history-button-red { -fx-background-image: url("../assets/ui/kenney/red/button_rectangle_gradient.png"); }
+.history-button-blue:hover, .history-button-red:hover { -fx-opacity: .86; }
+.history-button-blue:pressed, .history-button-red:pressed { -fx-opacity: .65; }
+.history-overlay { -fx-background-color: rgba(2,10,18,0.82); }
+.history-detail-card { -fx-padding: 22 26; -fx-effect: dropshadow(gaussian, rgba(0,0,0,.6), 25, .2, 0, 10); }
+.history-detail-heading { -fx-text-fill: #f7c76d; -fx-font-size: 21px; -fx-font-weight: bold; }
+.history-detail-subtitle { -fx-text-fill: #aecad7; -fx-font-size: 12px; }
+.history-close { -fx-background-color: #395166; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand; }
+.history-winner, .history-draw-banner { -fx-padding: 10 14; -fx-background-radius: 10; -fx-border-radius: 10; }
+.history-winner { -fx-background-color: #274b34; -fx-border-color: #73bd80; }
+.history-draw-banner { -fx-background-color: #544224; -fx-border-color: #d9ab60; }
+.history-banner-icon, .history-banner-text { -fx-text-fill: #f8e5a2; -fx-font-weight: bold; }
+.history-participants-panel { -fx-background-color: #10283a; -fx-background-radius: 10; -fx-padding: 6; }
