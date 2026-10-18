@@ -1,0 +1,87 @@
+/* Sprint 4B Room — scoped visual styling, compatible with RoomController.setStyle(). */
+.room-root { -fx-background-color: linear-gradient(to bottom right, #0b1928, #112a3b); -fx-font-family: "Segoe UI", "Arial"; }
+.room-header { -fx-padding: 17 23; -fx-background-color: #142b3d; -fx-background-radius: 17; -fx-border-color: #376d83; -fx-border-radius: 17; -fx-border-width: 1.5; }
+.room-name { -fx-text-fill: #f5b952; -fx-font-size: 25; -fx-font-weight: bold; }
+.room-subtitle { -fx-text-fill: #b4d4e2; -fx-font-size: 13; -fx-font-weight: bold; }
+.room-duration-label { -fx-text-fill: #9ed7e6; -fx-font-size: 12; -fx-font-weight: bold; }
+.room-duration-combo { -fx-background-color: #e8f4fa; -fx-border-color: #66aabf; -fx-border-radius: 8; -fx-background-radius: 8; }
+.room-section-title { -fx-font-size: 15; -fx-font-weight: bold; -fx-text-fill: #f5b952; }
+.room-slot-green, .room-slot-red, .room-slot-blue, .room-slot-sand {
+ -fx-background-color: #f1f6fa; -fx-background-radius: 16; -fx-border-radius: 16; -fx-border-width: 2;
+ -fx-padding: 16 10; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.24), 13, 0.1, 0, 5);
+}
+.room-slot-green { -fx-border-color: #30be78; }
+.room-slot-red { -fx-border-color: #ec6269; }
+.room-slot-blue { -fx-border-color: #439ddd; }
+.room-slot-sand { -fx-border-color: #d6a24d; }
+.room-slot-title-green,.room-slot-title-red,.room-slot-title-blue,.room-slot-title-sand { -fx-font-weight: bold; -fx-font-size: 10.5; }
+.room-slot-title-green { -fx-text-fill: #148044; }
+.room-slot-title-red { -fx-text-fill: #bd2937; }
+.room-slot-title-blue { -fx-text-fill: #2169a0; }
+.room-slot-title-sand { -fx-text-fill: #956118; }
+.room-tank-pad { -fx-background-color: #dfeef3; -fx-background-radius: 12; -fx-border-color: #d0e2eb; -fx-border-radius: 12; }
+.room-player-name { -fx-text-fill: #132739; -fx-font-weight: bold; -fx-font-size: 14; }
+.room-slot-badge { -fx-padding: 5 12; -fx-background-radius: 14; -fx-background-color: #e6edf2; -fx-text-fill: #587487; -fx-font-weight: bold; }
+.room-footer-caption { -fx-text-fill: #7496a7; -fx-font-weight: bold; -fx-font-size: 10; }
+.room-button-red,.room-button-green {
+ -fx-background-color: transparent;
+ -fx-background-size: 100% 100%; -fx-background-repeat: no-repeat; -fx-background-position: center;
+ -fx-font-weight: bold; -fx-font-size: 14; -fx-text-fill: white; -fx-cursor: hand;
+}
+.room-button-red { -fx-background-image: url("../assets/ui/kenney/red/button_rectangle_gradient.png"); }
+.room-button-green { -fx-background-image: url("../assets/ui/kenney/green/button_rectangle_gradient.png"); }
+.room-button-red:hover,.room-button-green:hover { -fx-opacity: 0.88; }
+.room-button-red:pressed,.room-button-green:pressed { -fx-opacity: 0.7; }
+.room-button-red:disabled,.room-button-green:disabled { -fx-opacity: 0.45; }
+
+
+/* Sprint 4B.1: header typography, readable disabled action. */
+.room-header { -fx-min-height: 116; }
+.room-name { -fx-font-size: 28px; }
+.room-subtitle { -fx-font-size: 12.5px; -fx-wrap-text: true; }
+.room-duration-label { -fx-font-size: 12px; -fx-text-fill: #bde9f5; }
+.room-button-green:disabled {
+    -fx-opacity: 0.88;
+    -fx-background-image: url("../assets/ui/kenney/green/button_rectangle_gradient.png");
+}
+/* RoomController currently applies inline setStyle() on readyButton. These
+   styles have higher precedence than stylesheets for the same properties.
+   To fully standardize dynamic button colors, refactor its setStyle calls
+   to pseudo-classes/style classes in a later controller-focused step. */
+
+/* Dynamic room states. All these classes are assigned by RoomController. */
+.room-name-state-empty { -fx-text-fill: #8aa0b8; -fx-font-style: italic; }
+.room-name-state-occupied { -fx-text-fill: #13283b; -fx-font-weight: bold; -fx-font-style: normal; }
+.room-badge-state-empty { -fx-background-color: #dfe8ef; -fx-text-fill: #527089; }
+.room-badge-state-host { -fx-background-color: #fff0bd; -fx-text-fill: #a04a0c; }
+.room-badge-state-ready { -fx-background-color: #cdf5dd; -fx-text-fill: #0c8248; }
+.room-badge-state-waiting { -fx-background-color: #ffe8bf; -fx-text-fill: #9c530c; }
+.room-action-state-start, .room-action-state-ready, .room-action-state-locked,
+.room-action-state-cancel {
+    -fx-font-weight: bold;
+    -fx-font-size: 15px;
+    -fx-background-color: transparent;
+    -fx-background-size: 100% 100%;
+    -fx-background-repeat: no-repeat;
+    -fx-background-position: center;
+    -fx-cursor: hand;
+}
+.room-action-state-start, .room-action-state-ready {
+    -fx-background-image: url("../assets/ui/kenney/green/button_rectangle_gradient.png");
+    -fx-text-fill: #ffffff;
+}
+.room-action-state-locked {
+    -fx-background-image: url("../assets/ui/kenney/green/button_rectangle_gradient.png");
+    -fx-text-fill: #ffffff;
+}
+.room-action-state-cancel {
+    -fx-background-image: url("../assets/ui/kenney/red/button_rectangle_gradient.png");
+    -fx-text-fill: #ffffff;
+}
+.room-action-state-locked:disabled,
+.room-action-state-start:disabled {
+    -fx-opacity: 0.76;
+    -fx-text-fill: #ffffff;
+}
+.room-action-state-ready:hover, .room-action-state-start:hover,
+.room-action-state-cancel:hover { -fx-opacity: 0.9; }

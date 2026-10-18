@@ -26,76 +26,40 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * Điều khiển màn hình phòng chờ trận đấu (Room Waiting View).
- * <p>
- * Quản lý danh sách thành viên trong phòng, trạng thái sẵn sàng, chọn thời lượng trận đấu (đối với chủ phòng)
- * và chuyển tiếp sang màn hình chơi game (GameCanvasApp) khi trận đấu bắt đầu.
- */
+/** Room waiting screen; networking and ready logic match the original implementation. */
 public class RoomController {
-
     private static final Logger LOGGER = Logger.getLogger(RoomController.class.getName());
     private static final Gson GSON = new Gson();
 
-    @FXML
-    private Label roomNameLabel;
-
-    @FXML
-    private Label roomStatusLabel;
-
-    @FXML
-    private Label p1Label;
-    @FXML
-    private Label p1StatusBadge;
-
-    @FXML
-    private Label p2Label;
-    @FXML
-    private Label p2StatusBadge;
-
-    @FXML
-    private Label p3Label;
-    @FXML
-    private Label p3StatusBadge;
-
-    @FXML
-    private Label p4Label;
-    @FXML
-    private Label p4StatusBadge;
-
-    @FXML
-    private Button readyButton;
-
-    @FXML
-    private Button leaveButton;
-
-    @FXML
-    private ComboBox<String> durationComboBox;
+    @FXML private Label roomNameLabel;
+    @FXML private Label roomStatusLabel;
+    @FXML private Label p1Label;
+    @FXML private Label p1StatusBadge;
+    @FXML private Label p2Label;
+    @FXML private Label p2StatusBadge;
+    @FXML private Label p3Label;
+    @FXML private Label p3StatusBadge;
+    @FXML private Label p4Label;
+    @FXML private Label p4StatusBadge;
+    @FXML private Button readyButton;
+    @FXML private Button leaveButton;
+    @FXML private ComboBox<String> durationComboBox;
 
     private final ClientSession session = ClientSession.getInstance();
     private final Consumer<Packet> packetListener = this::handleServerPacket;
-
     private RoomDTO currentRoom;
     private boolean listenerRegistered = false;
 
-    /**
-     * Nạp dữ liệu phòng chơi và khởi tạo giao diện phòng.
-     *
-     * @param room dữ liệu phòng từ máy chủ
-     */
     public void setRoom(RoomDTO room) {
         this.currentRoom = room;
         if (room == null) return;
-
         setupDurationComboBox();
         updateRoomUI(room);
-
         if (!listenerRegistered) {
             session.addPacketListener(packetListener);
             listenerRegistered = true;
             LOGGER.info("[Room] Đã đăng ký Room Packet Listener.");
         }
-
         try {
             ClientSocket socket = session.getClientSocket();
             if (socket != null && socket.isConnected()) {
@@ -106,34 +70,24 @@ public class RoomController {
 
     private void setupDurationComboBox() {
         if (durationComboBox == null) return;
-
         if (durationComboBox.getItems().isEmpty()) {
             durationComboBox.getItems().addAll("45 giây", "60 giây", "90 giây", "180 giây");
         }
-
         durationComboBox.setOnAction(event -> handleDurationChanged());
     }
 
     private void updateRoomUI(RoomDTO room) {
         Platform.runLater(() -> {
             roomNameLabel.setText(room.getRoomName());
-
-            String statusVi = "Đang chờ người chơi";
-            roomStatusLabel.setText(
-                    room.getCurrentPlayers() + "/" + room.getMaxPlayers()
-                    + " người chơi  •  " + statusVi
-                    + "  •  Thời lượng: " + room.getDuration() + "s"
-            );
-
+            roomStatusLabel.setText(room.getCurrentPlayers() + "/" + room.getMaxPlayers()
+                    + " người chơi  •  Đang chờ người chơi  •  Thời lượng: " + room.getDuration() + "s");
             clearSlots();
-
             List<String> players = room.getPlayerNames();
             String hostUsername = room.getHostUsername();
             Map<String, Boolean> playerReadyMap = room.getPlayerReadyMap();
             Map<Integer, Boolean> readyStates = room.getReadyStates();
             int hostId = room.getHostId();
             User currentUser = session.getCurrentUser();
-
             if (players != null) {
                 for (int i = 0; i < players.size(); i++) {
                     String username = players.get(i);
@@ -141,11 +95,10 @@ public class RoomController {
                     if (hostUsername != null && !hostUsername.trim().isEmpty()) {
                         isHost = hostUsername.equalsIgnoreCase(username);
                     } else if (currentUser != null && username.equals(currentUser.getUsername())) {
-                        isHost = (currentUser.getId() == hostId);
+                        isHost = currentUser.getId() == hostId;
                     } else if (i == 0) {
                         isHost = true;
                     }
-
                     boolean isReady = isHost;
                     if (!isHost) {
                         if (playerReadyMap != null && playerReadyMap.containsKey(username)) {
@@ -154,11 +107,9 @@ public class RoomController {
                             isReady = Boolean.TRUE.equals(readyStates.get(currentUser.getId()));
                         }
                     }
-
                     renderSlot(i + 1, username, isHost, isReady);
                 }
             }
-
             updateDurationUI(room);
             updateButton(room);
         });
@@ -179,14 +130,19 @@ public class RoomController {
         resetSlot(p4Label, p4StatusBadge, "Chỗ trống P4");
     }
 
+    private static void changeClass(javafx.scene.Node node, String prefix, String cssClass) {
+        node.getStyleClass().removeIf(name -> name.startsWith(prefix));
+        node.getStyleClass().add(cssClass);
+    }
+
     private void resetSlot(Label nameLabel, Label badgeLabel, String placeholder) {
         if (nameLabel != null) {
             nameLabel.setText(placeholder);
-            nameLabel.setStyle("-fx-text-fill: #94a3b8; -fx-font-style: italic;");
+            changeClass(nameLabel, "room-name-state-", "room-name-state-empty");
         }
         if (badgeLabel != null) {
             badgeLabel.setText("TRỐNG");
-            badgeLabel.setStyle("-fx-background-color: #f1f5f9; -fx-text-fill: #94a3b8; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
+            changeClass(badgeLabel, "room-badge-state-", "room-badge-state-empty");
         }
     }
 
@@ -202,40 +158,32 @@ public class RoomController {
 
     private void applySlot(Label nameLabel, Label badgeLabel, String username, boolean isHost, boolean isReady) {
         if (nameLabel == null || badgeLabel == null) return;
-
         nameLabel.setText(username);
-        nameLabel.setStyle("-fx-text-fill: #0f172a; -fx-font-weight: bold; -fx-font-style: normal;");
-
+        changeClass(nameLabel, "room-name-state-", "room-name-state-occupied");
         if (isHost) {
             badgeLabel.setText("CHỦ PHÒNG");
-            badgeLabel.setStyle("-fx-background-color: #fef3c7; -fx-text-fill: #b45309; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
+            changeClass(badgeLabel, "room-badge-state-", "room-badge-state-host");
         } else if (isReady) {
             badgeLabel.setText("SẴN SÀNG");
-            badgeLabel.setStyle("-fx-background-color: #dcfce7; -fx-text-fill: #15803d; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
+            changeClass(badgeLabel, "room-badge-state-", "room-badge-state-ready");
         } else {
             badgeLabel.setText("ĐANG CHỜ...");
-            badgeLabel.setStyle("-fx-background-color: #f8fafc; -fx-text-fill: #cbd5e1; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;");
+            changeClass(badgeLabel, "room-badge-state-", "room-badge-state-waiting");
         }
     }
 
     private void updateDurationUI(RoomDTO room) {
         if (durationComboBox == null) return;
-
         User currentUser = session.getCurrentUser();
         if (currentUser == null) return;
-
         boolean isHost = isUserHost(room, currentUser);
         String durationText = room.getDuration() + " giây";
-
         durationComboBox.setOnAction(null);
-
         if (!durationComboBox.getItems().contains(durationText)) {
             durationComboBox.getItems().add(durationText);
         }
-
         durationComboBox.setValue(durationText);
         durationComboBox.setDisable(!isHost);
-
         durationComboBox.setOnAction(event -> handleDurationChanged());
     }
 
@@ -243,10 +191,8 @@ public class RoomController {
         if (currentRoom == null) return;
         User currentUser = session.getCurrentUser();
         if (currentUser == null || !isUserHost(currentRoom, currentUser)) return;
-
         String selected = durationComboBox.getValue();
         if (selected == null) return;
-
         int duration = switch (selected) {
             case "45 giây" -> 45;
             case "60 giây" -> 60;
@@ -254,7 +200,6 @@ public class RoomController {
             case "180 giây" -> 180;
             default -> 60;
         };
-
         sendDuration(duration);
     }
 
@@ -265,11 +210,8 @@ public class RoomController {
                 roomStatusLabel.setText("Chưa kết nối Server!");
                 return;
             }
-
-            Packet request = new Packet(PacketType.ROOM_DURATION_REQ, String.valueOf(duration));
-            clientSocket.sendPacket(request);
+            clientSocket.sendPacket(new Packet(PacketType.ROOM_DURATION_REQ, String.valueOf(duration)));
             LOGGER.info("[Room] Host chọn thời lượng: " + duration + " giây");
-
         } catch (GameNetworkException e) {
             roomStatusLabel.setText(e.getMessage());
             LOGGER.log(Level.WARNING, "[Room] Lỗi nghiệp vụ khi gửi duration", e);
@@ -281,43 +223,25 @@ public class RoomController {
     private void updateButton(RoomDTO room) {
         User currentUser = session.getCurrentUser();
         if (currentUser == null) return;
-
         boolean isHost = isUserHost(room, currentUser);
-
         if (isHost) {
             readyButton.setText("BẮT ĐẦU TRẬN ĐẤU");
-
             boolean canStart = room.getCurrentPlayers() >= 2
                     && room.getCurrentPlayers() <= room.getMaxPlayers()
                     && areAllPlayersReady(room);
-
             readyButton.setDisable(!canStart);
-
-            if (canStart) {
-                readyButton.setStyle("-fx-background-color: linear-gradient(to bottom, #22c55e, #15803d); -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px; -fx-background-radius: 8px; -fx-cursor: hand; -fx-effect: dropshadow(three-pass-box, rgba(22,163,74,0.4), 8, 0, 0, 3);");
-            } else {
-                readyButton.setStyle("-fx-background-color: #cbd5e1; -fx-text-fill: #64748b; -fx-font-weight: bold; -fx-font-size: 14px; -fx-background-radius: 8px;");
-            }
-
+            changeClass(readyButton, "room-action-state-", canStart ? "room-action-state-start" : "room-action-state-locked");
         } else {
             boolean isReady = isCurrentUserReady(room);
-
-            if (isReady) {
-                readyButton.setText("HUỶ SẴN SÀNG");
-                readyButton.setDisable(false);
-                readyButton.setStyle("-fx-background-color: #fee2e2; -fx-text-fill: #dc2626; -fx-font-weight: bold; -fx-font-size: 14px; -fx-border-color: #fca5a5; -fx-border-width: 1.5px; -fx-background-radius: 8px; -fx-border-radius: 8px; -fx-cursor: hand;");
-            } else {
-                readyButton.setText("SẴN SÀNG");
-                readyButton.setDisable(false);
-                readyButton.setStyle("-fx-background-color: linear-gradient(to bottom, #3b82f6, #1d4ed8); -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px; -fx-background-radius: 8px; -fx-cursor: hand; -fx-effect: dropshadow(three-pass-box, rgba(37,99,235,0.35), 8, 0, 0, 3);");
-            }
+            readyButton.setText(isReady ? "HUỶ SẴN SÀNG" : "SẴN SÀNG");
+            readyButton.setDisable(false);
+            changeClass(readyButton, "room-action-state-", isReady ? "room-action-state-cancel" : "room-action-state-ready");
         }
     }
 
     private boolean isCurrentUserReady(RoomDTO room) {
         User currentUser = session.getCurrentUser();
         if (currentUser == null) return false;
-
         if (room.getPlayerReadyMap() != null && room.getPlayerReadyMap().containsKey(currentUser.getUsername())) {
             return Boolean.TRUE.equals(room.getPlayerReadyMap().get(currentUser.getUsername()));
         }
@@ -334,33 +258,25 @@ public class RoomController {
             for (Map.Entry<String, Boolean> entry : room.getPlayerReadyMap().entrySet()) {
                 if (hostUsername == null || !hostUsername.equalsIgnoreCase(entry.getKey())) {
                     nonHostCount++;
-                    if (!Boolean.TRUE.equals(entry.getValue())) {
-                        return false;
-                    }
+                    if (!Boolean.TRUE.equals(entry.getValue())) return false;
                 }
             }
             return nonHostCount > 0;
         }
-
         Map<Integer, Boolean> readyMap = room.getReadyStates();
         if (readyMap == null || readyMap.isEmpty()) return false;
-
         int nonHostCount = 0;
         for (Map.Entry<Integer, Boolean> entry : readyMap.entrySet()) {
             if (entry.getKey() != room.getHostId()) {
                 nonHostCount++;
-                if (!Boolean.TRUE.equals(entry.getValue())) {
-                    return false;
-                }
+                if (!Boolean.TRUE.equals(entry.getValue())) return false;
             }
         }
-
         return nonHostCount > 0;
     }
 
     private void handleServerPacket(Packet packet) {
         if (packet == null || packet.getType() == null) return;
-
         switch (packet.getType()) {
             case ROOM_STATE_UPDATE -> handleRoomStateUpdate(packet.getData());
             case GAME_START_NOTIFY -> handleGameStart(packet.getData());
@@ -384,14 +300,11 @@ public class RoomController {
         if (currentRoom == null) return;
         User currentUser = session.getCurrentUser();
         if (currentUser == null) return;
-
         if (isUserHost(currentRoom, currentUser)) {
             handleStartGame();
             return;
         }
-
-        boolean currentReady = isCurrentUserReady(currentRoom);
-        sendReady(!currentReady);
+        sendReady(!isCurrentUserReady(currentRoom));
     }
 
     private void sendReady(boolean ready) {
@@ -401,11 +314,8 @@ public class RoomController {
                 roomStatusLabel.setText("Chưa kết nối Server!");
                 return;
             }
-
-            Packet request = new Packet(PacketType.ROOM_READY_REQ, String.valueOf(ready));
-            clientSocket.sendPacket(request);
+            clientSocket.sendPacket(new Packet(PacketType.ROOM_READY_REQ, String.valueOf(ready)));
             LOGGER.info("[Room] Đã gửi READY: " + ready);
-
         } catch (GameNetworkException e) {
             roomStatusLabel.setText(e.getMessage());
             LOGGER.log(Level.WARNING, "[Room] Lỗi nghiệp vụ Ready: " + e.getErrorCode(), e);
@@ -426,24 +336,18 @@ public class RoomController {
                 roomStatusLabel.setText("Chưa kết nối Server!");
                 return;
             }
-
             if (currentRoom == null) return;
-
             if (currentRoom.getCurrentPlayers() < 2) {
                 roomStatusLabel.setText("Cần ít nhất 2 người chơi để bắt đầu!");
                 return;
             }
-
             if (!areAllPlayersReady(currentRoom)) {
                 roomStatusLabel.setText("Tất cả người chơi phải bấm Sẵn sàng!");
                 return;
             }
-
-            Packet request = new Packet(PacketType.ROOM_START_REQ, "");
-            clientSocket.sendPacket(request);
+            clientSocket.sendPacket(new Packet(PacketType.ROOM_START_REQ, ""));
             readyButton.setDisable(true);
             LOGGER.info("[Room] Host đã gửi ROOM_START_REQ.");
-
         } catch (GameNetworkException e) {
             roomStatusLabel.setText(e.getMessage());
             LOGGER.log(Level.WARNING, "[Room] Lỗi nghiệp vụ Start: " + e.getErrorCode(), e);
@@ -456,7 +360,6 @@ public class RoomController {
     private void handleGameStart(String rawJson) {
         LOGGER.info("[Room] Nhận GAME_START_NOTIFY!");
         removePacketListener();
-
         Platform.runLater(() -> {
             try {
                 Stage stage = (Stage) roomNameLabel.getScene().getWindow();
@@ -465,11 +368,9 @@ public class RoomController {
                 stage.setMaxWidth(Double.MAX_VALUE);
                 stage.setMaxHeight(Double.MAX_VALUE);
                 stage.setResizable(true);
-
                 GameCanvasApp gameCanvasApp = new GameCanvasApp();
                 gameCanvasApp.setStage(stage);
                 gameCanvasApp.setRoom(currentRoom);
-
                 Scene gameScene = gameCanvasApp.createGameScene();
                 stage.setScene(gameScene);
                 stage.setTitle("Tank 2D - Game");
@@ -477,7 +378,6 @@ public class RoomController {
                 stage.sizeToScene();
                 stage.show();
                 LOGGER.info("[Game] Đã chuyển sang màn hình Game!");
-
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "[Game] Không thể mở màn hình Game", e);
             }
@@ -497,25 +397,16 @@ public class RoomController {
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "[Room] Lỗi khi rời phòng", e);
         }
-
         removePacketListener();
-
         Platform.runLater(() -> {
             try {
-                FXMLLoader loader = new FXMLLoader(
-                        RoomController.class.getResource("/com/tank2d/client/view/lobby.fxml")
-                );
-                Scene lobbyScene = new Scene(loader.load(),
-                        ConfigLoader.getWindowWidth(),
-                        ConfigLoader.getWindowHeight()
-                );
-
+                FXMLLoader loader = new FXMLLoader(RoomController.class.getResource("/com/tank2d/client/view/lobby.fxml"));
+                Scene lobbyScene = new Scene(loader.load(), ConfigLoader.getWindowWidth(), ConfigLoader.getWindowHeight());
                 Stage stage = (Stage) leaveButton.getScene().getWindow();
                 stage.setScene(lobbyScene);
                 stage.setTitle("Tank 2D Online - Lobby");
                 stage.show();
                 LOGGER.info("[Room] Đã quay lại Lobby.");
-
             } catch (IOException e) {
                 LOGGER.log(Level.SEVERE, "[Room] Không thể quay lại Lobby", e);
             }

@@ -1,206 +1,50 @@
-/* ========================================================
-   TANK 2D ONLINE - LOBBY MODERN GAMING THEME
-   ======================================================== */
-
-.root {
-    -fx-background-color: #f1f5f9;
-    -fx-font-family: "Segoe UI", "Arial", sans-serif;
-}
-
-/* ---------- Top User Bar Card ---------- */
-.top-bar-card {
-    -fx-background-color: #ffffff;
-    -fx-background-radius: 14px;
-    -fx-padding: 10px 22px;
-    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.06), 14, 0, 0, 3);
-}
-
-/* ---------- Bảng Danh Sách Phòng ---------- */
-.lobby-table-card {
-    -fx-background-color: #ffffff;
-    -fx-background-radius: 14px;
-    -fx-border-color: #e2e8f0;
-    -fx-border-width: 1px;
-    -fx-border-radius: 14px;
-    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.05), 14, 0, 0, 3);
-}
-
-/* ---------- Header Cột Phòng ---------- */
-.table-header {
-    -fx-background-color: #f8fafc;
-    -fx-padding: 10px 18px;
-    -fx-background-radius: 13px 13px 0 0;
-    -fx-border-color: #e2e8f0;
-    -fx-border-width: 0 0 1px 0;
-}
-
-.table-header-label {
-    -fx-font-size: 12.5px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #64748b;
-}
-
-/* ---------- List View & Cố định không cuộn ngang ---------- */
-.list-view {
-    -fx-background-color: transparent;
-    -fx-border-width: 0;
-    -fx-background-insets: 0;
-    -fx-padding: 4px;
-}
-
-.list-view .scroll-bar:horizontal {
-    -fx-opacity: 0;
-    -fx-padding: -10;
-}
-
-.list-cell {
-    -fx-background-color: transparent;
-    -fx-padding: 4px 6px;
-    -fx-background-radius: 8px;
-}
-
-/* Hiệu ứng khi rê chuột vào phòng */
-.list-cell:filled:hover {
-    -fx-background-color: #f1f5f9;
-}
-
-/* HIỆU ỨNG KHI CLICK CHỌN 1 PHÒNG (NỔI BẬT RÕ RÀNG) */
-.list-cell:filled:selected {
-    -fx-background-color: #dbeafe !important;
-    -fx-border-color: #2563eb !important;
-    -fx-border-width: 1.5px !important;
-    -fx-border-radius: 8px !important;
-    -fx-background-radius: 8px !important;
-}
-
-/* ---------- Fix triệt để ComboBox & Popup Dropdown ---------- */
-.combo-box {
-    -fx-background-color: #ffffff;
-    -fx-border-color: #cbd5e1;
-    -fx-border-width: 1.2px;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
-    -fx-font-size: 13px;
-    -fx-font-weight: bold;
-    -fx-cursor: hand;
-}
-
-.combo-box:hover {
-    -fx-border-color: #2563eb;
-}
-
-.combo-box .list-cell {
-    -fx-text-fill: #1e293b;
-    -fx-font-size: 13px;
-    -fx-font-weight: bold;
-    -fx-padding: 6px 10px;
-}
-
-/* Dropdown list của ComboBox */
-.combo-box-popup .list-view {
-    -fx-background-color: #ffffff;
-    -fx-border-color: #cbd5e1;
-    -fx-border-width: 1px;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
-    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.15), 12, 0, 0, 4);
-}
-
-.combo-box-popup .list-cell {
-    -fx-background-color: #ffffff;
-    -fx-text-fill: #1e293b;
-    -fx-font-size: 13px;
-    -fx-font-weight: bold;
-    -fx-padding: 8px 12px;
-}
-
-/* Khi trỏ chuột vào mục trong menu: Nền xanh dịu, Chữ xanh đậm rõ nét, không bị lóe trắng */
-.combo-box-popup .list-cell:hover {
-    -fx-background-color: #dbeafe !important;
-    -fx-text-fill: #1d4ed8 !important;
-}
-
-.combo-box-popup .list-cell:selected {
-    -fx-background-color: #2563eb !important;
-    -fx-text-fill: #ffffff !important;
-}
-
-/* ---------- Game Action Buttons ---------- */
-.btn-create-room {
-    -fx-background-color: linear-gradient(to bottom, #3b82f6, #1d4ed8);
-    -fx-text-fill: white;
-    -fx-font-size: 14px;
-    -fx-font-weight: bold;
-    -fx-background-radius: 8px;
-    -fx-cursor: hand;
-    -fx-effect: dropshadow(three-pass-box, rgba(37, 99, 235, 0.35), 8, 0, 0, 3);
-}
-
-.btn-create-room:hover {
-    -fx-background-color: linear-gradient(to bottom, #60a5fa, #2563eb);
-}
-
-.btn-join-room {
-    -fx-background-color: linear-gradient(to bottom, #22c55e, #15803d);
-    -fx-text-fill: white;
-    -fx-font-size: 14px;
-    -fx-font-weight: bold;
-    -fx-background-radius: 8px;
-    -fx-cursor: hand;
-    -fx-effect: dropshadow(three-pass-box, rgba(22, 163, 74, 0.35), 8, 0, 0, 3);
-}
-
-.btn-join-room:hover {
-    -fx-background-color: linear-gradient(to bottom, #4ade80, #16a34a);
-}
-
-.btn-leaderboard {
-    -fx-background-color: #ffffff;
-    -fx-text-fill: #b45309;
-    -fx-font-size: 13.5px;
-    -fx-font-weight: bold;
-    -fx-border-color: #fde68a;
-    -fx-border-width: 1.5px;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
-    -fx-cursor: hand;
-}
-
-.btn-leaderboard:hover {
-    -fx-background-color: #fefce8;
-    -fx-border-color: #f59e0b;
-}
-
-.btn-match-history {
-    -fx-background-color: #ffffff;
-    -fx-text-fill: #4338ca;
-    -fx-font-size: 13.5px;
-    -fx-font-weight: bold;
-    -fx-border-color: #c7d2fe;
-    -fx-border-width: 1.5px;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
-    -fx-cursor: hand;
-}
-
-.btn-match-history:hover {
-    -fx-background-color: #eef2ff;
-    -fx-border-color: #6366f1;
-}
-
-.btn-logout {
-    -fx-background-color: #fee2e2;
-    -fx-text-fill: #b91c1c;
-    -fx-font-size: 12.5px;
-    -fx-font-weight: bold;
-    -fx-border-color: #fca5a5;
-    -fx-border-width: 1.2px;
-    -fx-border-radius: 6px;
-    -fx-background-radius: 6px;
-    -fx-cursor: hand;
-}
-
-.btn-logout:hover {
-    -fx-background-color: #ef4444;
-    -fx-text-fill: white;
-}
+/* Scoped Lobby theme. Intentionally keeps room rows light because LobbyController
+   currently assigns dark text via Label.setStyle(). */
+.lobby-root, .lobby-main { -fx-background-color: #0b1928; -fx-font-family: "Segoe UI", "Arial"; }
+.top-bar-card { -fx-background-color: #142b3d; -fx-background-radius: 15;
+    -fx-border-color: #3b677a; -fx-border-radius: 15; -fx-border-width: 1.4;
+    -fx-padding: 10 17; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.28), 12, 0, 0, 3); }
+.lobby-title { -fx-text-fill: #f5b952; -fx-font-size: 22; -fx-font-weight: bold; }
+.lobby-heading { -fx-text-fill: #f5b952; -fx-font-size: 17; -fx-font-weight: bold; }
+.lobby-kicker { -fx-text-fill: #83aebf; -fx-font-size: 10; -fx-font-weight: bold; }
+.lobby-player { -fx-text-fill: #eaf3f7; -fx-font-size: 16; -fx-font-weight: bold; }
+.lobby-table-card { -fx-background-color: #142b3d; -fx-background-radius: 15;
+    -fx-border-color: #386075; -fx-border-width: 1.5; -fx-border-radius: 15;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 15, 0, 0, 4); }
+.lobby-toolbar { -fx-padding: 16 20; }
+.lobby-filter-caption { -fx-text-fill: #b0c7d1; -fx-font-size: 12; -fx-font-weight: bold; }
+.lobby-filter { -fx-background-color: #eaf3f7; -fx-border-color: #59a4b6;
+    -fx-border-radius: 8; -fx-background-radius: 8; -fx-font-size: 12; }
+.lobby-filter .list-cell { -fx-text-fill: #142b3d; }
+.lobby-list-shell { -fx-background-color: #f0f5f8; -fx-background-radius: 0 0 12 12; }
+.table-header { -fx-background-color: #25475a; -fx-padding: 12 16;
+    -fx-border-color: #3e7186; -fx-border-width: 0 0 1 0; }
+.table-header-label { -fx-text-fill: #eaf3f7; -fx-font-size: 12; -fx-font-weight: bold; }
+.lobby-room-list { -fx-background-color: #f0f5f8; -fx-background-insets: 0;
+    -fx-padding: 4; -fx-border-width: 0; }
+.lobby-room-list .list-cell { -fx-background-color: #f0f5f8; -fx-padding: 8 4; }
+.lobby-room-list .list-cell:filled:odd { -fx-background-color: #e4eef4; }
+.lobby-room-list .list-cell:filled:hover { -fx-background-color: #cfebf5; }
+.lobby-room-list .list-cell:filled:selected { -fx-background-color: #9ed4eb; }
+.lobby-status { -fx-text-fill: #b9d5e1; -fx-font-size: 12; -fx-padding: 1 8; }
+.kenney-blue, .kenney-green, .kenney-yellow, .kenney-red {
+    -fx-background-color: transparent; -fx-background-repeat: no-repeat;
+    -fx-background-position: center; -fx-background-size: 100% 100%;
+    -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 12;
+    -fx-padding: 0 10; -fx-cursor: hand; }
+.kenney-blue { -fx-background-image: url("../assets/ui/kenney/blue/button_rectangle_gradient.png"); }
+.kenney-green { -fx-background-image: url("../assets/ui/kenney/green/button_rectangle_gradient.png"); }
+.kenney-yellow { -fx-background-image: url("../assets/ui/kenney/yellow/button_rectangle_gradient.png"); -fx-text-fill: #183348; }
+.kenney-red { -fx-background-image: url("../assets/ui/kenney/red/button_rectangle_gradient.png"); }
+.kenney-blue:hover, .kenney-green:hover, .kenney-yellow:hover, .kenney-red:hover { -fx-opacity: .89; }
+.kenney-blue:pressed, .kenney-green:pressed, .kenney-yellow:pressed, .kenney-red:pressed { -fx-opacity: .68; }
+.kenney-blue:disabled, .kenney-green:disabled, .kenney-yellow:disabled, .kenney-red:disabled { -fx-opacity: .44; }
+.lobby-overlay { -fx-background-color: rgba(3,12,22,.87); }
+.lobby-dialog { -fx-background-color: #193448; -fx-background-radius: 18;
+    -fx-border-color: #4c8da1; -fx-border-width: 1.5; -fx-border-radius: 18;
+    -fx-padding: 25 30; -fx-effect: dropshadow(gaussian, rgba(0,0,0,.55), 25, .1, 0, 7); }
+.dialog-icon { -fx-text-fill: #f5b952; -fx-font-size: 35; }
+.dialog-warning-title { -fx-text-fill: #ff7e7c; -fx-font-size: 19; -fx-font-weight: bold; }
+.dialog-accent-title { -fx-text-fill: #f5b952; -fx-font-size: 16; -fx-font-weight: bold; }
+.dialog-heading { -fx-text-fill: #eaf3f7; -fx-font-size: 15; -fx-font-weight: bold; }
+.dialog-description { -fx-text-fill: #b9d2de; -fx-font-size: 13; }

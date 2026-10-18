@@ -1,0 +1,90 @@
+/* Sprint 5A — isolated leaderboard theme. Kenney UI Pack PNG. */
+.leaderboard-root {
+    -fx-background-color: #0b1928;
+    -fx-font-family: "Segoe UI", "Arial";
+}
+.leaderboard-top {
+    -fx-background-color: #152d40;
+    -fx-background-radius: 18;
+    -fx-border-radius: 18;
+    -fx-border-color: #3d7085;
+    -fx-border-width: 1.5;
+    -fx-padding: 13 24;
+}
+.leaderboard-brand {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #f5b952;
+}
+.leaderboard-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #eaf3f7;
+}
+.leaderboard-eyebrow {
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #8ab9c9;
+}
+.leaderboard-panel {
+    -fx-background-color: #152e40;
+    -fx-background-radius: 16;
+    -fx-border-color: #3d7085;
+    -fx-border-radius: 16;
+    -fx-border-width: 1.5;
+    -fx-padding: 13;
+}
+.leaderboard-header {
+    -fx-background-color: #24475a;
+    -fx-background-radius: 9;
+    -fx-padding: 12 16;
+}
+.leaderboard-header .label {
+    -fx-text-fill: #cceaf3;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+.leaderboard-list {
+    -fx-background-color: #10283a;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-border-color: #2d5061;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+}
+.leaderboard-list .virtual-flow .clipped-container .sheet .list-cell {
+    -fx-background-color: #10283a;
+    -fx-padding: 3 4;
+}
+.leaderboard-list .list-cell:filled:hover { -fx-background-color: #1b4054; }
+.leaderboard-list .list-cell:filled:selected { -fx-background-color: #22536d; }
+.leaderboard-entry {
+    -fx-background-color: #193b50;
+    -fx-background-radius: 8;
+    -fx-padding: 11 12;
+}
+.leaderboard-entry .label { -fx-font-weight: bold; -fx-font-size: 13px; }
+.leaderboard-rank { -fx-text-fill: #a8c2d0; }
+.leaderboard-name { -fx-text-fill: #f0f7f9; }
+.leaderboard-points { -fx-text-fill: #f8ca74; }
+.leaderboard-kills { -fx-text-fill: #ff8c84; }
+.leaderboard-wins { -fx-text-fill: #66e2af; }
+.leaderboard-gold { -fx-background-color: #55421f; -fx-border-color: #d8a43e; -fx-border-radius: 8; -fx-border-width: 1; }
+.leaderboard-gold .leaderboard-rank { -fx-text-fill: #ffdb7e; }
+.leaderboard-silver { -fx-background-color: #334658; -fx-border-color: #99b7cb; -fx-border-radius: 8; -fx-border-width: 1; }
+.leaderboard-silver .leaderboard-rank { -fx-text-fill: #e2f1fc; }
+.leaderboard-bronze { -fx-background-color: #50382b; -fx-border-color: #d78b5e; -fx-border-radius: 8; -fx-border-width: 1; }
+.leaderboard-bronze .leaderboard-rank { -fx-text-fill: #ffbd8d; }
+.leaderboard-status { -fx-text-fill: #a2c9d8; -fx-font-size: 12px; -fx-padding: 4 6 2 6; }
+.leaderboard-back-button {
+    -fx-background-color: transparent;
+    -fx-background-image: url("../assets/ui/kenney/blue/button_rectangle_gradient.png");
+    -fx-background-repeat: no-repeat;
+    -fx-background-size: 100% 100%;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+.leaderboard-back-button:hover { -fx-opacity: 0.87; }
+.leaderboard-back-button:pressed { -fx-opacity: 0.65; }

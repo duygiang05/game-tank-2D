@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ComboBox?>
@@ -10,217 +9,87 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.shape.Circle?>
-<?import javafx.scene.shape.Rectangle?>
-
-<BorderPane xmlns="http://javafx.com/javafx/21"
-            xmlns:fx="http://javafx.com/fxml/1"
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.tank2d.client.controller.RoomController"
-            stylesheets="@lobby.css"
-            prefWidth="800.0"
-            prefHeight="600.0"
-            style="-fx-background-color: #f1f5f9;">
-
-    <!-- ============================================== -->
-    <!-- TOP: THANH HEADER PHÒNG CHỜ                    -->
-    <!-- ============================================== -->
-    <top>
-        <VBox spacing="10.0">
-            <padding>
-                <Insets top="16.0" right="35.0" bottom="10.0" left="35.0"/>
-            </padding>
-
-            <HBox alignment="CENTER_LEFT"
-                  style="-fx-background-color: white; -fx-background-radius: 14px; -fx-padding: 14px 24px; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.06), 14, 0, 0, 3);">
-
-                <!-- Icon xe tăng + Tên phòng + Trạng thái -->
-                <HBox alignment="CENTER_LEFT" spacing="14.0">
-                    <ImageView fitWidth="50.0" fitHeight="34.0" preserveRatio="true">
-                        <image>
-                            <Image url="@tank-logo_1.png"/>
-                        </image>
-                    </ImageView>
-
-                    <VBox spacing="2.0">
-                        <Label fx:id="roomNameLabel"
-                               text="Phòng đấu #01"
-                               style="-fx-text-fill: #1d4ed8; -fx-font-size: 20px; -fx-font-weight: bold;"/>
-                        <Label fx:id="roomStatusLabel"
-                               text="Đang chờ người chơi..."
-                               style="-fx-text-fill: #64748b; -fx-font-size: 13px; -fx-font-weight: bold;"/>
-                    </VBox>
-                </HBox>
-
-                <HBox HBox.hgrow="ALWAYS"/>
-
-                <!-- Cài đặt thời lượng -->
-                <HBox alignment="CENTER_RIGHT" spacing="10.0">
-                    <Label text="⏱ Thời lượng:"
-                           style="-fx-text-fill: #334155; -fx-font-size: 13.5px; -fx-font-weight: bold;"/>
-
-                    <ComboBox fx:id="durationComboBox"
-                              prefWidth="130.0"
-                              prefHeight="36.0"
-                              promptText="Chọn thời gian"/>
-                </HBox>
-            </HBox>
+            stylesheets="@room-theme.css" prefWidth="1000" prefHeight="750"
+            styleClass="room-root">
+  <top>
+    <VBox spacing="0">
+      <padding><Insets top="25" left="38" right="38" bottom="16"/></padding>
+      <HBox alignment="CENTER_LEFT" spacing="16" styleClass="room-header">
+        <ImageView fitWidth="75" fitHeight="55" preserveRatio="true">
+          <image><Image url="@tank-logo_1.png"/></image>
+        </ImageView>
+        <VBox spacing="5" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308">
+          <Label fx:id="roomNameLabel" text="Room 01" styleClass="room-name"/>
+          <Label fx:id="roomStatusLabel" text="Đang chờ người chơi..."
+                 wrapText="true" maxWidth="1.7976931348623157E308"
+                 styleClass="room-subtitle"/>
         </VBox>
-    </top>
-
-    <!-- ============================================== -->
-    <!-- CENTER: 4 VỊ TRÍ CHIẾN ĐẤU (P1 - P4)           -->
-    <!-- ============================================== -->
-    <center>
-        <VBox alignment="CENTER" spacing="16.0">
-            <padding>
-                <Insets top="8.0" right="35.0" bottom="8.0" left="35.0"/>
-            </padding>
-
-            <Label text="VỊ TRÍ CHIẾN ĐẤU &amp; XE TĂNG XUẤT PHÁT"
-                   style="-fx-text-fill: #475569; -fx-font-size: 14px; -fx-font-weight: bold; -fx-letter-spacing: 0.5px;"/>
-
-            <!-- 4 Thẻ Slot Player -->
-            <HBox alignment="CENTER" spacing="16.0">
-
-                <!-- SLOT P1 (Xanh lục / Green) -->
-                <VBox fx:id="slotP1"
-                      alignment="CENTER"
-                      spacing="9.0"
-                      prefWidth="165.0"
-                      prefHeight="235.0"
-                      style="-fx-background-color: white; -fx-background-radius: 14px; -fx-border-color: #22c55e; -fx-border-width: 2px; -fx-border-radius: 14px; -fx-padding: 14px; -fx-effect: dropshadow(three-pass-box, rgba(34,197,94,0.18), 12, 0, 0, 4);">
-
-                    <Label text="P1 • GÓC TRÊN TRÁI"
-                           style="-fx-text-fill: #15803d; -fx-font-size: 11.5px; -fx-font-weight: bold;"/>
-
-                    <!-- Mô hình Xe Tăng Chiến Đấu P1 (Green Tank) -->
-                    <StackPane prefWidth="85.0" prefHeight="75.0"
-                               style="-fx-background-color: #f0fdf4; -fx-background-radius: 12px;">
-                        <Rectangle width="50.0" height="34.0" arcWidth="8.0" arcHeight="8.0" fill="#22c55e"/>
-                        <Circle radius="12.0" fill="#16a34a"/>
-                        <Rectangle width="22.0" height="6.0" arcWidth="3.0" arcHeight="3.0" fill="#166534" translateX="14.0"/>
-                    </StackPane>
-
-                    <Label fx:id="p1Label"
-                           text="Chờ..."
-                           style="-fx-text-fill: #0f172a; -fx-font-size: 14px; -fx-font-weight: bold; -fx-alignment: CENTER;"/>
-
-                    <Label fx:id="p1StatusBadge"
-                           text="👑 CHỦ PHÒNG"
-                           style="-fx-background-color: #dcfce7; -fx-text-fill: #15803d; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;"/>
-                </VBox>
-
-                <!-- SLOT P2 (Đỏ rực lửa) -->
-                <VBox fx:id="slotP2"
-                      alignment="CENTER"
-                      spacing="9.0"
-                      prefWidth="165.0"
-                      prefHeight="235.0"
-                      style="-fx-background-color: white; -fx-background-radius: 14px; -fx-border-color: #e2e8f0; -fx-border-width: 1.5px; -fx-border-radius: 14px; -fx-padding: 14px; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.05), 10, 0, 0, 3);">
-
-                    <Label text="P2 • GÓC TRÊN PHẢI"
-                           style="-fx-text-fill: #dc2626; -fx-font-size: 11.5px; -fx-font-weight: bold;"/>
-
-                    <!-- Mô hình Xe Tăng Chiến Đấu P2 (Red Tank) -->
-                    <StackPane prefWidth="85.0" prefHeight="75.0"
-                               style="-fx-background-color: #fef2f2; -fx-background-radius: 12px;">
-                        <Rectangle width="50.0" height="34.0" arcWidth="8.0" arcHeight="8.0" fill="#ef4444"/>
-                        <Circle radius="12.0" fill="#dc2626"/>
-                        <Rectangle width="22.0" height="6.0" arcWidth="3.0" arcHeight="3.0" fill="#991b1b" translateX="14.0"/>
-                    </StackPane>
-
-                    <Label fx:id="p2Label"
-                           text="Trống"
-                           style="-fx-text-fill: #94a3b8; -fx-font-size: 14px; -fx-font-weight: bold; -fx-alignment: CENTER;"/>
-
-                    <Label fx:id="p2StatusBadge"
-                           text="CHƯA SẴN SÀNG"
-                           style="-fx-background-color: #f1f5f9; -fx-text-fill: #64748b; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;"/>
-                </VBox>
-
-                <!-- SLOT P3 (Tím thần bí / Purple) -->
-                <VBox fx:id="slotP3"
-                      alignment="CENTER"
-                      spacing="9.0"
-                      prefWidth="165.0"
-                      prefHeight="235.0"
-                      style="-fx-background-color: white; -fx-background-radius: 14px; -fx-border-color: #e2e8f0; -fx-border-width: 1.5px; -fx-border-radius: 14px; -fx-padding: 14px; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.05), 10, 0, 0, 3);">
-
-                    <Label text="P3 • GÓC DƯỚI TRÁI"
-                           style="-fx-text-fill: #9333ea; -fx-font-size: 11.5px; -fx-font-weight: bold;"/>
-
-                    <!-- Mô hình Xe Tăng Chiến Đấu P3 (Purple Tank) -->
-                    <StackPane prefWidth="85.0" prefHeight="75.0"
-                               style="-fx-background-color: #faf5ff; -fx-background-radius: 12px;">
-                        <Rectangle width="50.0" height="34.0" arcWidth="8.0" arcHeight="8.0" fill="#a855f7"/>
-                        <Circle radius="12.0" fill="#9333ea"/>
-                        <Rectangle width="22.0" height="6.0" arcWidth="3.0" arcHeight="3.0" fill="#6b21a8" translateX="14.0"/>
-                    </StackPane>
-
-                    <Label fx:id="p3Label"
-                           text="Trống"
-                           style="-fx-text-fill: #94a3b8; -fx-font-size: 14px; -fx-font-weight: bold; -fx-alignment: CENTER;"/>
-
-                    <Label fx:id="p3StatusBadge"
-                           text="CHƯA SẴN SÀNG"
-                           style="-fx-background-color: #f1f5f9; -fx-text-fill: #64748b; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;"/>
-                </VBox>
-
-                <!-- SLOT P4 (Vàng sa mạc) -->
-                <VBox fx:id="slotP4"
-                      alignment="CENTER"
-                      spacing="9.0"
-                      prefWidth="165.0"
-                      prefHeight="235.0"
-                      style="-fx-background-color: white; -fx-background-radius: 14px; -fx-border-color: #e2e8f0; -fx-border-width: 1.5px; -fx-border-radius: 14px; -fx-padding: 14px; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.05), 10, 0, 0, 3);">
-
-                    <Label text="P4 • GÓC DƯỚI PHẢI"
-                           style="-fx-text-fill: #d97706; -fx-font-size: 11.5px; -fx-font-weight: bold;"/>
-
-                    <!-- Mô hình Xe Tăng Chiến Đấu P4 (Yellow Tank) -->
-                    <StackPane prefWidth="85.0" prefHeight="75.0"
-                               style="-fx-background-color: #fffbeb; -fx-background-radius: 12px;">
-                        <Rectangle width="50.0" height="34.0" arcWidth="8.0" arcHeight="8.0" fill="#eab308"/>
-                        <Circle radius="12.0" fill="#ca8a04"/>
-                        <Rectangle width="22.0" height="6.0" arcWidth="3.0" arcHeight="3.0" fill="#854d0e" translateX="14.0"/>
-                    </StackPane>
-
-                    <Label fx:id="p4Label"
-                           text="Trống"
-                           style="-fx-text-fill: #94a3b8; -fx-font-size: 14px; -fx-font-weight: bold; -fx-alignment: CENTER;"/>
-
-                    <Label fx:id="p4StatusBadge"
-                           text="CHƯA SẴN SÀNG"
-                           style="-fx-background-color: #f1f5f9; -fx-text-fill: #64748b; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 4px 10px; -fx-background-radius: 12px;"/>
-                </VBox>
-
-            </HBox>
+        <VBox alignment="CENTER_RIGHT" spacing="6" minWidth="150">
+          <Label text="THỜI LƯỢNG TRẬN" styleClass="room-duration-label"/>
+          <ComboBox fx:id="durationComboBox" prefWidth="150" minWidth="150"
+                    prefHeight="40" styleClass="room-duration-combo"/>
         </VBox>
-    </center>
-
-    <!-- ============================================== -->
-    <!-- BOTTOM: CÁC NÚT ĐIỀU KHIỂN PHÒNG CHỜ           -->
-    <!-- ============================================== -->
-    <bottom>
-        <HBox alignment="CENTER" spacing="22.0">
-            <padding>
-                <Insets top="10.0" right="35.0" bottom="24.0" left="35.0"/>
-            </padding>
-
-            <Button fx:id="leaveButton"
-                    text="← Rời phòng"
-                    prefWidth="180.0"
-                    prefHeight="44.0"
-                    style="-fx-background-color: white; -fx-text-fill: #dc2626; -fx-font-weight: bold; -fx-font-size: 14px; -fx-border-color: #fca5a5; -fx-border-width: 1.5px; -fx-border-radius: 8px; -fx-background-radius: 8px; -fx-cursor: hand;"
-                    onAction="#handleLeave"/>
-
-            <Button fx:id="readyButton"
-                    text="SẴN SÀNG"
-                    prefWidth="220.0"
-                    prefHeight="44.0"
-                    styleClass="btn-create-room"
-                    onAction="#handleReady"/>
-        </HBox>
-    </bottom>
-
+      </HBox>
+    </VBox>
+  </top>
+  <center>
+    <VBox alignment="CENTER" spacing="22">
+      <padding><Insets top="8" left="38" right="38" bottom="8"/></padding>
+      <Label text="CHỌN VỊ TRÍ CHIẾN ĐẤU  /  CHUẨN BỊ XUẤT PHÁT" styleClass="room-section-title"/>
+      <HBox alignment="CENTER" spacing="16">
+                <VBox fx:id="slotP1" alignment="CENTER" spacing="11" prefWidth="194" prefHeight="258" styleClass="room-slot-green">
+                    <Label text="P1  /  GÓC TRÊN TRÁI" styleClass="room-slot-title-green" />
+                    <StackPane minHeight="105" prefHeight="105" maxWidth="151" styleClass="room-tank-pad">
+                        <ImageView fitWidth="92" fitHeight="92" preserveRatio="true">
+                            <image><Image url="@../assets/images/kenney/tanks/tank_green.png"/></image>
+                        </ImageView>
+                    </StackPane>
+                    <Label fx:id="p1Label" text="Chỗ trống P1" maxWidth="170" alignment="CENTER" styleClass="room-player-name"/>
+                    <Label fx:id="p1StatusBadge" text="TRỐNG" styleClass="room-slot-badge"/>
+                </VBox>
+                <VBox fx:id="slotP2" alignment="CENTER" spacing="11" prefWidth="194" prefHeight="258" styleClass="room-slot-red">
+                    <Label text="P2  /  GÓC TRÊN PHẢI" styleClass="room-slot-title-red" />
+                    <StackPane minHeight="105" prefHeight="105" maxWidth="151" styleClass="room-tank-pad">
+                        <ImageView fitWidth="92" fitHeight="92" preserveRatio="true">
+                            <image><Image url="@../assets/images/kenney/tanks/tank_red.png"/></image>
+                        </ImageView>
+                    </StackPane>
+                    <Label fx:id="p2Label" text="Chỗ trống P2" maxWidth="170" alignment="CENTER" styleClass="room-player-name"/>
+                    <Label fx:id="p2StatusBadge" text="TRỐNG" styleClass="room-slot-badge"/>
+                </VBox>
+                <VBox fx:id="slotP3" alignment="CENTER" spacing="11" prefWidth="194" prefHeight="258" styleClass="room-slot-blue">
+                    <Label text="P3  /  GÓC DƯỚI TRÁI" styleClass="room-slot-title-blue" />
+                    <StackPane minHeight="105" prefHeight="105" maxWidth="151" styleClass="room-tank-pad">
+                        <ImageView fitWidth="92" fitHeight="92" preserveRatio="true">
+                            <image><Image url="@../assets/images/kenney/tanks/tank_blue.png"/></image>
+                        </ImageView>
+                    </StackPane>
+                    <Label fx:id="p3Label" text="Chỗ trống P3" maxWidth="170" alignment="CENTER" styleClass="room-player-name"/>
+                    <Label fx:id="p3StatusBadge" text="TRỐNG" styleClass="room-slot-badge"/>
+                </VBox>
+                <VBox fx:id="slotP4" alignment="CENTER" spacing="11" prefWidth="194" prefHeight="258" styleClass="room-slot-sand">
+                    <Label text="P4  /  GÓC DƯỚI PHẢI" styleClass="room-slot-title-sand" />
+                    <StackPane minHeight="105" prefHeight="105" maxWidth="151" styleClass="room-tank-pad">
+                        <ImageView fitWidth="92" fitHeight="92" preserveRatio="true">
+                            <image><Image url="@../assets/images/kenney/tanks/tank_sand.png"/></image>
+                        </ImageView>
+                    </StackPane>
+                    <Label fx:id="p4Label" text="Chỗ trống P4" maxWidth="170" alignment="CENTER" styleClass="room-player-name"/>
+                    <Label fx:id="p4StatusBadge" text="TRỐNG" styleClass="room-slot-badge"/>
+                </VBox>
+      </HBox>
+      <Label text="MULTIPLAYER  •  4 PLAYER SLOTS  •  REAL-TIME COMBAT" styleClass="room-footer-caption"/>
+    </VBox>
+  </center>
+  <bottom>
+    <HBox alignment="CENTER" spacing="20">
+      <padding><Insets top="9" bottom="32" left="35" right="35"/></padding>
+      <Button fx:id="leaveButton" text="←  RỜI PHÒNG" prefWidth="211" prefHeight="68"
+              styleClass="room-button-red" onAction="#handleLeave"/>
+      <Button fx:id="readyButton" text="SẴN SÀNG" prefWidth="265" prefHeight="68"
+              styleClass="room-button-green" onAction="#handleReady"/>
+    </HBox>
+  </bottom>
 </BorderPane>
