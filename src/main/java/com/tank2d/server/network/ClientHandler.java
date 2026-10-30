@@ -213,7 +213,7 @@ public class ClientHandler implements Runnable {
                     res = new LoginResponse(false, -1, "", ErrorCode.AUTH_USER_ALREADY_LOGGED_IN.getDefaultMessage());
                 } else {
                     this.currentUser = user;
-                    res = new LoginResponse(true, user.getId(), user.getUsername(), "Đăng nhập thành công!");
+                    res = new LoginResponse(true, user.getId(), user.getUsername(), "LOGIN SUCCESSFUL!");
                 }
             } else {
                 res = new LoginResponse(false, -1, "", ErrorCode.AUTH_INVALID_CREDENTIALS.getDefaultMessage());
@@ -229,14 +229,7 @@ public class ClientHandler implements Runnable {
 
             if (currentUser != null) {
                 broadcastOnlinePlayers();
-                if (!checkUserPenalized()) {
-                    Room playingRoom = roomManager.getPlayingRoomByUserId(currentUser.getId());
-                    if (playingRoom != null && playingRoom.getGameStateManager() != null && !playingRoom.getGameStateManager().isGameOver()) {
-                        double remain = playingRoom.getGameStateManager().getMatchRemainingTime();
-                        ReconnectPromptDTO promptDTO = new ReconnectPromptDTO(playingRoom.getRoomId(), playingRoom.getRoomName(), remain);
-                        NetworkUtil.sendPacket(dos, new Packet(PacketType.GAME_RECONNECT_PROMPT, gson.toJson(promptDTO)));
-                    }
-                }
+                checkAndHandleActiveRoom();
             }
         } catch (IOException ignored) {}
     }
@@ -247,6 +240,42 @@ public class ClientHandler implements Runnable {
      * @return {@code true} nếu người dùng vẫn bị phạt
      * @throws IOException khi gửi packet thất bại
      */
+    public static boolean isUserConnected(int userId) {
+        for (ClientHandler client : connectedClients) {
+            if (client.currentUser != null && client.currentUser.getId() == userId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void checkAndHandleActiveRoom() throws IOException {
+        if (currentUser == null) return;
+        if (checkUserPenalized()) return;
+
+        Room userRoom = roomManager.getRoomByUserId(currentUser.getId());
+        if (userRoom == null) return;
+
+        if (Room.STATUS_PLAYING.equalsIgnoreCase(userRoom.getStatus())
+                && userRoom.getGameStateManager() != null
+                && !userRoom.getGameStateManager().isGameOver()) {
+            // TH1: Trận đấu còn tiếp diễn -> Gửi thông báo Reconnect vào trận
+            double remain = userRoom.getGameStateManager().getMatchRemainingTime();
+            ReconnectPromptDTO promptDTO = new ReconnectPromptDTO(userRoom.getRoomId(), userRoom.getRoomName(), remain);
+            NetworkUtil.sendPacket(dos, new Packet(PacketType.GAME_RECONNECT_PROMPT, gson.toJson(promptDTO)));
+            LOGGER.info("[ClientHandler] Gửi GAME_RECONNECT_PROMPT cho User " + currentUser.getUsername() + " (Room " + userRoom.getRoomId() + ")");
+        } else {
+            // TH2: Trận đấu đã kết thúc nhưng phòng vẫn còn (Waiting / Full) -> Tự động đưa vào lại phòng chờ
+            this.currentRoomId = userRoom.getRoomId();
+            userRoom.setReady(currentUser.getId(), false);
+            LOGGER.info("[ClientHandler] User " + currentUser.getUsername() + " tự động kết nối lại vào phòng chờ " + userRoom.getRoomName());
+            NetworkUtil.sendPacket(dos, new Packet(PacketType.ROOM_STATE_UPDATE, gson.toJson(roomManager.getRoomDTO(userRoom.getRoomId()))));
+            broadcastRoomStateForRoom(userRoom.getRoomId());
+            broadcastLobbyRooms();
+            broadcastOnlinePlayers();
+        }
+    }
+
     private boolean checkUserPenalized() throws IOException {
         if (currentUser == null) return false;
         if (roomManager.isPenalized(currentUser.getId())) {
@@ -270,7 +299,7 @@ public class ClientHandler implements Runnable {
         try {
             LoginRequest req = gson.fromJson(rawJson, LoginRequest.class);
             boolean isSuccess = userDAO.register(req.getUsername(), req.getPassword());
-            res = isSuccess ? new RegisterResponse(true, "Đăng ký thành công!")
+            res = isSuccess ? new RegisterResponse(true, "REGISTRATION SUCCESSFUL!")
                     : new RegisterResponse(false, ErrorCode.AUTH_USERNAME_TAKEN.getDefaultMessage());
         } catch (GameNetworkException e) {
             res = new RegisterResponse(false, e.getMessage());
@@ -343,14 +372,7 @@ public class ClientHandler implements Runnable {
             NetworkUtil.sendPacket(dos, response);
 
             if (currentUser != null) {
-                if (!checkUserPenalized()) {
-                    Room playingRoom = roomManager.getPlayingRoomByUserId(currentUser.getId());
-                    if (playingRoom != null && playingRoom.getGameStateManager() != null && !playingRoom.getGameStateManager().isGameOver()) {
-                        double remain = playingRoom.getGameStateManager().getMatchRemainingTime();
-                        ReconnectPromptDTO promptDTO = new ReconnectPromptDTO(playingRoom.getRoomId(), playingRoom.getRoomName(), remain);
-                        NetworkUtil.sendPacket(dos, new Packet(PacketType.GAME_RECONNECT_PROMPT, gson.toJson(promptDTO)));
-                    }
-                }
+                checkAndHandleActiveRoom();
             }
         } catch (IOException ignored) {}
     }
@@ -494,6 +516,22 @@ public class ClientHandler implements Runnable {
             stateManager.setOnGameOverCallback(() -> {
                 liftPenaltiesForRoom(targetRoomId);
                 roomManager.resetRoomAfterMatch(targetRoomId);
+
+                // Nếu tất cả người chơi trong phòng đều đã offline, giải phóng phòng
+                Room targetRoom = roomManager.getRoom(targetRoomId);
+                if (targetRoom != null) {
+                    boolean hasOnline = false;
+                    for (User p : targetRoom.getPlayers()) {
+                        if (isUserConnected(p.getId())) {
+                            hasOnline = true;
+                            break;
+                        }
+                    }
+                    if (!hasOnline) {
+                        roomManager.deleteRoom(targetRoomId);
+                    }
+                }
+
                 broadcastRoomStateForRoom(targetRoomId);
                 broadcastLobbyRooms();
                 broadcastOnlinePlayers();

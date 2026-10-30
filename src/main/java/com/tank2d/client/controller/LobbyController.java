@@ -14,6 +14,9 @@ import com.tank2d.common.protocol.Packet;
 import com.tank2d.common.protocol.PacketType;
 
 import javafx.application.Platform;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.util.Duration;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Pos;
@@ -146,6 +149,7 @@ public class LobbyController {
     private final Consumer<Packet> packetListener = this::handleServerPacket;
 
     private ReconnectPromptDTO pendingReconnectMatch = null;
+    private Timeline autoReconnectTimeline = null;
     private boolean isPenalized = false;
     private int penalizedRoomId = -1;
 
@@ -797,14 +801,43 @@ public class LobbyController {
             int remainSec = (int) promptDTO.getRemainingTime();
             reconnectTimeLabel.setText(String.format("TIME REMAINING: %02d:%02d", remainSec / 60, remainSec % 60));
         }
+        if (skipReconnectButton != null) {
+            skipReconnectButton.setVisible(false);
+            skipReconnectButton.setManaged(false);
+        }
+        if (confirmReconnectButton != null) {
+            confirmReconnectButton.setText("CONNECTING IN 2S... ➜");
+        }
         if (reconnectOverlay != null) {
             reconnectOverlay.setVisible(true);
         }
         if (mainContentPane != null) {
             mainContentPane.setEffect(new GaussianBlur(12));
         }
-        statusLabel.setText("Active battle detected in " + promptDTO.getRoomName() + ".");
+        statusLabel.setText("Active battle detected in " + promptDTO.getRoomName() + ". Reconnecting automatically...");
         statusLabel.setStyle("-fx-text-fill: #ea580c; -fx-font-weight: bold;");
+
+        ToastUtil.showInfo(rootStackPane, "ACTIVE BATTLE DETECTED! RECONNECTING IN 2s...");
+
+        if (autoReconnectTimeline != null) {
+            autoReconnectTimeline.stop();
+        }
+        final int[] countdownSec = {2};
+        autoReconnectTimeline = new Timeline(
+                new KeyFrame(Duration.seconds(1), e -> {
+                    countdownSec[0]--;
+                    if (confirmReconnectButton != null) {
+                        confirmReconnectButton.setText("CONNECTING IN " + countdownSec[0] + "S... ➜");
+                    }
+                }),
+                new KeyFrame(Duration.seconds(2), e -> {
+                    if (reconnectOverlay != null && reconnectOverlay.isVisible()) {
+                        handleConfirmReconnect();
+                    }
+                })
+        );
+        autoReconnectTimeline.setCycleCount(1);
+        autoReconnectTimeline.play();
     }
 
     /**
@@ -827,6 +860,9 @@ public class LobbyController {
      */
     @FXML
     private void handleConfirmReconnect() {
+        if (autoReconnectTimeline != null) {
+            autoReconnectTimeline.stop();
+        }
         try {
             statusLabel.setText("Reconnecting to battle arena...");
             statusLabel.setStyle("-fx-text-fill: #2563eb; -fx-font-weight: bold;");
@@ -862,6 +898,9 @@ public class LobbyController {
             Platform.runLater(() -> {
                 try {
                     session.removePacketListener(packetListener);
+                    if (autoReconnectTimeline != null) {
+                        autoReconnectTimeline.stop();
+                    }
                     pendingReconnectMatch = null;
                     isPenalized = false;
 

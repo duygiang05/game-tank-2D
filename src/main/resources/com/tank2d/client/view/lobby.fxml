@@ -243,13 +243,13 @@
             </VBox>
 
             <HBox alignment="CENTER" spacing="14.0">
-                <Button fx:id="skipReconnectButton" text="SKIP"
+                <Button fx:id="skipReconnectButton" text="SKIP" visible="false" managed="false"
                         prefWidth="130.0" prefHeight="42.0"
                         styleClass="btn-logout"
                         onAction="#handleSkipReconnect"/>
 
-                <Button fx:id="confirmReconnectButton" text="RECONNECT ➜"
-                        prefWidth="200.0" prefHeight="42.0"
+                <Button fx:id="confirmReconnectButton" text="CONNECTING IN 2S... ➜"
+                        prefWidth="260.0" prefHeight="42.0"
                         styleClass="btn-create-room"
                         onAction="#handleConfirmReconnect"/>
             </HBox>

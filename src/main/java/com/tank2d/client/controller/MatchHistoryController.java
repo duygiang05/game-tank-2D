@@ -29,6 +29,7 @@ import com.tank2d.client.util.AssetLoader;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
@@ -214,58 +215,63 @@ public class MatchHistoryController {
                     boolean isMe = (p.getUserId() == myUserId);
 
                     HBox pRankBox = new HBox(4.0);
-                    pRankBox.setPrefWidth(80.0);
-                    pRankBox.setMaxWidth(80.0);
+                    pRankBox.setPrefWidth(75.0);
+                    pRankBox.setMinWidth(75.0);
+                    pRankBox.setMaxWidth(75.0);
                     pRankBox.setAlignment(Pos.CENTER_LEFT);
 
                     int rank = p.getRankPosition();
                     Image pMedal = AssetLoader.getMedalImage(rank);
                     if (pMedal != null) {
                         ImageView pMedalView = new ImageView(pMedal);
-                        pMedalView.setFitWidth(18);
-                        pMedalView.setFitHeight(18);
+                        pMedalView.setFitWidth(16);
+                        pMedalView.setFitHeight(16);
                         pMedalView.setPreserveRatio(true);
                         pRankBox.getChildren().add(pMedalView);
                     }
 
-                    Label rankLabel = new Label(pMedal != null ? "#" + rank : (rank <= 3 ? "#" + rank : "    #" + rank));
+                    Label rankLabel = new Label(pMedal != null ? "#" + rank : (rank <= 3 ? "#" + rank : "  #" + rank));
                     if (rank == 1) {
-                        rankLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #fbbf24; -fx-font-weight: bold; -fx-font-size: 11.5px;");
+                        rankLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #fbbf24; -fx-font-weight: bold; -fx-font-size: 11px;");
                     } else if (rank == 2) {
-                        rankLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #cbd5e1; -fx-font-weight: bold; -fx-font-size: 11.5px;");
+                        rankLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #cbd5e1; -fx-font-weight: bold; -fx-font-size: 11px;");
                     } else if (rank == 3) {
-                        rankLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #f97316; -fx-font-weight: bold; -fx-font-size: 11.5px;");
+                        rankLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #f97316; -fx-font-weight: bold; -fx-font-size: 11px;");
                     } else {
                         rankLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-text-fill: #94a3b8; -fx-font-weight: bold; -fx-font-size: 11px;");
                     }
                     pRankBox.getChildren().add(rankLabel);
 
                     Label nameLabel = new Label(p.getUsername() + (isMe ? " (YOU)" : ""));
-                    nameLabel.setPrefWidth(250.0);
-                    nameLabel.setMaxWidth(250.0);
+                    nameLabel.setPrefWidth(230.0);
+                    nameLabel.setMinWidth(150.0);
                     nameLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
                     nameLabel.setAlignment(Pos.CENTER_LEFT);
+                    HBox.setHgrow(nameLabel, Priority.ALWAYS);
                     if (isMe) {
-                        nameLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 11.5px; -fx-text-fill: #38bdf8;");
+                        nameLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: #38bdf8;");
                     } else {
-                        nameLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 11.5px; -fx-text-fill: #f1f5f9;");
+                        nameLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: #f1f5f9;");
                     }
 
                     Label killsLabel = new Label("🎯 " + p.getKills());
-                    killsLabel.setPrefWidth(100.0);
-                    killsLabel.setMaxWidth(100.0);
+                    killsLabel.setPrefWidth(90.0);
+                    killsLabel.setMinWidth(90.0);
+                    killsLabel.setMaxWidth(90.0);
                     killsLabel.setAlignment(Pos.CENTER_RIGHT);
                     killsLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: #f1f5f9;");
 
                     Label hitsLabel = new Label("💥 " + p.getHits());
-                    hitsLabel.setPrefWidth(110.0);
-                    hitsLabel.setMaxWidth(110.0);
+                    hitsLabel.setPrefWidth(90.0);
+                    hitsLabel.setMinWidth(90.0);
+                    hitsLabel.setMaxWidth(90.0);
                     hitsLabel.setAlignment(Pos.CENTER_RIGHT);
                     hitsLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: #f1f5f9;");
 
                     int pts = p.getPointsEarned();
                     Label ptsLabel = new Label((pts >= 0 ? "+" : "") + pts + " XP");
                     ptsLabel.setPrefWidth(110.0);
+                    ptsLabel.setMinWidth(110.0);
                     ptsLabel.setMaxWidth(110.0);
                     ptsLabel.setAlignment(Pos.CENTER_RIGHT);
                     ptsLabel.setStyle("-fx-font-family: 'Kenney Future', 'Segoe UI', sans-serif; -fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: " + (pts >= 0 ? "#4ade80;" : "#f87171;"));

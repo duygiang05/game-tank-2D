@@ -123,6 +123,19 @@ public class RoomManager {
             return true;
         }
 
+        boolean hasOnlinePlayer = false;
+        for (User p : room.getPlayers()) {
+            if (com.tank2d.server.network.ClientHandler.isUserConnected(p.getId())) {
+                hasOnlinePlayer = true;
+                break;
+            }
+        }
+        if (!hasOnlinePlayer) {
+            rooms.remove(roomId);
+            LOGGER.info("[RoomManager] Phòng " + roomId + " đã được xóa vì không còn người chơi online.");
+            return true;
+        }
+
         if (wasHost) {
             room.transferHostRandom();
             LOGGER.info("[RoomManager] Host cũ rời phòng " + roomId + ". Host mới: ID " + room.getHostId());
@@ -274,6 +287,26 @@ public class RoomManager {
      * @param userId ID người chơi cần tra cứu
      * @return phòng chơi đang diễn ra trận đấu của người chơi, hoặc {@code null} nếu không có
      */
+    /**
+     * Tìm phòng mà người chơi đang tham gia (bất kể trạng thái Playing hay Waiting).
+     *
+     * @param userId ID người chơi cần tra cứu
+     * @return phòng chơi của người chơi, hoặc {@code null} nếu không tham gia phòng nào
+     */
+    public synchronized Room getRoomByUserId(int userId) {
+        for (Room room : rooms.values()) {
+            if (room.hasPlayer(userId)) {
+                return room;
+            }
+        }
+        return null;
+    }
+
+    public synchronized void deleteRoom(int roomId) {
+        rooms.remove(roomId);
+        LOGGER.info("[RoomManager] Phòng " + roomId + " đã được xóa.");
+    }
+
     public synchronized Room getPlayingRoomByUserId(int userId) {
         for (Room room : rooms.values()) {
             if (Room.STATUS_PLAYING.equalsIgnoreCase(room.getStatus()) && room.hasPlayer(userId)) {

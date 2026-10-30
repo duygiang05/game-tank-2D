@@ -229,10 +229,12 @@ public class LoginController {
 
                 } else {
                     String msg = response.getMessage();
-                    if (msg == null || msg.isBlank()) {
+                    if (msg == null || msg.isBlank() || msg.contains("TÊN ĐĂNG NHẬP") || msg.contains("MẬT KHẨU") || msg.toLowerCase().contains("invalid credentials")) {
                         msg = "INVALID USERNAME OR PASSWORD!";
                     } else if (msg.contains("đang đăng nhập") || msg.toLowerCase().contains("already logged in")) {
                         msg = "ACCOUNT IS CURRENTLY LOGGED IN ON ANOTHER DEVICE!";
+                    } else if (msg.contains("ĐÃ TỒN TẠI") || msg.toLowerCase().contains("already exists")) {
+                        msg = "USERNAME ALREADY EXISTS!";
                     } else {
                         msg = msg.toUpperCase();
                     }
@@ -346,7 +348,7 @@ public class LoginController {
 
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "[Login] Không thể mở màn hình Lobby", e);
-            showToast("Không thể mở màn hình Lobby!", false);
+            showToast("COULD NOT OPEN LOBBY SCREEN!", false);
         }
     }
 
