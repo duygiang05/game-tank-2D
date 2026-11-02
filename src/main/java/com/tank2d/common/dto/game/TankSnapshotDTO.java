@@ -16,6 +16,7 @@ public class TankSnapshotDTO {
     private boolean hasShield;
     private boolean hasNitro;
     private boolean isDisconnected;
+    private int hits;
 
     /**
      * Khởi tạo bản ghi snapshot đầy đủ của xe tăng bao gồm các hiệu ứng bổ trợ.
@@ -42,6 +43,7 @@ public class TankSnapshotDTO {
         this.hasShield = hasShield;
         this.hasNitro = hasNitro;
         this.isDisconnected = false;
+        this.hits = 0;
     }
 
     /**
@@ -69,6 +71,7 @@ public class TankSnapshotDTO {
     public boolean hasShield() { return hasShield; }
     public boolean hasNitro() { return hasNitro; }
     public boolean isDisconnected() { return isDisconnected; }
+    public int getHits() { return hits; }
 
     public void setX(double x) { this.x = x; }
     public void setY(double y) { this.y = y; }
@@ -81,4 +84,5 @@ public class TankSnapshotDTO {
     public void setAlive(boolean isAlive){
         this.isAlive = isAlive;
     }
+    public void setHits(int hits) { this.hits = hits; }
 }
